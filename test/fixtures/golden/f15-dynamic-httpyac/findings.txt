@@ -1,0 +1,2 @@
+warn TC-EXPRESSION-NEUTRALIZED @ Dynamic: 1 piece of text between {{ }} looked like code or a path, not a variable name; the braces were separated so that no tool runs or reads it.
+info TC-SYSVAR-UNMAPPED @ Dynamic: Dynamic variables with no equivalent were left as they are: bool, date, email.

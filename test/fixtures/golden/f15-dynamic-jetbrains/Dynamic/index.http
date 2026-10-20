@@ -1,0 +1,15 @@
+### ids
+# @name ids
+GET {{base}}/ids/{{$uuid}}
+
+### left alone
+# @name left_alone
+GET {{base}}/x/{{#email}}/{{#bool}}/{{#date, X}}/{%20{#dateISO,%20{year:%20-1}}%20}
+
+### numbers
+# @name numbers
+GET {{base}}/n/{{$random.integer(1, 1000001)}}/{{$random.integer(1, 7)}}/{{$random.integer(5, 1000001)}}/{{$random.integer(1, 1000001)}}
+
+### time
+# @name time
+GET {{base}}/t/{{$isoTimestamp}}/{{#date}}

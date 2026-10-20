@@ -1,0 +1,1 @@
+info TC-HEADER-DEFAULT-DROPPED @ RDP: Thunder's default headers were dropped from 1 request.

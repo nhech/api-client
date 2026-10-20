@@ -1,0 +1,7 @@
+### in A
+# @name in_A
+# @assert status == 200
+GET https://a.example/in-a
+X-Tenant: acme
+Accept: application/json
+Authorization: Bearer {{token}}

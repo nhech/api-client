@@ -1,0 +1,4 @@
+warn TC-PARAM-NOT-IN-URL @ Orders / Search: 2 enabled query parameters were missing from the URL and were appended.
+warn TC-FILE-PATH @ Orders / Upload: An attached file is outside the repository or has an absolute path.
+warn TC-PATHPARAM-EMPTY @ Orders / Get item: A path parameter has no value; the placeholder was kept.
+info TC-SECRET-MOVED @ Orders: 1 literal secret was moved to the private environment file.

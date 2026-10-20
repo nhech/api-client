@@ -1,0 +1,49 @@
+{
+  "name": "api-client-importer",
+  "displayName": "API Client: Import from Thunder Client (draft)",
+  "description": "Imports Thunder Client collections and environments into plain .http files. Local only: no account, no network, no telemetry.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "local-draft",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Importing writes files into the workspace and reads data from other folders, so it needs a trusted workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "The imported files are written with the file system of the machine the extension runs on."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "apiClient.importThunder",
+        "title": "API Client: Import from Thunder Client...",
+        "category": "API Client"
+      }
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node esbuild.mjs",
+    "package": "node -e \"require('node:fs').mkdirSync('../.artifacts',{recursive:true})\" && node esbuild.mjs --release && vsce package --no-dependencies --out ../.artifacts/api-client-importer.vsix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nhech/api-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nhech/api-client/issues"
+  },
+  "homepage": "https://github.com/nhech/api-client#readme"
+}

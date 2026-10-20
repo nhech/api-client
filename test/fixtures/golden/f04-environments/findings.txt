@@ -1,0 +1,4 @@
+warn TC-ENV-DUP @ Environment dev: 1 variable name was repeated; the last value of each was kept.
+warn TC-ENV-ENCRYPTED @ Environment dev: 1 encrypted variable was not decrypted; type its value in again in the private file.
+info TC-SECRET-MOVED @ Environment dev: 1 secret-looking variable was moved to the private environment file.
+info TC-ENV-FILE @ Environment dev: The environment refers to a dotenv file, which is not read.

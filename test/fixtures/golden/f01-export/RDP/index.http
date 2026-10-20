@@ -1,0 +1,7 @@
+### Health
+# @name Health
+HEAD {{base}}/health
+
+### Status page
+# @name Status_page
+GET https://status.example/api/v2/status.json

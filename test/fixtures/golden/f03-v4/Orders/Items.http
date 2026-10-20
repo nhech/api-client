@@ -1,0 +1,3 @@
+### Get item
+# @name Get_item
+GET {{base}}/orders/{{order}}/items/:itemId

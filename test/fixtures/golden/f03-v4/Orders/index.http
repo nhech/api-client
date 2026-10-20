@@ -1,0 +1,33 @@
+### Pay
+# @name Pay
+# [disabled form field] coupon=X
+POST {{base}}/pay
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic merchant {{secret_orders_basic_password}}
+
+amount=12.50&note=a%20%26%20b%20%3D%20c
+
+### Search
+# @name Search
+GET {{base}}/search?q=a%20b&page=2
+
+### Upload
+# @name Upload
+POST {{base}}/upload
+Content-Type: multipart/form-data; boundary=----ApiClientImport
+
+------ApiClientImport
+Content-Disposition: form-data; name="title"
+
+Quarterly
+------ApiClientImport
+Content-Disposition: form-data; name="report"; filename="report.csv"
+Content-Type: application/octet-stream
+
+< ./data/report.csv
+------ApiClientImport
+Content-Disposition: form-data; name="other"; filename="secret.csv"
+Content-Type: application/octet-stream
+
+< C:\Users\me\secret.csv
+------ApiClientImport--

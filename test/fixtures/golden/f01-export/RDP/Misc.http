@@ -1,0 +1,17 @@
+### Create item
+# @name Create_item
+# @assert status < 300
+# @assert json $.id isNumber
+POST {{base}}/items
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "name": "item",
+  "tags": ["a", "b"]
+}
+
+### Delete item
+# @name Delete_item
+DELETE {{base}}/items/{{item_id}}
+Authorization: Bearer {{access_token}}

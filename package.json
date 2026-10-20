@@ -1,0 +1,57 @@
+{
+  "name": "api-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Import Thunder Client collections and environments into plain .http files for REST Client, httpYac and the JetBrains HTTP Client. Local only: no account, no network, no telemetry.",
+  "keywords": [
+    "thunder-client",
+    "http",
+    "rest-client",
+    "httpyac",
+    "jetbrains",
+    "import",
+    "migration",
+    "api"
+  ],
+  "license": "MIT",
+  "author": "longtd",
+  "homepage": "https://github.com/nhech/api-client#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nhech/api-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nhech/api-client/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "thunder-import": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test tools extension/src extension/test extension/esbuild.mjs eslint.config.mjs",
+    "build": "tsc -p tsconfig.json",
+    "test:compile": "tsc -p tsconfig.test.json",
+    "test": "npm run test:compile && node --test .test-build/test/unit/*.test.js",
+    "selftest:tools": "node tools/thunder-structure.cjs --selftest",
+    "mutate": "node tools/mutate.cjs",
+    "ext:typecheck": "npm --prefix extension run typecheck",
+    "ext:build": "npm --prefix extension run build",
+    "ext:host-test": "npm run ext:build && node extension/test/run.cjs",
+    "check": "npm run typecheck && npm run ext:typecheck && npm run lint && npm test && npm run selftest:tools"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "@types/vscode": "1.100.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.0"
+  }
+}

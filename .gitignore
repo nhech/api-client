@@ -1,0 +1,17 @@
+node_modules
+dist/
+.test-build/
+.artifacts/
+*.log
+*.vsix
+
+# Reports made by tools/thunder-structure.cjs from a real machine: structure only, but still personal
+thunder-report*.md
+thunder-report*.json
+
+# Made by samples/make-sample.cjs and by the importer run on it (fake data, rebuilt on demand)
+samples/thunder-data/
+samples/workspace/
+samples/workspace-httpyac/
+samples/workspace-jetbrains/
+samples/out-*/

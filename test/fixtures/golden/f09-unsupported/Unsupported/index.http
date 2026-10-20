@@ -1,0 +1,38 @@
+### aws
+# @name aws
+# [auth aws not imported]
+GET https://x.example/a
+
+### binary
+# @name binary
+# [body not imported: binary]
+POST https://x.example/b
+
+### digest
+# @name digest
+# [auth digest not imported]
+GET https://x.example/d
+
+### ntlm
+# @name ntlm
+# [auth ntlm not imported]
+GET https://x.example/n
+
+### oauth
+# @name oauth
+# [auth oauth2 not imported; settings: clientSecret, grantType]
+GET https://x.example/o
+
+### schema test
+# @name schema_test
+# @assert status == 200
+GET https://x.example/t
+
+### script
+# @name script
+# [script not imported: pre]
+# | tc.setVar("a", 1);
+# [script not imported: post]
+# | // check
+# | tc.test("ok", () => {});
+GET https://x.example/s

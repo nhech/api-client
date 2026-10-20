@@ -1,0 +1,6 @@
+### create
+# @name create
+POST https://v3.example/items
+Content-Type: application/json
+
+{"a":1}

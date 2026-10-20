@@ -1,0 +1,48 @@
+### absolute
+# @name absolute
+# @assert status == 201
+# @assert duration < 800
+GET https://other.example/x
+x-tenant: bee
+X-Level: b
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### own auth none
+# @name own_auth_none
+# @assert status == 201
+# @assert duration < 800
+GET https://b.example/v2/z
+x-tenant: bee
+X-Level: b
+Accept: application/json
+
+### own header wins
+# @name own_header_wins
+# @assert status == 201
+# @assert duration < 800
+GET https://b.example/v2/w
+X-TENANT: mine
+X-Level: b
+Accept: application/json
+Authorization: Basic u {{pw}}
+
+### relative
+# @name relative
+# @assert status == 201
+# @assert duration < 800
+GET https://b.example/v2/items
+x-tenant: bee
+X-Level: b
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### variable
+# @name variable
+# @assert status == 201
+# @assert duration < 800
+GET {{host}}/y
+x-tenant: bee
+X-Level: b
+Accept: application/json
+Authorization: Bearer {{token}}

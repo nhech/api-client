@@ -1,0 +1,9 @@
+warn TC-HEADER-DUP @ Shop / absolute: Two headers differ only in letter case; the later one was kept.
+warn TC-HEADER-DUP @ Shop / own auth none: Two headers differ only in letter case; the later one was kept.
+warn TC-HEADER-DUP @ Shop / own header wins: Two headers differ only in letter case; the later one was kept.
+warn TC-HEADER-DUP @ Shop / relative: Two headers differ only in letter case; the later one was kept.
+warn TC-HEADER-DUP @ Shop / variable: Two headers differ only in letter case; the later one was kept.
+info TC-INHERIT-HEADERS @ Shop: 7 requests received headers from a folder or the collection.
+info TC-INHERIT-AUTH @ Shop: 5 requests use authentication set on a folder or the collection.
+info TC-INHERIT-BASEURL @ Shop: 5 requests got a base URL from a folder or the collection.
+info TC-INHERIT-TESTS @ Shop: 7 requests received tests from a folder or the collection.

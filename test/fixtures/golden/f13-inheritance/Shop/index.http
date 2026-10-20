@@ -1,0 +1,7 @@
+### at root
+# @name at_root
+# @assert status == 200
+GET https://root.example/root
+Accept: application/json
+X-Tenant: default
+Authorization: Bearer {{root_token}}

@@ -1,0 +1,10 @@
+{
+  "rest-client.environmentVariables": {
+    "RDP": {
+      "base": "https://api.example",
+      "symbol": "MSFT.O",
+      "user": "me@example.invalid",
+      "ver": "v1"
+    }
+  }
+}

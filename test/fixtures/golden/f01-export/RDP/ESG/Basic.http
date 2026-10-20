@@ -1,0 +1,12 @@
+### ESG - Basic
+# @name ESG_Basic
+# @assert status == 200
+# @assert header Content-Type == application/json; charset=utf-8
+GET {{base}}/data/{{ver}}/views/basic?universe={{symbol}}
+Authorization: Bearer {{access_token}}
+
+### ESG - Scores
+# @name ESG_Scores
+# [disabled query] end=2021
+GET {{base}}/data/{{ver}}/views/scores?universe={{symbol}}&start=2020
+Authorization: Bearer {{access_token}}

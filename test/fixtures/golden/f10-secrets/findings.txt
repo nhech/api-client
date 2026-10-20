@@ -1,0 +1,3 @@
+info TC-SECRET-MOVED @ Secrets: 7 literal secrets were moved to the private environment file.
+warn TC-ENV-ENCRYPTED @ Environment dev: 1 encrypted variable was not decrypted; type its value in again in the private file.
+info TC-SECRET-MOVED @ Environment dev: 1 secret-looking variable was moved to the private environment file.

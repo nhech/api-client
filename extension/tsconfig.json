@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "commonjs", "moduleResolution": "node",
+    "strict": true, "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true, "noFallthroughCasesInSwitch": true, "noImplicitReturns": true,
+    "esModuleInterop": true, "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true, "noEmit": true, "rootDir": "..", "types": ["node", "vscode"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "../src/**/*.ts"]
+}

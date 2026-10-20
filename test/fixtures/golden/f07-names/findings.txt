@@ -1,0 +1,11 @@
+info TC-NAME-SANITIZED @ ../x: The name is not valid in a file name, so it is written as "x".
+info TC-NAME-SANITIZED @ CON: The name is not valid in a file name, so it is written as "CON_".
+info TC-NAME-COLLISION @ con: Another name is the same ignoring letter case, so this one is written as "con_-2".
+info TC-NAME-SANITIZED @ ../x / <unnamed>: The name is not valid in a file name, so it is written as "unnamed".
+info TC-NAME-SANITIZED @ ../x / CON: The name is not valid in a file name, so it is written as "CON_".
+info TC-NAME-SANITIZED @ ../x / a/b\c:d*e?f"g<h>i|j: The name is not valid in a file name, so it is written as "a-b-c-d-e-f-g-h-i-j".
+info TC-NAME-SANITIZED @ ../x / aux.txt: The name is not valid in a file name, so it is written as "aux_.txt".
+info TC-NAME-COLLISION @ ../x / index: Another name is the same ignoring letter case, so this one is written as "index-2".
+info TC-NAME-COLLISION @ ../x / same: Another name is the same ignoring letter case, so this one is written as "same-2".
+info TC-NAME-SANITIZED @ ../x / trailing.: The name is not valid in a file name, so it is written as "trailing".
+info TC-NAME-SANITIZED @ ../x / xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...: The name is not valid in a file name, so it is written as "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx".

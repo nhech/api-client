@@ -1,0 +1,9 @@
+{
+  "rest-client.environmentVariables": {
+    "dev": {
+      "base": "https://dev.example",
+      "from_vault": "{{vault_value}}",
+      "host": "{ { require('os').hostname() } }"
+    }
+  }
+}

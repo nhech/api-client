@@ -1,0 +1,34 @@
+### body
+# @name body
+POST {{base}}/b
+Content-Type: text/plain
+
+first
+{ { exports.x = 1 } }
+last { { unclosed
+
+### dynamic
+# @name dynamic
+GET {{base}}/d/{{$guid}}/{{$randomInt 1 10}}/{%20{#date,%20{year:%20-1}}%20}
+
+### form
+# @name form
+POST {{base}}/f
+Content-Type: application/x-www-form-urlencoded
+
+%7B%20%7B%20a()%20%7D%20%7D=%7B%20%7B%201%20%2B%201%20%7D%20%7D&dotted=%7B%20%7Buser.name%7D%20%7D
+
+### header
+# @name header
+GET {{base}}/h
+X-Evil: { { process.env.SECRET } }
+-evil-: v
+X-Fine: {{token}} and {{ spaced }} and {{my var}}
+
+### nested
+# @name nested
+GET {{base}}/n/{%20{%20a%20{%20{%20b()%20}%20}%20}%20}/{%20{%20{%20c()%20}%20}%20}
+
+### url
+# @name url
+GET {{base}}/q?x={%20{%20require('fs').readFileSync('/etc/passwd')%20}%20}&y={%20{$processEnv%20SECRET}%20}&ok={{token}}

@@ -1,0 +1,9 @@
+### Login
+# @name Login
+# @capture access_token = json $.access_token
+# @capture refresh_token = json $.refresh_token
+# @assert status == 200
+POST {{base}}/auth/oauth2/{{ver}}/token
+Content-Type: application/x-www-form-urlencoded
+
+username={{user}}&password={{password}}&grant_type=password

@@ -1,0 +1,3 @@
+info TC-HISTORY-SKIPPED @ thunderclient.json: 1 history entry was skipped.
+warn TC-ORPHAN-REQUEST @ Unsorted / lost: A request belonged to no known collection and was moved to "Unsorted".
+info TC-INHERIT-BASEURL @ Shop: 2 requests got a base URL from a folder or the collection.

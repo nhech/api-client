@@ -1,0 +1,5 @@
+info TC-HISTORY-SKIPPED @ collections/tc_col_a.json: 1 history entry was skipped.
+warn TC-ORPHAN-FOLDER @ Broken / Lost: A folder pointed to a missing parent and was moved to the top of the collection.
+warn TC-CYCLE @ Broken / A: A folder cycle was cut at this folder, which now sits at the top of the collection.
+warn TC-CYCLE @ Broken / Self: A folder cycle was cut at this folder, which now sits at the top of the collection.
+warn TC-ORPHAN-REQUEST @ Broken / nowhere: A request pointed to a missing folder and was moved to the top of the collection.
