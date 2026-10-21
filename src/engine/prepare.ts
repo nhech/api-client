@@ -1,7 +1,7 @@
 import type { Clock } from '../core/clock';
 import { effectiveRequest, type EffectiveRequest, type Level } from '../core/inherit';
 import type { Request } from '../core/model';
-import { describeVariables, variableScopes, type Scope, type VarValue, type VariableInfo } from '../core/vars';
+import { describeVariables, variableScopes, type Scope, type ScopeInput, type VarValue, type VariableInfo } from '../core/vars';
 import type { ContainerNode, EnvironmentNode, Loaded, RequestNode } from '../storage/store';
 import { buildWire, type Built } from './build';
 import { sendOptionsFrom, type SendOptions } from './send';
@@ -51,6 +51,8 @@ export interface PrepareInput {
 export interface Prepared {
   /** The variables of the request in the order they are searched, for what has to be resolved after the answer (the values the tests compare with). */
   scopes: Scope[];
+  /** Where the variables come from, without what was set while requests ran: what a script is given a snapshot of. */
+  scopeInput: Omit<ScopeInput, 'runtime'>;
   built: Built;
   effective: EffectiveRequest;
   collection: ContainerNode;
@@ -73,10 +75,8 @@ export function prepareSend(input: PrepareInput): Prepared | undefined {
   const levels: Level[] = located.chain.map(container => ({ kind: container === located.collection ? 'collection' : 'folder', name: container.container.name, container: container.container }));
   const environment = input.environmentId === undefined ? undefined : input.loaded.environments.find(item => item.environment.id === input.environmentId);
   const effective = effectiveRequest(input.request, levels, input.loaded.workspace.file.settings);
-  const scopes = variableScopes({
-    levels, workspace: input.loaded.workspace.file,
-    ...(environment === undefined ? {} : { environment: environment.environment }), ...(input.runtime === undefined ? {} : { runtime: input.runtime })
-  });
+  const scopeInput: Omit<ScopeInput, 'runtime'> = { levels, workspace: input.loaded.workspace.file, ...(environment === undefined ? {} : { environment: environment.environment }) };
+  const scopes = variableScopes({ ...scopeInput, ...(input.runtime === undefined ? {} : { runtime: input.runtime }) });
   const built = buildWire({
     request: input.request, effective, scopes, clock: input.clock, resolveFile: relative => input.resolveFile(located.collection.path, relative),
     ...(input.oauthToken === undefined ? {} : { oauthToken: input.oauthToken })
@@ -92,7 +92,7 @@ export function prepareSend(input: PrepareInput): Prepared | undefined {
     built.wire.url = `http://${url}`;
     built.warnings.push('The address had no scheme, so http:// was used.');
   }
-  return { scopes, built, effective, collection: located.collection, environment, options: sendOptionsFrom(effective.settings), problems };
+  return { scopes, scopeInput, built, effective, collection: located.collection, environment, options: sendOptionsFrom(effective.settings), problems };
 }
 
 /** The variables a request can use, for the editor to mark `{{names}}` as known or not; `complete` is false when the request is not in a loaded collection, so that nothing is marked unknown. */

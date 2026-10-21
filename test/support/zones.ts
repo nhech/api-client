@@ -45,10 +45,12 @@ export const ZONES: Zone[] = [
     modules: ['node:path'],
     uses: ['stages', 'util', 'io']
   },
-  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net'] },
+  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net', 'script', 'script-pure', 'script-consent'] },
   // The sandbox of the scripts: the messages and the code of the API are pure; the manager starts and watches the worker; the worker is the one place that holds the engine.
   { name: 'script-pure', paths: ['src/script/protocol.ts', 'src/script/prelude.ts', 'src/script/outcome.ts'], modules: [], uses: ['util', 'core'] },
   { name: 'script', paths: ['src/script/'], modules: ['node:fs', 'node:worker_threads'], uses: ['script-pure', 'util', 'core'] },
+  // The record of what a person agreed to run: a hash of the text of each script, which is why it may use node:crypto and nothing else.
+  { name: 'script-consent', paths: ['src/script/consent.ts'], modules: ['node:crypto'], uses: ['util'] },
   { name: 'script-worker', paths: ['src/script/worker.ts'], modules: ['node:crypto', 'node:worker_threads', 'quickjs-emscripten-core', '@jitl/quickjs-wasmfile-release-sync'], uses: ['script-pure'] },
   { name: 'page', paths: ['extension/src/webview/'], modules: [], uses: ['util'] },
   // The request editor in the page: Preact and CodeMirror are the only packages that go into it (dist/app.meta.json is checked against the same list), and it

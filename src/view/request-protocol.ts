@@ -3,6 +3,7 @@ import type { Container, Environment } from '../core/model';
 import type { VariableInfo } from '../core/vars';
 import type { Finding } from '../format/schema';
 import type { ResponseView } from './response';
+import type { ScriptReport } from './scripts';
 
 /**
  * The messages between the request editor page and the extension. The page is our code, but what it shows comes from a
@@ -69,7 +70,7 @@ export type ToView =
   | { type: 'sending'; id: number }
   | { type: 'response'; id: number; response: ResponseView }
   /** The request could not be sent or got no answer: `code` is what the engine calls it, `hint` says what to try. */
-  | { type: 'failed'; id: number; code: string; message: string; hint: string; warnings: string[] }
+  | { type: 'failed'; id: number; code: string; message: string; hint: string; warnings: string[]; scripts?: ScriptReport }
   | { type: 'cancelled'; id: number };
 
 export const MAX_OPS = 200;

@@ -2,6 +2,7 @@ import type { Clock } from './clock';
 import type { Environment, Var, WorkspaceFile } from './model';
 import type { Level } from './inherit';
 import { compareCodePoints } from '../util/chars';
+import { isSecretName } from './redact';
 
 /**
  * Variables. `{{name}}` is replaced by the value of the nearest scope that has it, `{{$guid}}` and the other `{{$...}}` words
@@ -282,4 +283,52 @@ export function describeVariables(input: ScopeInput): VariableInfo[] {
   if (input.environment !== undefined) take(input.environment.vars, `environment ${input.environment.name}`);
   take(input.workspace.vars, 'workspace');
   return [...found.values()].sort((a, b) => compareCodePoints(a.name, b.name));
+}
+
+// ---- what a script sees ----
+
+/** The values of every secret variable of these scopes, and of the variables whose names look like secrets: what is hidden in whatever scripts write. */
+export function secretValues(scopes: readonly Scope[]): string[] {
+  const values = new Set<string>();
+  for (const scope of scopes) for (const [name, entry] of scope) if ((entry.secret || isSecretName(name)) && entry.value !== '') values.add(entry.value);
+  return [...values];
+}
+
+/** The variables a script is given: by the scopes it can write to, and all of them as a request would see them. Plain data: no prototype, so a name is only a name. */
+export interface VariableSnapshot {
+  environment: Record<string, string>;
+  collection: Record<string, string>;
+  globals: Record<string, string>;
+  merged: Record<string, string>;
+}
+
+/** What the requests have set so far, by scope (`RuntimeVariables.snapshot`). */
+export interface SnapshotRuntime {
+  active: ReadonlyMap<string, string>;
+  local: ReadonlyMap<string, string>;
+  global: ReadonlyMap<string, string>;
+}
+
+const record = (): Record<string, string> => Object.create(null) as Record<string, string>;
+
+/**
+ * `environment` is the active environment and what was set in it, `collection` the variables of the folders and the collection and what
+ * was set there, `globals` the workspace and what was set everywhere. `merged` is what a request resolves a name to: the same order as
+ * `variableScopes`, with what scripts and captures set beating everything and, among those, the nearest scope winning.
+ */
+export function snapshotVariables(input: Omit<ScopeInput, 'runtime'>, runtime: SnapshotRuntime): VariableSnapshot {
+  const environment = record();
+  const collection = record();
+  const globals = record();
+  const merged = record();
+  const copy = (target: Record<string, string>, values: Iterable<[string, string]>): void => { for (const [name, value] of values) { target[name] = value; merged[name] = value; } };
+  const plain = (scope: Scope): [string, string][] => [...scope].map(([name, entry]) => [name, entry.value]);
+  copy(globals, plain(scopeOf(input.workspace.vars)));
+  if (input.dotenv !== undefined) copy(environment, plain(input.dotenv));
+  if (input.environment !== undefined) copy(environment, plain(scopeOf(input.environment.vars)));
+  for (const level of input.levels) copy(collection, plain(scopeOf(level.container.vars)));
+  copy(globals, runtime.global);
+  copy(environment, runtime.active);
+  copy(collection, runtime.local);
+  return { environment, collection, globals, merged };
 }

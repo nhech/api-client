@@ -1,3 +1,5 @@
+import type { VariableChanges } from '../core/runtime';
+
 /**
  * What goes into a run of scripts and what comes out. The output is written by the scripts' own code, in an engine that a hostile script
  * has full control of, so it is read as untrusted data: every field is checked, text is cut at a size, counts are limited, names are
@@ -28,8 +30,7 @@ const LEVELS: readonly string[] = ['log', 'info', 'warn', 'error', 'debug'];
 
 export interface ScriptTest { name: string; passed: boolean; message: string; skipped: boolean }
 export interface ScriptLog { level: LogLevel; text: string }
-/** Pairs, not an object: a name such as `__proto__` is a name like any other. */
-export interface VariableChanges { set: [string, string][]; unset: string[] }
+export type { VariableChanges };
 export interface RequestChanges { method?: string; url?: string; headers?: [string, string][]; bodyRaw?: string }
 
 export interface ScriptOutput {
@@ -150,4 +151,38 @@ export function parseOutput(text: string): OutputResult {
   const request = readRequest(own(raw, 'request'));
   if (request !== undefined) value.request = request;
   return { ok: true, value };
+}
+
+// ---- what a script asks the extension to send (pm.sendRequest) ----
+
+/** The most requests one run of scripts may send. */
+export const HTTP_PER_RUN = 10;
+
+export interface HttpArgument { method: string; url: string; headers: [string, string][]; body?: string }
+export type HttpArgumentResult = { ok: true; value: HttpArgument } | { ok: false; error: string };
+
+const refuse = (error: string): { ok: false; error: string } => ({ ok: false, error });
+
+/** Reads the request a script wants sent. It comes from the engine of the script, so nothing in it is believed: a request that is not plain is refused whole, so that the script is told instead of getting a different request. */
+export function parseHttpArgument(text: string): HttpArgumentResult {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { return refuse('the request is not JSON'); }
+  if (!isRecord(raw)) return refuse('the request is not an object');
+  const url = own(raw, 'url');
+  if (typeof url !== 'string' || url.length > OUTPUT_LIMITS.urlChars || !/^https?:\/\/[^\s]+$/i.test(url)) return refuse('the address has to be a whole http:// or https:// address');
+  const method = own(raw, 'method');
+  if (typeof method !== 'string' || !/^[A-Z]{1,20}$/.test(method) || method === 'CONNECT') return refuse('the method has to be written in capitals, and CONNECT is not allowed');
+  const headers: [string, string][] = [];
+  const given = own(raw, 'headers');
+  if (given !== undefined) {
+    if (!Array.isArray(given) || given.length > OUTPUT_LIMITS.headers) return refuse('the headers are not a list of the right size');
+    for (const pair of given) {
+      if (!Array.isArray(pair) || typeof pair[0] !== 'string' || typeof pair[1] !== 'string') return refuse('a header is not a name and a value');
+      if (!TOKEN.test(pair[0]) || pair[0].length > OUTPUT_LIMITS.headerNameChars || pair[1].length > OUTPUT_LIMITS.headerValueChars || hasLineBreak(pair[1])) return refuse('a header has a name or a value that cannot be sent');
+      headers.push([pair[0], pair[1]]);
+    }
+  }
+  const body = own(raw, 'body');
+  if (body !== undefined && body !== null && (typeof body !== 'string' || body.length > OUTPUT_LIMITS.bodyChars)) return refuse('the body has to be text and not larger than a script may send');
+  return { ok: true, value: { method, url, headers, ...(typeof body === 'string' ? { body } : {}) } };
 }

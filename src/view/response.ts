@@ -4,6 +4,7 @@ import { isSecretName, redactedValue, redactValues } from '../core/redact';
 import { isoTime } from '../core/vars';
 import type { RedirectHop, Timings, TlsInfo, WireRequest, WireResponse } from '../engine/types';
 import { printable } from '../util/chars';
+import type { ScriptReport } from './scripts';
 
 /**
  * What the response pane shows, made from what the engine returned: the body as text in the charset it declared (or as a picture, or
@@ -93,6 +94,8 @@ export interface ResponseView {
   /** What the tests of the request and of its folders made of the response, and what its captures saved. */
   tests: TestResult[];
   saved: SavedView[];
+  /** What the scripts of the request, its folders and its collection did; absent when there were none or they did not run. */
+  scripts?: ScriptReport;
   /** The engine cut the body at the limit of the settings. */
   truncated: boolean;
   /** The body is in a file, not in memory. */
@@ -417,6 +420,7 @@ export interface ResponseViewInput {
   warnings: readonly string[];
   tests?: readonly TestResult[];
   captures?: readonly CaptureResult[];
+  scripts?: ScriptReport;
 }
 
 const headerOf = (headers: readonly (readonly [string, string])[], name: string): string => headers.find(([key]) => key.toLowerCase() === name)?.[1] ?? '';
@@ -442,7 +446,7 @@ export function buildResponseView(input: ResponseViewInput): ResponseView {
     body, size: response.size, wireBytes: response.wireBytes, timings: response.timings, redirects: response.redirects,
     finalUrl: printable(redactValues(response.finalUrl, input.redactions)), tls: response.tls, warnings, cookies,
     sent: describeSent(response.sent, input.redactions), tests: [...(input.tests ?? [])], saved: (input.captures ?? []).map(savedView),
-    truncated: response.truncated, onDisk: response.body.kind === 'file'
+    ...(input.scripts === undefined ? {} : { scripts: input.scripts }), truncated: response.truncated, onDisk: response.body.kind === 'file'
   };
 }
 

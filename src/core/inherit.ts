@@ -26,6 +26,8 @@ export interface EffectiveHeader {
 export interface ScriptSource {
   code: string;
   from: string;
+  /** The id of the collection, folder or request the script is in: what a person's consent to run it is kept under. */
+  id: string;
 }
 
 export interface EffectiveRequest {
@@ -113,17 +115,17 @@ export function effectiveRequest(request: Request, chain: readonly Level[], work
   const postScripts: ScriptSource[] = [];
   const tests: { expr: string; from: string }[] = [];
   const seen = new Set<string>();
-  const take = (scripts: { pre: string; post: string }, assertions: readonly { expr: string; enabled: boolean }[], from: string): void => {
-    if (scripts.pre.trim() !== '') preScripts.push({ code: scripts.pre, from });
-    if (scripts.post.trim() !== '') postScripts.push({ code: scripts.post, from });
+  const take = (scripts: { pre: string; post: string }, assertions: readonly { expr: string; enabled: boolean }[], from: string, id: string): void => {
+    if (scripts.pre.trim() !== '') preScripts.push({ code: scripts.pre, from, id });
+    if (scripts.post.trim() !== '') postScripts.push({ code: scripts.post, from, id });
     for (const line of assertions) {
       if (!line.enabled || line.expr.trim() === '' || seen.has(line.expr)) continue;
       seen.add(line.expr);
       tests.push({ expr: line.expr, from });
     }
   };
-  for (const level of levels) take(level.container.scripts, level.container.tests, level.name);
-  take(request.scripts, request.tests, 'request');
+  for (const level of levels) take(level.container.scripts, level.container.tests, level.name, level.container.id);
+  take(request.scripts, request.tests, 'request', request.id);
 
   return {
     url: applyBaseUrl(request.url, baseUrl),

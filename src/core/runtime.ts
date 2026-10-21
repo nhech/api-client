@@ -19,6 +19,20 @@ export interface RuntimeContext {
   collection: string;
 }
 
+export type RuntimeScope = 'active' | 'local' | 'global';
+
+/** What a script set and removed in one scope. Pairs, not an object: a name such as `__proto__` is a name like any other. */
+export interface VariableChanges {
+  set: readonly (readonly [string, string])[];
+  unset: readonly string[];
+}
+
+export interface RuntimeScopes {
+  active: Map<string, string>;
+  local: Map<string, string>;
+  global: Map<string, string>;
+}
+
 export const MAX_RUNTIME_VARIABLES = 1000;
 export const MAX_RUNTIME_VALUE_CHARS = 256 * 1024;
 
@@ -40,13 +54,36 @@ export class RuntimeVariables {
     return count;
   }
 
+  private target(scope: RuntimeScope, context: RuntimeContext): Map<string, string> {
+    return scope === 'global' ? this.global : scope === 'local' ? this.bucket(this.local, context.collection) : this.bucket(this.active, context.environmentId ?? '');
+  }
+
+  private put(scope: RuntimeScope, name: string, value: string | undefined, context: RuntimeContext): void {
+    const target = this.target(scope, context);
+    if (value === undefined) { target.delete(name); return; }
+    if (!target.has(name) && this.size >= MAX_RUNTIME_VARIABLES) return;
+    target.set(name, value.length > MAX_RUNTIME_VALUE_CHARS ? value.slice(0, MAX_RUNTIME_VALUE_CHARS) : value);
+  }
+
   /** Sets or removes the variable a capture says; a result that failed changes nothing. */
   apply(result: CaptureResult, context: RuntimeContext): void {
     if (!result.ok || result.variable === '') return;
-    const target = result.scope === 'global' ? this.global : result.scope === 'local' ? this.bucket(this.local, context.collection) : this.bucket(this.active, context.environmentId ?? '');
-    if (result.action === 'delete') { target.delete(result.variable); return; }
-    if (!target.has(result.variable) && this.size >= MAX_RUNTIME_VARIABLES) return;
-    target.set(result.variable, result.value.length > MAX_RUNTIME_VALUE_CHARS ? result.value.slice(0, MAX_RUNTIME_VALUE_CHARS) : result.value);
+    this.put(result.scope, result.variable, result.action === 'delete' ? undefined : result.value, context);
+  }
+
+  /** Sets and removes what a script asked for in one scope; the removals come first, so a name that is in both ends up set. */
+  change(scope: RuntimeScope, changes: VariableChanges, context: RuntimeContext): void {
+    for (const name of changes.unset) this.put(scope, name, undefined, context);
+    for (const [name, value] of changes.set) this.put(scope, name, value, context);
+  }
+
+  /** The values of a context, by scope, as plain maps that can be changed without touching these. */
+  snapshot(context: RuntimeContext): RuntimeScopes {
+    return {
+      active: new Map(this.active.get(context.environmentId ?? '')),
+      local: new Map(this.local.get(context.collection)),
+      global: new Map(this.global)
+    };
   }
 
   /** What a request in this context sees: the strongest scope of the resolver. */

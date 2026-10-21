@@ -48,8 +48,8 @@ test('Scripts and assertions run outermost first with the request last; empty sc
     level('folder', 'Orders', { scripts: { pre: 'b();', post: 'c();' }, tests: [{ expr: 'status == 200', enabled: true }, { expr: 'body includes ok', enabled: true }] })
   ];
   const result = effectiveRequest(request({ scripts: { pre: 'd();', post: 'e();' }, tests: [{ expr: 'json $.id exists', enabled: true }, { expr: 'body includes ok', enabled: true }] }), chain);
-  assert.deepEqual(result.preScripts, [{ code: 'a();', from: 'Shop' }, { code: 'b();', from: 'Orders' }, { code: 'd();', from: 'request' }]);
-  assert.deepEqual(result.postScripts, [{ code: 'c();', from: 'Orders' }, { code: 'e();', from: 'request' }]);
+  assert.deepEqual(result.preScripts, [{ code: 'a();', from: 'Shop', id: 'id-Shop' }, { code: 'b();', from: 'Orders', id: 'id-Orders' }, { code: 'd();', from: 'request', id: 'r1' }], 'each says whose it is, by the id that survives a rename');
+  assert.deepEqual(result.postScripts, [{ code: 'c();', from: 'Orders', id: 'id-Orders' }, { code: 'e();', from: 'request', id: 'r1' }]);
   assert.deepEqual(result.tests, [{ expr: 'status == 200', from: 'Shop' }, { expr: 'body includes ok', from: 'Orders' }, { expr: 'json $.id exists', from: 'request' }]);
 });
 
