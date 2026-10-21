@@ -19,9 +19,11 @@ export interface Zone {
 
 export const ZONES: Zone[] = [
   { name: 'stages', paths: ['src/model/', 'src/normalize/', 'src/convert/', 'src/emit/'], modules: [], uses: ['util'], deterministic: true },
-  { name: 'util', paths: ['src/util/', 'src/reader/limits.ts'], modules: [], uses: [] },
+  { name: 'util', paths: ['src/util/', 'src/reader/limits.ts', 'src/write/gitignore.ts'], modules: [], uses: [] },
   { name: 'core', paths: ['src/core/'], modules: [], uses: ['util'], deterministic: true },
   { name: 'format', paths: ['src/format/'], modules: [], uses: ['util', 'core'], deterministic: true },
+  { name: 'storage', paths: ['src/storage/'], modules: [], uses: ['stages', 'util', 'core', 'format'] },
+  { name: 'storage-node', paths: ['src/storage/node-fs.ts'], modules: ['node:crypto', 'node:fs', 'node:path'], uses: ['io', 'util', 'storage'] },
   { name: 'io', paths: ['src/reader/', 'src/write/', 'src/discover.ts'], modules: ['node:fs', 'node:fs/promises', 'node:path'], uses: ['stages', 'util'] },
   {
     name: 'app',
