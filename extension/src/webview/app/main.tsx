@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import type { ToHost, ToView } from '../../../../src/view/request-protocol';
 import { App } from './App';
-import { connect, receive } from './store';
+import { connect, receive, sendNow } from './store';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
@@ -11,15 +11,22 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
  */
 const vscode = acquireVsCodeApi();
 const violations: string[] = [];
-document.addEventListener('securitypolicyviolation', event => { violations.push(`${event.violatedDirective} ${event.blockedURI}`); });
+document.addEventListener('securitypolicyviolation', event => {
+  const text = `${event.violatedDirective} ${event.blockedURI}`;
+  violations.push(text);
+  // One that comes after the first drawing (a response with a picture, a style) is reported as it happens.
+  if (ready) port.post({ type: 'violation', text });
+});
+let ready = false;
 
 const port = { post: (message: ToHost): void => vscode.postMessage(message) };
 connect({ postMessage: message => vscode.postMessage(message) });
 window.addEventListener('message', event => { receive(event.data as ToView); });
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') port.post({ type: 'cancel' });
+  else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); sendNow(); }
 });
 
 render(<App port={port} />, document.getElementById('app') as HTMLElement);
 // Once the first drawing is done, the extension is told the page is alive and what was refused.
-requestAnimationFrame(() => { port.post({ type: 'ready', violations }); });
+requestAnimationFrame(() => { port.post({ type: 'ready', violations }); ready = true; });

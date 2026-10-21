@@ -45,7 +45,7 @@ export const ZONES: Zone[] = [
     modules: ['node:path'],
     uses: ['stages', 'util', 'io']
   },
-  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view'] },
+  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net'] },
   { name: 'page', paths: ['extension/src/webview/'], modules: [], uses: ['util'] },
   // The request editor in the page: Preact and CodeMirror are the only packages that go into it (dist/app.meta.json is checked against the same list), and it
   // applies the edits it sends with the same code the extension checks them with, so it may use the view zone.

@@ -1,11 +1,13 @@
 import { randomBytes } from 'node:crypto';
+import { isAbsolute, relative } from 'node:path';
 import * as vscode from 'vscode';
 import { newRequest } from '../../src/core/model';
 import { readRequest, writeRequest } from '../../src/format/schema';
 import type { YMap } from '../../src/format/yaml';
 import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
 import { buildAppHtml } from '../../src/view/page';
-import { parseToHost, type RequestState, type ToView } from '../../src/view/request-protocol';
+import { parseToHost, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
+import { RequestRunner, type SendEnvironment } from './sender';
 
 /** The custom editor of a request file (`*.req.yml`): the page of the client over the text document. */
 export const REQUEST_VIEW_TYPE = 'apiClient.request';
@@ -16,6 +18,9 @@ export interface RequestEditorTestView {
   readonly violations: string[];
   /** What the page was last told. */
   lastMessage(): ToView | undefined;
+  /** The last messages the page was told, oldest first. */
+  messages(): readonly ToView[];
+  readonly isSending: boolean;
   state(): RequestState;
   /** Delivers a message as if the page had sent it. */
   receive(raw: unknown): Promise<void>;
@@ -32,12 +37,18 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
   private extra: YMap = new Map();
   private selfChanges = 0;
   private last: ToView | undefined;
+  private readonly recent: ToView[] = [];
+  /** Messages of the page are handled one after the other, so a send never reads the file before the edit that came before it has been applied. */
+  private chain: Promise<void> = Promise.resolve();
+  private readonly runner: RequestRunner;
   readonly violations: string[] = [];
   private readonly subscriptions: vscode.Disposable[] = [];
 
-  constructor(private readonly document: vscode.TextDocument, private readonly panel: vscode.WebviewPanel) {
+  constructor(private readonly document: vscode.TextDocument, private readonly panel: vscode.WebviewPanel, env: SendEnvironment) {
+    this.runner = new RequestRunner(env, message => this.post(message));
+    this.env = env;
     this.subscriptions.push(
-      panel.webview.onDidReceiveMessage((raw: unknown) => { void this.receive(raw); }),
+      panel.webview.onDidReceiveMessage((raw: unknown) => { this.receive(raw).catch(() => undefined); }),
       vscode.workspace.onDidChangeTextDocument(event => {
         if (event.document !== document || event.contentChanges.length === 0) return;
         if (this.selfChanges > 0) { this.selfChanges--; return; }
@@ -47,12 +58,22 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     );
   }
 
+  private readonly env: SendEnvironment;
+
   get isReady(): boolean {
     return this.ready;
   }
 
+  get isSending(): boolean {
+    return this.runner.isRunning;
+  }
+
   lastMessage(): ToView | undefined {
     return this.last;
+  }
+
+  messages(): readonly ToView[] {
+    return this.recent;
   }
 
   /** The request as the document holds it now, or why it cannot be edited. */
@@ -71,12 +92,30 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
 
   private post(message: ToView): void {
     this.last = message;
+    this.recent.push(message);
+    if (this.recent.length > 50) this.recent.shift();
     void this.panel.webview.postMessage(message);
   }
 
-  async receive(raw: unknown): Promise<void> {
+  receive(raw: unknown): Promise<void> {
     const message = parseToHost(raw);
-    if (message === undefined) return;
+    if (message === undefined) return Promise.resolve();
+    // Cancelling does not wait for what came before it.
+    if (message.type === 'cancel') { this.runner.cancel(); return Promise.resolve(); }
+    const run = this.chain.then(() => this.handle(message));
+    this.chain = run.catch(() => undefined);
+    return run;
+  }
+
+  /** The file of the request relative to the workspace folder, which is how the collections name their requests. */
+  private relativePath(): string | undefined {
+    const folder = this.env.workspace.folder();
+    if (folder === undefined) return undefined;
+    const path = relative(folder.uri.fsPath, this.document.uri.fsPath).replaceAll('\\', '/');
+    return path.startsWith('..') || isAbsolute(path) ? undefined : path;
+  }
+
+  private async handle(message: ToHost): Promise<void> {
     if (message.type === 'ready') {
       this.ready = true;
       this.violations.splice(0, this.violations.length, ...message.violations);
@@ -85,8 +124,28 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
       await vscode.commands.executeCommand('vscode.openWith', this.document.uri, 'default');
     } else if (message.type === 'edit') {
       await this.edit(message.rev, message.ops);
+    } else if (message.type === 'send') {
+      this.send();
+    } else if (message.type === 'saveResponse') {
+      await this.runner.save();
+    } else if (message.type === 'openResponse') {
+      await this.runner.open();
+    } else if (message.type === 'violation') {
+      if (this.violations.length < 20) this.violations.push(message.text);
+    } else if (message.type === 'copyResponse') {
+      await this.runner.copy(message.pretty);
     }
-    // Sending and cancelling come with the engine.
+  }
+
+  private send(): void {
+    const state = this.state();
+    const path = this.relativePath();
+    if (state.readOnly !== undefined || path === undefined) {
+      this.post({ type: 'failed', id: 0, code: 'invalid-request', message: state.readOnly !== undefined ? 'This file cannot be read as a request, so it cannot be sent.' : 'This file is outside the folder that is open, so it cannot be sent from here.', hint: '', warnings: [] });
+      return;
+    }
+    // The send runs on its own; messages that come while it runs (an edit, a cancel) are handled as they arrive.
+    void this.runner.start(path, state.request);
   }
 
   private async edit(rev: number, ops: Parameters<typeof applyEditOps>[1]): Promise<void> {
@@ -118,6 +177,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
   }
 
   dispose(): void {
+    this.runner.dispose();
     for (const subscription of this.subscriptions) subscription.dispose();
   }
 }
@@ -126,7 +186,7 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
   /** The open editors by the address of their file, for the tests of the extension. */
   readonly open = new Map<string, RequestSession>();
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext, private readonly env: SendEnvironment) {}
 
   resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
     const root = this.context.extensionUri;
@@ -137,7 +197,7 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
       cspSource: panel.webview.cspSource, nonce: randomBytes(16).toString('base64'), screen: 'request',
       scriptUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(dist, 'app.js')).toString(), styleUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(media, 'app.css')).toString()
     });
-    const session = new RequestSession(document, panel);
+    const session = new RequestSession(document, panel, this.env);
     const key = document.uri.toString();
     this.open.set(key, session);
     panel.onDidDispose(() => { session.dispose(); if (this.open.get(key) === session) this.open.delete(key); });

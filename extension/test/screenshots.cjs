@@ -5,6 +5,7 @@
  * each one; this side takes the picture through the browser debugging port of the editor and writes a PNG.
  *
  *   node extension/test/screenshots.cjs [out-folder]            default: docs/images
+ *   SHOTS_SCENARIO=request node ...                              the request editor (four themes) instead of the importer panel
  *   API_CLIENT_TEST_EXECUTABLE=<Code.exe> node ...               uses this VS Code
  *
  * Needs `npm run ext:build` first. Nothing of the person's own VS Code is read or changed.
@@ -19,6 +20,9 @@ const { runTests } = require('@vscode/test-electron');
 const repo = path.resolve(__dirname, '..', '..');
 const out = path.resolve(process.argv[2] || path.join(repo, 'docs', 'images'));
 const PORT = Number(process.env.API_CLIENT_SHOT_PORT || 9339);
+const SCENARIO = process.env.SHOTS_SCENARIO === 'request' ? 'request' : 'importer';
+const THEMES = SCENARIO === 'request' ? ['dark', 'light', 'hc-dark', 'hc-light'] : ['dark', 'light'];
+const THEME_NAMES = { dark: 'Default Dark Modern', light: 'Default Light Modern', 'hc-dark': 'Default High Contrast', 'hc-light': 'Default High Contrast Light' };
 
 function findExecutable() {
   const given = process.env.API_CLIENT_TEST_EXECUTABLE;
@@ -65,7 +69,7 @@ async function takeShots(exchange, theme) {
         await sleep(request.settle || 900);
         // The top 30 pixels are the title bar of the window (the name of the window, which says it is a development host); the picture starts below it.
         const shot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 30, width: request.width, height: request.height - 30, scale: 1 } });
-        const name = `${request.name}${theme === 'light' ? '-light' : ''}.png`;
+        const name = `${request.name}${theme === 'dark' ? '' : `-${theme}`}.png`;
         fs.mkdirSync(out, { recursive: true });
         fs.writeFileSync(path.join(out, name), Buffer.from(shot.result.data, 'base64'));
         taken.push(name);
@@ -88,7 +92,7 @@ async function session(theme, executable) {
   const made = spawnSync(process.execPath, [path.join(repo, 'samples', 'make-sample.cjs'), path.join(profile, 'User', 'globalStorage', 'rangav.vscode-thunder-client')], { encoding: 'utf8' });
   if (made.status !== 0) throw new Error(`make-sample failed: ${made.stderr}`);
   fs.writeFileSync(path.join(profile, 'User', 'settings.json'), JSON.stringify({
-    'workbench.colorTheme': theme === 'light' ? 'Default Light Modern' : 'Default Dark Modern', 'telemetry.telemetryLevel': 'off', 'update.mode': 'none',
+    'workbench.colorTheme': THEME_NAMES[theme], 'telemetry.telemetryLevel': 'off', 'update.mode': 'none',
     'workbench.startupEditor': 'none', 'window.commandCenter': false, 'workbench.tips.enabled': false, 'chat.commandCenter.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden'
   }, null, 2));
   const shots = takeShots(exchange, theme);
@@ -96,7 +100,7 @@ async function session(theme, executable) {
     await runTests({
       vscodeExecutablePath: executable,
       extensionDevelopmentPath: path.resolve(__dirname, '..'),
-      extensionTestsPath: path.resolve(__dirname, 'shots-suite.cjs'),
+      extensionTestsPath: path.resolve(__dirname, SCENARIO === 'request' ? 'shots-request.cjs' : 'shots-suite.cjs'),
       extensionTestsEnv: { HTTP_FILES_IMPORTER_TEST: '1', SHOTS_EXCHANGE: exchange, SHOTS_THEME: theme, APPDATA: path.join(root, 'appdata'), HOME: home, USERPROFILE: home },
       launchArgs: [workspace, '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--disable-updates', '--user-data-dir', profile, '--extensions-dir', path.join(root, 'extensions'), `--remote-debugging-port=${PORT}`, '--remote-allow-origins=*']
     });
@@ -111,5 +115,5 @@ async function session(theme, executable) {
 (async () => {
   const executable = findExecutable();
   if (!executable) { console.error('No VS Code found. Set API_CLIENT_TEST_EXECUTABLE.'); process.exitCode = 2; return; }
-  for (const theme of ['dark', 'light']) console.log(`${theme}: ${(await session(theme, executable)).join(', ')}`);
+  for (const theme of THEMES) console.log(`${theme}: ${(await session(theme, executable)).join(', ')}`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

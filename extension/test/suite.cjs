@@ -256,4 +256,136 @@ exports.run = async function run() {
   await vscode.commands.executeCommand('vscode.openWith', newerKey, 'apiClient.request');
   await until(() => test.requestEditor(newerKey.toString())?.lastMessage()?.type === 'init', 'a file of a newer version opens');
   assert.match(test.requestEditor(newerKey.toString()).lastMessage().readOnly, /newer version/);
+
+  // 10. Sending: a request of a collection goes to a server in this process with the variables of the active environment, its folders'
+  //     authentication and its own headers; the answer comes back as the page shows it, a failure is explained, a send can be cancelled, and
+  //     the secrets are hidden in what is shown of the request.
+  const http = require('node:http');
+  const seen = [];
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      seen.push({ method: req.method, url: req.url, headers: req.headers, body: Buffer.concat(chunks).toString() });
+      if (req.url.startsWith('/json')) {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Set-Cookie', ['sid=abc12345; Path=/; HttpOnly', 'theme=dark']);
+        res.end('{"ok":true,"big":12345678901234567890,"echo":"super-secret-value-9"}');
+      } else if (req.url.startsWith('/slow')) {
+        setTimeout(() => { res.end('late'); }, 20000).unref();
+      } else if (req.url.startsWith('/png')) {
+        res.setHeader('Content-Type', 'image/png');
+        res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64'));
+      } else {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'text/plain');
+        res.end('nothing here');
+      }
+    });
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  try {
+    put('api-client/environments/dev.env.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAC\nname: Dev\nvars:\n  - name: base\n    value: ' + base + '\n  - name: token\n    value: ""\n    secret: true\n');
+    put('api-client/environments/dev.env.local.yml', 'schema: 1\nvalues:\n  token: super-secret-value-9\n');
+    put('api-client/collections/shop/collection.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAA\nname: Shop\nauth:\n  kind: bearer\n  token: "{{token}}"\nheaders:\n  - name: X-Shop\n    value: s\n');
+    const sendPath = 'api-client/collections/shop/send.req.yml';
+    put(sendPath, 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ASE\nname: Send\nmethod: POST\nurl: "{{base}}/json?x=1"\nheaders:\n  - name: X-Own\n    value: mine\nbody:\n  kind: json\n  text: |-\n    {"a":1,"t":"{{token}}"}\n');
+    put('api-client/collections/shop/missing.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ASF\nname: Missing\nurl: "{{base}}/nothing"\n');
+    put('api-client/collections/shop/slow.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ASG\nname: Slow\nurl: "{{base}}/slow"\n');
+    put('api-client/collections/shop/picture.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ASH\nname: Picture\nurl: "{{base}}/png"\n');
+    put('api-client/collections/shop/novar.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ASI\nname: No variable\nurl: "{{nowhere}}/x"\n');
+    put('api-client/collections/shop/closed.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ASJ\nname: Closed\nurl: http://127.0.0.1:1/\n');
+    await until(() => test.client().collections[0].children.filter(child => child.kind === 'request').length >= 7, 'the watcher loads the requests');
+    await until(() => test.client().environments.length === 1 && test.client().workspace.loaded?.environments[0]?.environment.vars[0]?.value === base, 'and the environment');
+    await test.client().workspace.setActiveEnvironment('01J9Z4V0N2XK7Q3M8T5R6Y1AAC');
+
+    const open = async name => {
+      const uri = vscode.Uri.file(path.join(workspace, 'api-client', 'collections', 'shop', name));
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'apiClient.request');
+      await until(() => test.requestEditor(uri.toString())?.isReady === true, name + ' is open');
+      return test.requestEditor(uri.toString());
+    };
+    const answer = async (view, type) => { await until(() => view.messages().some(message => message.type === type), 'the page was told: ' + type); return view.messages().filter(message => message.type === type).at(-1); };
+
+    // 10a. The request goes out as written, and the answer is what the page shows.
+    const sendView = await open('send.req.yml');
+    await sendView.receive({ type: 'send' });
+    const done = await answer(sendView, 'response');
+    assert.deepEqual(sendView.messages().map(message => message.type).filter(type => type === 'sending' || type === 'response'), ['sending', 'response']);
+    assert.equal(seen.length, 1);
+    assert.deepEqual([seen[0].method, seen[0].url, seen[0].headers['x-own'], seen[0].headers['x-shop'], seen[0].headers.authorization, seen[0].headers['content-type']], ['POST', '/json?x=1', 'mine', 's', 'Bearer super-secret-value-9', 'application/json']);
+    assert.equal(seen[0].body, '{"a":1,"t":"super-secret-value-9"}', 'variables are replaced in the body');
+    const view = done.response;
+    assert.deepEqual([view.status, view.statusText, view.body.kind, view.body.language, view.body.mediaType], [200, 'OK', 'text', 'json', 'application/json']);
+    assert.match(view.body.pretty, /"big": 12345678901234567890,/, 'numbers are not rounded');
+    assert.deepEqual(view.cookies.map(cookie => [cookie.name, cookie.httpOnly]), [['sid', true], ['theme', false]]);
+    assert.deepEqual(view.sent.headers.find(([name]) => name === 'Authorization'), ['Authorization', '[redacted]'], 'the credential is hidden in what was sent');
+    assert.ok(!view.sent.body.includes('super-secret-value-9') && view.sent.body.includes('[redacted]'), 'and the value of the secret in the body');
+    assert.ok(!view.sent.url.includes('super-secret'), 'nor in the address');
+    assert.ok(view.timings.totalMs >= 0 && view.size > 0);
+    assert.deepEqual(sendView.violations, [], 'drawing the answer broke no rule of the policy');
+
+    // 10b. The same request again: the cookie of the server goes with it (the jar), and the first answer is replaced.
+    await sendView.receive({ type: 'send' });
+    await until(() => sendView.messages().filter(message => message.type === 'response').length === 2, 'the second answer');
+    assert.equal(seen[1].headers.cookie, 'sid=abc12345; theme=dark', 'what the server set comes back');
+
+    // 10c. A status that is not 2xx is an answer, not a failure; a variable with no value is sent as written and said so; an unreachable port is explained.
+    const missing = await open('missing.req.yml');
+    await missing.receive({ type: 'send' });
+    const notFound = (await answer(missing, 'response')).response;
+    assert.deepEqual([notFound.status, notFound.body.raw], [404, 'nothing here']);
+    const novar = await open('novar.req.yml');
+    await novar.receive({ type: 'send' });
+    const unresolved = await answer(novar, 'failed');
+    assert.equal(unresolved.code, 'invalid-request');
+    assert.match(unresolved.message, /variables that have no value: nowhere/);
+    const closed = await open('closed.req.yml');
+    await closed.receive({ type: 'send' });
+    const refused = await answer(closed, 'failed');
+    assert.equal(refused.code, 'refused');
+    assert.ok(refused.message.length > 10 && refused.hint.length > 10, 'a sentence that says what happened and what to try');
+
+    // 10d. A picture arrives as a data address of a type from the list.
+    const picture = await open('picture.req.yml');
+    await picture.receive({ type: 'send' });
+    const image = (await answer(picture, 'response')).response;
+    assert.deepEqual([image.body.kind, image.body.image.startsWith('data:image/png;base64,')], ['image', true]);
+    await until(() => picture.violations.length === 0, 'the policy had nothing to refuse');
+
+    // 10e. A send can be cancelled, and the page is told; a second cancel changes nothing; another send then works.
+    const slow = await open('slow.req.yml');
+    await slow.receive({ type: 'send' });
+    await until(() => slow.isSending, 'the send is on its way');
+    await slow.receive({ type: 'cancel' });
+    await answer(slow, 'cancelled');
+    assert.equal(slow.isSending, false);
+    await slow.receive({ type: 'cancel' });
+    assert.equal(slow.lastMessage().type, 'cancelled');
+
+    // 10f. A send reads the file as it is now, edits that came just before it included, even when they have not been saved.
+    const edited = await open('send.req.yml');
+    const before = edited.messages().length;
+    await edited.receive({ type: 'edit', rev: edited.state().rev, ops: [{ op: 'set', path: ['url'], value: base + '/json?edited=1' }] });
+    await edited.receive({ type: 'send' });
+    await until(() => edited.messages().slice(before).some(message => message.type === 'response'), 'the answer to the edited request');
+    assert.equal(seen.at(-1).url, '/json?edited=1');
+
+    // 10g. A file outside a collection, or a request that cannot be read, is not sent, and says why.
+    put('api-client/loose.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ASK\nname: Loose\nurl: ' + base + '/json\n');
+    const loose = vscode.Uri.file(path.join(workspace, 'api-client', 'loose.req.yml'));
+    await vscode.commands.executeCommand('vscode.openWith', loose, 'apiClient.request');
+    await until(() => test.requestEditor(loose.toString())?.isReady === true, 'the loose file is open');
+    await test.requestEditor(loose.toString()).receive({ type: 'send' });
+    assert.match((await answer(test.requestEditor(loose.toString()), 'failed')).message, /not in a collection/);
+    const unreadableView = test.requestEditor(vscode.Uri.file(path.join(workspace, 'api-client', 'collections', 'shop', 'unreadable.req.yml')).toString());
+    if (unreadableView) {
+      await unreadableView.receive({ type: 'send' });
+      assert.match((await answer(unreadableView, 'failed')).message, /cannot be read as a request/);
+    }
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
 };

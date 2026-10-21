@@ -2,17 +2,14 @@ import { useState } from 'preact/hooks';
 import { AUTH_KINDS, BODY_KINDS, newAuth, newBody, type Auth, type AuthKind, type Body, type BodyKind, type Part, type Request } from '../../../../src/core/model';
 import { CodeEditor } from './CodeEditor';
 import { Check, Choice, Field, KeyValueGrid, Tabs, type TabSpec } from './components';
-import { confirmed, edit, flushNow, notice, request } from './store';
-import type { ToHost } from '../../../../src/view/request-protocol';
+import { defaultRequestTab } from '../../../../src/view/tabs';
+import { ResponsePane } from './ResponsePane';
+import { confirmed, edit, flushNow, notice, request, sending, sendNow, type HostPort } from './store';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
 const AUTH_LABELS: Record<AuthKind, string> = { inherit: 'Inherit from parent', none: 'No authentication', bearer: 'Bearer token', basic: 'Basic', apikey: 'API key', oauth2: 'OAuth 2.0' };
 const BODY_LABELS: Record<BodyKind, string> = { none: 'None', text: 'Text', json: 'JSON', xml: 'XML', form: 'Form (urlencoded)', multipart: 'Form (multipart)', graphql: 'GraphQL', binary: 'Binary file' };
-
-export interface HostPort {
-  post(message: ToHost): void;
-}
 
 function Method(props: { value: string }) {
   const options = METHODS.includes(props.value.toUpperCase() as (typeof METHODS)[number]) ? METHODS : [props.value, ...METHODS];
@@ -114,9 +111,10 @@ const countRows = (rows: readonly { enabled: boolean; name: string }[]): string 
 };
 
 function Editor(props: { request: Request; port: HostPort }) {
-  const [tab, setTab] = useState('query');
+  const [tab, setTab] = useState<string>(() => defaultRequestTab(props.request));
   const r = props.request;
-  const send = (): void => { flushNow(); props.port.post({ type: 'send' }); };
+  const send = (): void => sendNow();
+  const running = sending.value !== undefined;
   const tabs: TabSpec[] = [
     { id: 'query', label: 'Query', badge: countRows(r.query) }, { id: 'headers', label: 'Headers', badge: countRows(r.headers) }, { id: 'auth', label: 'Auth', badge: r.auth.kind === 'inherit' || r.auth.kind === 'none' ? '' : '\u2022' },
     { id: 'body', label: 'Body', badge: r.body.kind === 'none' ? '' : '\u2022' }, { id: 'docs', label: 'Docs', badge: r.docs === '' ? '' : '\u2022' }
@@ -126,8 +124,9 @@ function Editor(props: { request: Request; port: HostPort }) {
       <div class="bar">
         <Method value={r.method} />
         <CodeEditor value={r.url} oneLine label="Address" placeholder="https://example.com/path or {{baseUrl}}/path" onChange={value => edit({ op: 'set', path: ['url'], value })} onSubmit={send} onBlur={flushNow} />
-        <button type="button" class="send" onClick={send}>Send</button>
+        {running ? <button type="button" class="send cancel" onClick={() => props.port.post({ type: 'cancel' })}>Cancel</button> : <button type="button" class="send" onClick={send}>Send</button>}
       </div>
+      <div class="panes">
       <Tabs tabs={tabs} active={tab} onSelect={setTab} label="Request">
         {tab === 'query' ? <><KeyValueGrid rows={r.query} path={['query']} label="Query parameters" namePlaceholder="Parameter" />{r.pathParams.length > 0 ? <><h3>Path parameters</h3><KeyValueGrid rows={r.pathParams} path={['pathParams']} label="Path parameters" /></> : null}</> : null}
         {tab === 'headers' ? <KeyValueGrid rows={r.headers} path={['headers']} label="Headers" namePlaceholder="Header" /> : null}
@@ -135,7 +134,8 @@ function Editor(props: { request: Request; port: HostPort }) {
         {tab === 'body' ? <BodyTab body={r.body} send={send} /> : null}
         {tab === 'docs' ? <div class="editor-box"><CodeEditor value={r.docs} language="text" label="Notes on this request" placeholder="Notes for yourself and your team" onChange={value => edit({ op: 'set', path: ['docs'], value })} onBlur={flushNow} /></div> : null}
       </Tabs>
-      <section class="response" aria-label="Response"><p class="hint">Press Ctrl+Enter, or Send, to send the request. The response appears here.</p></section>
+      <ResponsePane port={props.port} />
+      </div>
     </div>
   );
 }

@@ -19,11 +19,11 @@ import { useEffect, useRef } from 'preact/hooks';
 export type Language = 'json' | 'js' | 'xml' | 'text';
 
 /** Marks a change that came from outside, so that it is not sent back as an edit. */
-const External = Annotation.define<boolean>();
+export const External = Annotation.define<boolean>();
 
-const nonce = document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') ?? '';
+export const nonce = document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') ?? '';
 
-const highlight = HighlightStyle.define([
+export const highlight = HighlightStyle.define([
   { tag: tags.propertyName, color: 'var(--vscode-debugTokenExpression-name)' },
   { tag: tags.string, color: 'var(--vscode-debugTokenExpression-string)' },
   { tag: [tags.number, tags.bool, tags.null], color: 'var(--vscode-debugTokenExpression-number)' },
@@ -31,7 +31,7 @@ const highlight = HighlightStyle.define([
   { tag: tags.comment, color: 'var(--vscode-descriptionForeground)' }
 ]);
 
-const theme = EditorView.theme({
+export const theme = EditorView.theme({
   '&': { color: 'var(--vscode-editor-foreground)', backgroundColor: 'var(--vscode-input-background, var(--vscode-editor-background))', fontFamily: 'var(--vscode-editor-font-family)', fontSize: 'var(--vscode-editor-font-size)' },
   '&.cm-focused': { outline: '1px solid var(--vscode-focusBorder)' },
   '.cm-content': { caretColor: 'var(--vscode-editorCursor-foreground)' },
@@ -49,8 +49,8 @@ const variables = ViewPlugin.fromClass(class {
   update(update: ViewUpdate): void { this.decorations = variableMatcher.updateDeco(update, this.decorations); }
 }, { decorations: instance => instance.decorations });
 
-function languageExtensions(language: Language): Extension[] {
-  if (language === 'json') return [json(), linter(jsonParseLinter())];
+export function languageExtensions(language: Language, lint = true): Extension[] {
+  if (language === 'json') return lint ? [json(), linter(jsonParseLinter())] : [json()];
   if (language === 'js') return [javascript()];
   if (language === 'xml') return [xml()];
   return [];

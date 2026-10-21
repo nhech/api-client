@@ -8,6 +8,7 @@ import type { TreeNode } from '../../src/view/tree';
 import { ClientWorkspace } from './clientWorkspace';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
+import { SendEnvironment } from './sender';
 import { CollectionsTree, EnvironmentsTree } from './trees';
 import { REPORT_SCHEME, ReportDocuments, VscodeHost } from './vscodeHost';
 import { WizardPanel } from './wizardPanel';
@@ -61,8 +62,10 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     status.show();
   };
 
-  const requests = new RequestEditorProvider(context);
+  const sending = new SendEnvironment(context, workspace);
+  const requests = new RequestEditorProvider(context, sending);
   context.subscriptions.push(
+    sending,
     vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false }),
     reports, workspace, collections, environments, collections.view, environmentsView, historyView, status, workspace.onDidChange(showStatus),
     vscode.workspace.registerTextDocumentContentProvider(REPORT_SCHEME, reports),

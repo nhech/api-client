@@ -37,6 +37,14 @@ test('A nonce or a source list that could change the policy is refused, and the 
 test('A message of the page is read only when it is exactly one of the known shapes', () => {
   assert.deepEqual(parseToHost({ type: 'send' }), { type: 'send' });
   assert.deepEqual(parseToHost({ type: 'cancel', extra: 1 }), { type: 'cancel' });
+  assert.deepEqual(parseToHost({ type: 'saveResponse', path: '/etc/passwd' }), { type: 'saveResponse' }, 'the page cannot say where to save');
+  assert.deepEqual(parseToHost({ type: 'openResponse' }), { type: 'openResponse' });
+  assert.deepEqual(parseToHost({ type: 'violation', text: 'x'.repeat(500) }), { type: 'violation', text: 'x'.repeat(200) }, 'a report is cut');
+  assert.equal(parseToHost({ type: 'violation', text: 5 }), undefined);
+  assert.equal(parseToHost({ type: 'violation' }), undefined);
+  assert.deepEqual(parseToHost({ type: 'copyResponse', pretty: true }), { type: 'copyResponse', pretty: true });
+  assert.deepEqual(parseToHost({ type: 'copyResponse', pretty: 'yes' }), { type: 'copyResponse', pretty: false }, 'only true is true');
+  assert.equal(parseToHost({ type: 'response' }), undefined, 'the answers of the extension are not messages to it');
   assert.deepEqual(parseToHost({ type: 'ready', violations: ['a', 5, 'b'.repeat(500)] }), { type: 'ready', violations: ['a', 'b'.repeat(200)] });
   assert.deepEqual(parseToHost({ type: 'ready' }), { type: 'ready', violations: [] });
   assert.deepEqual(parseToHost({ type: 'edit', rev: 3, ops: [{ op: 'set', path: ['url'], value: 'x' }, { op: 'insert', path: ['headers'], index: 0, value: { name: 'A' } }, { op: 'remove', path: ['headers'], index: 1 }, { op: 'move', path: ['headers'], from: 0, to: 2 }] }),
@@ -177,4 +185,14 @@ test('Property: random edits of a text give the exact new text (1000 pairs, both
     const offsetOf = (line: number, char: number): number => lines.slice(0, line).reduce((total, item) => total + item.length + eol.length, 0) + char;
     assert.equal(document.slice(0, offsetOf(range.startLine, range.startChar)) + range.text + document.slice(offsetOf(range.endLine, range.endChar)), after.replace(/\n/g, eol), `run ${run}`);
   }
+});
+
+test('A request opens on the tab that has something in it', async () => {
+  const { defaultRequestTab } = await import('../../src/view/tabs');
+  const row = (name: string, enabled = true) => ({ name, value: '1', enabled, description: '' });
+  assert.equal(defaultRequestTab(base()), 'headers', 'the base request has a header and nothing else');
+  assert.equal(defaultRequestTab({ ...base(), headers: [] }), 'query', 'an empty request opens on the query');
+  assert.equal(defaultRequestTab({ ...base(), headers: [row('A')], query: [row('q')] }), 'query', 'the query comes first');
+  assert.equal(defaultRequestTab({ ...base(), headers: [row('A', false)], query: [row('', true), row('q', false)] }), 'query', 'rows that are switched off or have no name do not count');
+  assert.equal(defaultRequestTab({ ...base(), query: [row('q')], body: { kind: 'json', text: '{}' } }), 'body', 'a body wins');
 });

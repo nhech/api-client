@@ -1,5 +1,6 @@
 import type { Request } from '../core/model';
 import type { Finding } from '../format/schema';
+import type { ResponseView } from './response';
 
 /**
  * The messages between the request editor page and the extension. The page is our code, but what it shows comes from a
@@ -21,6 +22,14 @@ export type ToHost =
   | { type: 'edit'; rev: number; ops: EditOp[] }
   | { type: 'send' }
   | { type: 'cancel' }
+  /** Save the body of the last response to a file the person chooses. */
+  | { type: 'saveResponse' }
+  /** Open the body of the last response in an editor tab. */
+  | { type: 'openResponse' }
+  /** The Content-Security-Policy refused something after the first drawing. */
+  | { type: 'violation'; text: string }
+  /** Copy the body of the last response to the clipboard, formatted or as it came. */
+  | { type: 'copyResponse'; pretty: boolean }
   /** Show the file in the text editor (when the page cannot edit it). */
   | { type: 'openAsText' };
 
@@ -36,7 +45,13 @@ export type ToView =
   | ({ type: 'init' } & RequestState)
   /** The file changed: by an edit of the page (`self`), on disk, or by an undo in the text editor. */
   | ({ type: 'doc'; cause: 'self' | 'disk' | 'undo' } & RequestState)
-  | { type: 'rejected'; rev: number; reason: string };
+  | { type: 'rejected'; rev: number; reason: string }
+  /** A send began; `id` says which one the answers below belong to. */
+  | { type: 'sending'; id: number }
+  | { type: 'response'; id: number; response: ResponseView }
+  /** The request could not be sent or got no answer: `code` is what the engine calls it, `hint` says what to try. */
+  | { type: 'failed'; id: number; code: string; message: string; hint: string; warnings: string[] }
+  | { type: 'cancelled'; id: number };
 
 export const MAX_OPS = 200;
 export const MAX_PATH_LENGTH = 8;
@@ -106,7 +121,9 @@ function parseOp(raw: unknown): EditOp | undefined {
 export function parseToHost(raw: unknown): ToHost | undefined {
   if (!isRecord(raw)) return undefined;
   const type = own(raw, 'type');
-  if (type === 'send' || type === 'cancel' || type === 'openAsText') return { type };
+  if (type === 'send' || type === 'cancel' || type === 'openAsText' || type === 'saveResponse' || type === 'openResponse') return { type };
+  if (type === 'violation') { const text = own(raw, 'text'); return typeof text === 'string' ? { type, text: text.slice(0, 200) } : undefined; }
+  if (type === 'copyResponse') return { type, pretty: own(raw, 'pretty') === true };
   if (type === 'ready') {
     const given = own(raw, 'violations');
     const violations = Array.isArray(given) ? given.filter((item): item is string => typeof item === 'string').slice(0, MAX_VIOLATIONS).map(item => item.slice(0, 200)) : [];

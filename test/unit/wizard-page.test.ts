@@ -108,7 +108,12 @@ test('No script of a page puts text in as HTML, runs code from text, loads anyth
     assert.deepEqual(['eval(', 'new Function', 'setTimeout("', "setTimeout('", 'importScripts', 'import(', 'javascript:'].filter(word => code.includes(word)), [], file + ': code from text');
     assert.deepEqual(['fetch(', 'XMLHttpRequest', 'WebSocket', 'sendBeacon', 'EventSource', 'localStorage', 'sessionStorage', 'indexedDB', 'document.cookie', 'navigator.clipboard'].filter(word => code.includes(word)), [], file + ': network or storage');
     assert.ok(!/setAttribute\(\s*['"`]on/i.test(code), file + ': no event attribute set from text');
-    assert.ok(!/\bhref\s*=|\bsrc\s*=/.test(code), file + ': no link or image address is set');
+    if (file.endsWith('/app/ImageView.tsx')) {
+      // The one place an address is set: a picture, and only when the address is a data address of a type from the fixed list.
+      assert.equal((code.match(/\bsrc\s*=/g) ?? []).length, 1, file + ': one image');
+      assert.ok(/DATA_IMAGE\.test\(props\.source\)/.test(code) && /\^data:image\\\/\(\?:png\|jpeg\|gif\|webp\|bmp\|x-icon\|avif\);base64,\[A-Za-z0-9\+\/=\]\+\$/.test(code), file + ': the address is checked before it is used');
+      assert.ok(!/\bhref\s*=/.test(code), file + ': no link');
+    } else assert.ok(!/\bhref\s*=|\bsrc\s*=/.test(code), file + ': no link or image address is set');
   }
 });
 

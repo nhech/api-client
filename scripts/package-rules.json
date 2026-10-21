@@ -22,8 +22,14 @@
       "requires": [
         "node:crypto",
         "node:fs",
+        "node:http",
+        "node:https",
         "node:os",
         "node:path",
+        "node:stream",
+        "node:stream/promises",
+        "node:tls",
+        "node:zlib",
         "vscode"
       ]
     },
