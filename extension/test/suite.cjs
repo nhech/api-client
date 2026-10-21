@@ -18,10 +18,10 @@ exports.run = async function run() {
   assert.equal(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath.toLowerCase(), workspace.toLowerCase(), 'the throw-away workspace is open');
 
   // 1. The command is declared in the manifest, so the first call activates the extension (no activation event of its own).
-  assert.equal((await vscode.commands.getCommands(true)).includes('apiClient.importThunder'), false, 'nothing is registered before the command is used');
+  assert.equal((await vscode.commands.getCommands(true)).includes('httpFilesImporter.importThunder'), false, 'nothing is registered before the command is used');
 
   // 2. A full run: accept the first item of every Quick Pick (the folder found next to this editor, "Continue", the write).
-  const result = vscode.commands.executeCommand('apiClient.importThunder');
+  const result = vscode.commands.executeCommand('httpFilesImporter.importThunderSteps');
   let finished = false;
   result.then(() => { finished = true; }, () => { finished = true; });
   const report = path.join(workspace, 'api', 'IMPORT_REPORT.md');
@@ -38,7 +38,7 @@ exports.run = async function run() {
   const outcome = await result;
   assert.equal(outcome?.status, 'done', `the flow finished: ${JSON.stringify(outcome)}`);
 
-  assert.ok((await vscode.commands.getCommands(true)).includes('apiClient.importThunder'), 'the command is registered once the extension is active');
+  assert.ok((await vscode.commands.getCommands(true)).includes('httpFilesImporter.importThunder'), 'the command is registered once the extension is active');
 
   // 3. What was written.
   const files = {};
@@ -87,7 +87,7 @@ exports.run = async function run() {
 
   // 5. A second run, cancelled at the first Quick Pick, changes nothing.
   const before = JSON.stringify(Object.keys(files));
-  const second = vscode.commands.executeCommand('apiClient.importThunder');
+  const second = vscode.commands.executeCommand('httpFilesImporter.importThunderSteps');
   await sleep(1500);
   await vscode.commands.executeCommand('workbench.action.closeQuickOpen');
   const cancelled = await second;
@@ -95,4 +95,76 @@ exports.run = async function run() {
   assert.equal(JSON.stringify(fs.readdirSync(path.join(workspace, 'api'))), JSON.stringify(fs.readdirSync(path.join(workspace, 'api'))));
   assert.equal(fs.existsSync(path.join(workspace, 'api-2')), false, 'nothing was written by the cancelled run');
   assert.ok(before.length > 0);
+
+  // 6. The importer panel: the main command opens it, it loads under its Content-Security-Policy and says so, and the messages the page
+  //    sends (here sent as the page would) read the data, plan, and write. Nothing is written until "import".
+  const extension = vscode.extensions.getExtension('longtd.http-files-importer');
+  assert.ok(extension && extension.isActive, 'the extension is active');
+  const test = extension.exports;
+  assert.ok(test && typeof test.panel === 'function', 'the test interface is there when the runner asks for it');
+  assert.equal(test.panel(), undefined, 'no panel before the command');
+  await vscode.commands.executeCommand('httpFilesImporter.importThunder');
+  const panel = test.panel();
+  assert.ok(panel, 'the command opened the panel');
+  const tabs = () => vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(tab => tab.input instanceof vscode.TabInputWebview);
+  for (let waited = 0; tabs().length === 0 && waited < 5000; waited += 100) await sleep(100);
+  assert.equal(tabs().length, 1, 'one webview tab is open');
+  for (let waited = 0; !panel.isReady && waited < 15000; waited += 100) await sleep(100);
+  assert.equal(panel.isReady, true, 'the page loaded and its script ran under the Content-Security-Policy');
+  await vscode.commands.executeCommand('httpFilesImporter.importThunder');
+  assert.equal(tabs().length, 1, 'opening it again brings the same panel to the front');
+
+  let view = panel.view();
+  assert.equal(view.step, 'source');
+  assert.equal(view.candidates.length, 1, 'the Thunder Client data next to this editor is offered');
+  const writtenBefore = JSON.stringify(fs.readdirSync(workspace).sort());
+  await panel.receive('rubbish');
+  await panel.receive({ type: 'import', path: '/etc' });
+  await panel.receive({ type: 'useCandidate', id: 7 });
+  await panel.receive({ type: 'setOptions', options: { target: 'postman', targetDir: 5 } });
+  assert.equal(panel.view().step, 'source', 'messages that are not exactly ours change nothing');
+
+  await panel.receive({ type: 'useCandidate', id: 0 });
+  view = panel.view();
+  assert.equal(view.step, 'review');
+  assert.equal(view.summary.requests, 2);
+  assert.equal(view.plan.targetDir, 'api-2', 'the first import used "api", so a new folder is planned');
+  assert.equal(JSON.stringify(fs.readdirSync(workspace).sort()), writtenBefore, 'reading and planning wrote nothing');
+  assert.ok(!JSON.stringify(view).includes(CANARY), 'the view holds no secret');
+
+  await panel.receive({ type: 'setOptions', options: { target: 'jetbrains', targetDir: 'requests' } });
+  view = panel.view();
+  assert.equal(view.options.target, 'jetbrains');
+  assert.equal(view.plan.targetDir, 'requests');
+  await panel.receive({ type: 'setOptions', options: { targetDir: '../outside' } });
+  assert.equal(panel.view().plan, undefined, 'a folder outside the workspace has no plan');
+  assert.ok(panel.view().optionsError, 'and says why');
+  await panel.receive({ type: 'import' });
+  assert.equal(panel.view().step, 'review', 'it cannot be imported');
+  await panel.receive({ type: 'setOptions', options: { targetDir: 'requests' } });
+
+  await panel.receive({ type: 'import' });
+  view = panel.view();
+  assert.equal(view.step, 'done');
+  assert.equal(view.result.targetDir, 'requests');
+  const shop = fs.readFileSync(path.join(workspace, 'requests', 'Shop', 'index.http'), 'utf8');
+  assert.ok(!shop.includes(CANARY), 'the secret is not in a shared file');
+  assert.ok(fs.readFileSync(path.join(workspace, 'requests', 'http-client.private.env.json'), 'utf8').includes(CANARY), 'it is in the private file');
+  assert.equal(fs.existsSync(path.join(workspace, 'requests', 'rest-client.settings.json')), false, 'the REST Client files are only for that tool');
+  await panel.receive({ type: 'startOver' });
+  assert.equal(panel.view().step, 'source');
+
+  // 7. Closing the tab must not break the command: the closed panel is forgotten and the command opens a new one.
+  await vscode.window.tabGroups.close(tabs()[0]);
+  for (let waited = 0; test.panel() !== undefined && waited < 5000; waited += 100) await sleep(100);
+  assert.equal(test.panel(), undefined, 'the closed panel is forgotten');
+  await vscode.commands.executeCommand('httpFilesImporter.importThunder');
+  const again = test.panel();
+  assert.ok(again, 'the command opens a new panel after the old one was closed');
+  for (let waited = 0; tabs().length === 0 && waited < 5000; waited += 100) await sleep(100);
+  assert.equal(tabs().length, 1);
+  for (let waited = 0; !again.isReady && waited < 15000; waited += 100) await sleep(100);
+  assert.equal(again.isReady, true, 'the new page loaded');
+  await again.receive({ type: 'useCandidate', id: 0 });
+  assert.equal(again.view().step, 'review');
 };

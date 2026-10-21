@@ -55,5 +55,13 @@ test('The built extension (when it has been built) imports only what the core ne
   let text: string;
   try { text = readFileSync(bundle, 'utf8'); } catch { return; }
   const modules = new Set([...text.matchAll(/require\(\s*"([^"]+)"\s*\)/g)].map(match => match[1]));
-  assert.deepEqual([...modules].sort(), ['node:fs', 'node:os', 'node:path', 'vscode']);
+  // node:crypto is there for the random nonce of the panel's page; nothing else beyond files, paths and the home folder.
+  assert.deepEqual([...modules].sort(), ['node:crypto', 'node:fs', 'node:os', 'node:path', 'vscode']);
+});
+
+test('The built script of the panel loads nothing: it requires no module at all', () => {
+  let text: string;
+  try { text = readFileSync(join(extensionRoot, 'dist', 'wizard.js'), 'utf8'); } catch { return; }
+  assert.ok(!/\brequire\s*\(/.test(text), 'no require in a script that runs in a page');
+  assert.ok(!/\bimport\s*\(/.test(text) && !/\bimportScripts\b/.test(text), 'no dynamic import');
 });

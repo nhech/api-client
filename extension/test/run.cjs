@@ -6,6 +6,8 @@
  *
  *   node extension/test/run.cjs                      uses the VS Code found next to the user's programs
  *   API_CLIENT_TEST_EXECUTABLE=<Code.exe> node ...   uses this one
+ *   API_CLIENT_TEST_VSIX=<file.vsix> node ...        tries the PACKAGE: it is installed in the throw-away profile and the folder of this
+ *                                                    extension is not loaded, so what the package holds is what runs
  *
  * Needs `npm run build` in extension/ first.
  */
@@ -72,12 +74,25 @@ function findExecutable() {
     ].join('\n'));
   }
 
+  // With a package, VS Code loads the installed extension; the development path then points to an empty stand-in (runTests wants one).
+  let developmentPath = path.resolve(__dirname, '..');
+  const packageFile = process.env.API_CLIENT_TEST_VSIX;
+  if (packageFile) {
+    const [cli] = resolveCliArgsFromVSCodeExecutablePath(executable);
+    const quote = text => '"' + text + '"';
+    const installed = spawnSync([quote(cli), '--install-extension', quote(path.resolve(packageFile)), '--extensions-dir', quote(extensions), '--user-data-dir', quote(profile)].join(' '), { encoding: 'utf8', shell: true, timeout: 120000 });
+    if (installed.status !== 0) throw new Error('Installing the package failed: ' + (installed.stderr || installed.stdout));
+    developmentPath = path.join(root, 'stand-in');
+    fs.mkdirSync(developmentPath, { recursive: true });
+    fs.writeFileSync(path.join(developmentPath, 'package.json'), JSON.stringify({ name: 'stand-in', version: '0.0.0', publisher: 'stand-in', engines: { vscode: '*' } }));
+  }
+
   try {
     await runTests({
       vscodeExecutablePath: executable,
-      extensionDevelopmentPath: path.resolve(__dirname, '..'),
+      extensionDevelopmentPath: developmentPath,
       extensionTestsPath: path.resolve(__dirname, 'suite.cjs'),
-      extensionTestsEnv: { API_CLIENT_TEST_ROOT: root, API_CLIENT_TEST_REST_CLIENT: restClientVsix ? '1' : '0', APPDATA: appData, HOME: home },
+      extensionTestsEnv: { HTTP_FILES_IMPORTER_TEST: '1', API_CLIENT_TEST_ROOT: root, API_CLIENT_TEST_REST_CLIENT: restClientVsix ? '1' : '0', APPDATA: appData, HOME: home },
       launchArgs: [workspace, '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--disable-updates', '--user-data-dir', profile, '--extensions-dir', extensions]
     });
     console.log('Host run passed.');

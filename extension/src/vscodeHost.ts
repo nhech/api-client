@@ -1,11 +1,13 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
 import type { Candidate } from '../../src/discover';
+import { importMessages } from '../../src/host';
 import type { DoneAction, ImportHost, ImportSettings, RestClientSettingsOutcome, ScopeOutcome, SourceChoice } from '../../src/host';
 import { REST_CLIENT_SETTING, mergeEnvironments } from '../../src/settings-merge';
 import type { EnvMap, RestClientSettings } from '../../src/settings-merge';
 import type { ImportSummary } from '../../src/pipeline';
 import type { WriteOutcome, WritePlan } from '../../src/write/writer';
+import { shortenHome } from '../../src/util/display-path';
 import { targetSegments } from '../../src/write/paths';
 import { TARGETS, TARGET_LABEL } from '../../src/model/target';
 
@@ -33,10 +35,7 @@ export class ReportDocuments implements vscode.TextDocumentContentProvider {
   dispose(): void { this.changed.dispose(); }
 }
 
-const shorten = (fsPath: string): string => {
-  const home = os.homedir();
-  return home !== '' && fsPath.startsWith(home) ? `~${fsPath.slice(home.length)}` : fsPath;
-};
+const shorten = (fsPath: string): string => shortenHome(fsPath, os.homedir());
 
 const POLICY_LABEL: Readonly<Record<ImportSettings['policy'], string>> = {
   'new-folder': 'Use a new folder when the target already has files',
@@ -111,7 +110,7 @@ export class VscodeHost implements ImportHost {
         { id: 'policy', label: `$(files) ${POLICY_LABEL[settings.policy]}`, description: 'select to change' }
       ];
       if (settings.target === 'rest-client') {
-        items.push({ id: 'rest', label: `$(settings-gear) Fill in the REST Client settings for me: ${settings.applyRestClientSettings ? 'yes' : 'no'}`, description: settings.applyRestClientSettings ? 'variables go to the workspace settings, secrets to your user settings (kept out of Settings Sync); nothing you have is replaced' : 'you paste rest-client.settings.json yourself' });
+        items.push({ id: 'rest', label: `$(settings-gear) Fill in the REST Client settings for me: ${settings.applyRestClientSettings && settings.moveSecrets ? 'yes' : 'no'}`, description: !settings.moveSecrets ? 'only when secrets are moved to the private file, or a literal secret would reach the workspace settings' : settings.applyRestClientSettings ? 'variables go to the workspace settings, secrets to your user settings (kept out of Settings Sync); nothing you have is replaced' : 'you paste rest-client.settings.json yourself' });
       }
       const picked = await vscode.window.showQuickPick(items, { title: 'Import from Thunder Client: settings', placeHolder: 'Review the settings, then choose Continue', ignoreFocusOut: true });
       if (picked === undefined) return undefined;
@@ -139,7 +138,7 @@ export class VscodeHost implements ImportHost {
     const replaced = plan.files.filter(file => file.action === 'overwrite').length;
     if (replaced > 0) notes.push(`${replaced} file${replaced === 1 ? '' : 's'} replaced`);
     if (plan.gitignore === 'created' || plan.gitignore === 'updated') notes.push(`.gitignore ${plan.gitignore === 'created' ? 'is created' : 'gets a line'} for the private file`);
-    if (settings.target === 'rest-client' && settings.applyRestClientSettings) notes.push('the REST Client settings are filled in: variables in the workspace settings, secrets in your user settings (kept out of Settings Sync)');
+    if (settings.target === 'rest-client' && settings.applyRestClientSettings && settings.moveSecrets) notes.push('the REST Client settings are filled in: variables in the workspace settings, secrets in your user settings (kept out of Settings Sync)');
     const picked = await vscode.window.showQuickPick([{ label: `$(check) Write ${writes} file${writes === 1 ? '' : 's'} into ${plan.targetDir}`, description: notes.join('; ') }], { title: 'Import from Thunder Client: confirm', placeHolder: 'Press Enter to write, Escape to cancel', ignoreFocusOut: true });
     return picked !== undefined;
   }
@@ -172,19 +171,7 @@ export class VscodeHost implements ImportHost {
   }
 
   async done(outcome: WriteOutcome, imported: ImportSummary, restClient?: RestClientSettingsOutcome): Promise<DoneAction | undefined> {
-    const where = outcome.plan.targetDir;
-    const requests = `Imported ${imported.requests} request${imported.requests === 1 ? '' : 's'} into ${where}.`;
-    const parts = [requests];
-    if (restClient?.status === 'applied') {
-      const added = restClient.workspace.variables + (restClient.user?.variables ?? 0);
-      parts.push(`REST Client settings: ${added} variable${added === 1 ? '' : 's'} added${restClient.user === undefined ? '' : ' (secrets in your user settings)'}. Choose an environment with "Rest Client: Switch Environment".`);
-      const kept = [...restClient.workspace.kept, ...(restClient.user?.kept ?? [])];
-      if (kept.length > 0) parts.push(`${kept.length} already had another value and was kept: ${kept.slice(0, 5).join(', ')}${kept.length > 5 ? ', ...' : ''}.`);
-    } else if (restClient?.status === 'rest-client-missing') {
-      parts.push('REST Client is not installed (humao.rest-client), so its settings were not filled in; paste rest-client.settings.json and rest-client.private.settings.json after installing it.');
-    } else if (restClient?.status === 'failed') {
-      parts.push(`The REST Client settings could not be changed (${restClient.message}); paste rest-client.settings.json and rest-client.private.settings.json by hand.`);
-    }
+    const parts = importMessages(outcome, imported, restClient);
     const choice = await vscode.window.showInformationMessage(parts.join(' '), 'Open folder', 'Open report');
     return choice === 'Open folder' ? 'open-folder' : choice === 'Open report' ? 'open-report' : undefined;
   }

@@ -2,7 +2,7 @@ import { importFromPath } from './run';
 import { SourceError } from './reader/fs-reader';
 import { REPORT_FILE } from './emit';
 import { DEFAULT_IMPORT_OPTIONS } from './pipeline';
-import type { ConflictPolicy, ImportResult } from './pipeline';
+import type { ConflictPolicy, ImportResult, ImportSummary } from './pipeline';
 import type { Target } from './model/target';
 import type { Candidate } from './discover';
 import { restClientSettingsFrom } from './settings-merge';
@@ -133,7 +133,8 @@ export async function runImportFlow(host: ImportHost, dependencies: FlowDependen
 
     const outcome = await writeFiles(request);
     let restClient: RestClientSettingsOutcome | undefined;
-    if (settings.target === 'rest-client' && settings.applyRestClientSettings) {
+    // Only when the secrets were moved out of the shared files: with moving off, a literal secret would go to the workspace settings too.
+    if (settings.target === 'rest-client' && settings.applyRestClientSettings && settings.moveSecrets) {
       const written = new Set(outcome.plan.files.filter(file => file.action !== 'skip').map(file => file.path));
       const found = restClientSettingsFrom(result.files.filter(file => written.has(file.path)));
       // The files are already written: a problem with the settings must not look like a failed import.
@@ -148,6 +149,22 @@ export async function runImportFlow(host: ImportHost, dependencies: FlowDependen
     await host.error(message);
     return { status: 'error', message };
   }
+}
+
+/** The sentences that tell the person what an import did, the same on every screen that shows them. Names and counts only. */
+export function importMessages(outcome: WriteOutcome, imported: ImportSummary, restClient?: RestClientSettingsOutcome): string[] {
+  const parts = [`Imported ${imported.requests} request${imported.requests === 1 ? '' : 's'} into ${outcome.plan.targetDir}.`];
+  if (restClient?.status === 'applied') {
+    const added = restClient.workspace.variables + (restClient.user?.variables ?? 0);
+    parts.push(`REST Client settings: ${added} variable${added === 1 ? '' : 's'} added${restClient.user === undefined ? '' : ' (secrets in your user settings)'}. Choose an environment with "Rest Client: Switch Environment".`);
+    const kept = [...restClient.workspace.kept, ...(restClient.user?.kept ?? [])];
+    if (kept.length > 0) parts.push(`${kept.length} already had another value and was kept: ${kept.slice(0, 5).join(', ')}${kept.length > 5 ? ', ...' : ''}.`);
+  } else if (restClient?.status === 'rest-client-missing') {
+    parts.push('REST Client is not installed (humao.rest-client), so its settings were not filled in; paste rest-client.settings.json and rest-client.private.settings.json after installing it.');
+  } else if (restClient?.status === 'failed') {
+    parts.push(`The REST Client settings could not be changed (${restClient.message}); paste rest-client.settings.json and rest-client.private.settings.json by hand.`);
+  }
+  return parts;
 }
 
 const reportOf = (result: ImportResult): string => result.files.find(file => file.path === REPORT_FILE)?.content ?? '';

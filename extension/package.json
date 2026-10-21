@@ -1,16 +1,38 @@
 {
-  "name": "api-client-importer",
-  "displayName": "API Client: Import from Thunder Client (draft)",
-  "description": "Imports Thunder Client collections and environments into plain .http files. Local only: no account, no network, no telemetry.",
+  "name": "http-files-importer",
+  "displayName": "HTTP Files Importer",
+  "description": "Import Thunder Client collections and environments into plain .http files for REST Client, httpYac and the JetBrains HTTP Client. Local only: no account, no network, no telemetry.",
   "version": "0.1.0",
-  "private": true,
-  "publisher": "local-draft",
+  "publisher": "longtd",
   "license": "MIT",
+  "preview": true,
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0a0a0a",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.100.0"
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "thunder client",
+    "thunder-client",
+    "import",
+    "migrate",
+    "migration",
+    "convert",
+    "http",
+    ".http",
+    "rest client",
+    "httpyac",
+    "jetbrains",
+    "http client",
+    "api",
+    "collections",
+    "environments"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [],
@@ -27,16 +49,37 @@
   "contributes": {
     "commands": [
       {
-        "command": "apiClient.importThunder",
-        "title": "API Client: Import from Thunder Client...",
-        "category": "API Client"
+        "command": "httpFilesImporter.importThunder",
+        "title": "Import from Thunder Client...",
+        "category": "HTTP Files Importer"
+      },
+      {
+        "command": "httpFilesImporter.importThunderSteps",
+        "title": "Import from Thunder Client (step by step)...",
+        "category": "HTTP Files Importer"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "httpFilesImporter.start",
+          "name": "HTTP Files Importer",
+          "visibility": "collapsed",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "httpFilesImporter.start",
+        "contents": "Move your Thunder Client collections and environments to plain .http files.\n[Open the importer](command:httpFilesImporter.importThunder)\nNothing is written until you press Import. Local only: no account, no network, no telemetry."
       }
     ]
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "node esbuild.mjs",
-    "package": "node -e \"require('node:fs').mkdirSync('../.artifacts',{recursive:true})\" && node esbuild.mjs --release && vsce package --no-dependencies --out ../.artifacts/api-client-importer.vsix"
+    "package": "node -e \"require('node:fs').mkdirSync('../.artifacts',{recursive:true})\" && node esbuild.mjs --release && vsce package --no-dependencies --out ../.artifacts/http-files-importer.vsix"
   },
   "repository": {
     "type": "git",
