@@ -118,7 +118,28 @@ const MUTATIONS = [
   { id: "M96", rule: "Vars: a disabled variable has no value", file: "src/core/vars.ts", find: "if (variable.enabled && variable.name !== '') scope.set(", replace: "if (variable.name !== '') scope.set(" },
   { id: "M97", rule: "Vars: the nearest folder's variables come before its parents'", file: "src/core/vars.ts", find: "for (let index = input.levels.length - 1; index >= 0; index--) scopes.push(", replace: "for (let index = 0; index < input.levels.length; index++) scopes.push(" },
   { id: "M98", rule: "Vars: the civil date arithmetic is right", file: "src/core/vars.ts", find: "monthIndex < 10 ? monthIndex + 3 : monthIndex - 9", replace: "monthIndex < 10 ? monthIndex + 4 : monthIndex - 9" },
-  { id: "M99", rule: "Vars: a day is 86400000 ms in a time offset", file: "src/core/vars.ts", find: "d: 86_400_000", replace: "d: 86_000_000" }
+  { id: "M99", rule: "Vars: a day is 86400000 ms in a time offset", file: "src/core/vars.ts", find: "d: 86_400_000", replace: "d: 86_000_000" },
+  { id: "M100", rule: "Storage: a file name is the name in lower case with hyphens", file: "src/storage/store.ts", find: "name.toLowerCase().replace(/\\s+/g, '-')", replace: "name.replace(/\\s+/g, '-')" },
+  { id: "M101", rule: "Storage: folders come before requests when nothing says otherwise", file: "src/storage/store.ts", find: "(a.kind === 'request' ? 1 : 0) - (b.kind === 'request' ? 1 : 0) ||", replace: "" },
+  { id: "M102", rule: "Storage: an entry named twice in the order is shown once", file: "src/storage/store.ts", find: "if (node !== undefined && !placed.has(slug)) {", replace: "if (node !== undefined) {" },
+  { id: "M103", rule: "Storage: the value of a secret variable stays out of the shared file", file: "src/storage/secrets.ts", find: "return { ...variable, value: '' };", replace: "return variable;" },
+  { id: "M104", rule: "Storage: only secret variables are split off", file: "src/storage/secrets.ts", find: "if (!variable.secret) return variable;\n    if (variable.value !== '') secrets[variable.name]", replace: "if (false) return variable;\n    if (variable.value !== '') secrets[variable.name]" },
+  { id: "M105", rule: "Storage: the file of secrets is private", file: "src/storage/store.ts", find: "const LOCAL_FILE_MODE = 0o600;", replace: "const LOCAL_FILE_MODE = 0o644;" },
+  { id: "M106", rule: "Storage: the file of secrets is kept out of Git", file: "src/storage/store.ts", find: "const GITIGNORE_LINES = ['*.local.yml', '.runs/'];", replace: "const GITIGNORE_LINES = ['.runs/'];" },
+  { id: "M107", rule: "Storage: a folder cannot be moved into itself", file: "src/storage/store.ts", find: "(targetDir === node.path || targetDir.startsWith(`${node.path}/`))", replace: "(targetDir === node.path)" },
+  { id: "M108", rule: "Storage: a collection cannot be moved", file: "src/storage/store.ts", find: "if (node.kind === 'collection') throw new StoreError('A collection cannot be moved into another one.');", replace: "" },
+  { id: "M109", rule: "Storage: a removed entry leaves the order of its folder", file: "src/storage/store.ts", find: "else if (node.kind !== 'collection') await this.removeFromOrder(parentPath(node.path), node.slug);", replace: "" },
+  { id: "M110", rule: "Storage: a folder nested too deeply is left out", file: "src/storage/store.ts", find: "if (depth > STORAGE_LIMITS.maxDepth) {", replace: "if (depth > STORAGE_LIMITS.maxDepth + 100) {" },
+  { id: "M111", rule: "Storage: a folder with too many entries is cut", file: "src/storage/store.ts", find: "if (entries.length <= STORAGE_LIMITS.maxEntriesPerFolder) return entries;", replace: "if (entries.length <= STORAGE_LIMITS.maxEntriesPerFolder * 100) return entries;" },
+  { id: "M112", rule: "Storage: a folder of attachments is not a folder of requests", file: "src/storage/store.ts", find: "if (implicit && children.length === 0) return undefined;", replace: "" },
+  { id: "M113", rule: "Storage: a folder under collections without collection.yml is not a collection", file: "src/storage/store.ts", find: "} else if (kind === 'collection') {", replace: "} else if (false) {" },
+  { id: "M114", rule: "NodeFs: a file is never read through a link in a folder above it", file: "src/storage/node-fs.ts", find: "const { absolute, segments } = this.resolve(path);\n    await this.checkAncestors(segments);\n    let stats;", replace: "const { absolute, segments } = this.resolve(path);\n    void segments;\n    let stats;" },
+  { id: "M115", rule: "NodeFs: a target that is a folder or a link is not replaced", file: "src/storage/node-fs.ts", find: "if (!existing.isFile()) throw new Error('the target is a link or a folder: it is not replaced');", replace: "" },
+  { id: "M116", rule: "NodeFs: the root of the workspace is not removed", file: "src/storage/node-fs.ts", find: "if (segments.length === 0) throw new Error('the root of the workspace is not removed');", replace: "" },
+  { id: "M117", rule: "NodeFs: a rename does not replace what exists", file: "src/storage/node-fs.ts", find: "if (await this.exists(to)) throw new Error(`${to} exists already`);", replace: "" },
+  { id: "M118", rule: "NodeFs: a file over the size limit is refused", file: "src/storage/node-fs.ts", find: "stats.size > STORAGE_LIMITS.maxFileBytes", replace: "stats.size > STORAGE_LIMITS.maxFileBytes * 1000" },
+  { id: "M119", rule: "NodeFs: a name that is not allowed is refused", file: "src/storage/node-fs.ts", find: "if (problem !== undefined) throw new Error(`the name \"${segment}\" is not allowed: ${problem}`);", replace: "" },
+  { id: "M120", rule: "NodeFs: a link to a folder is not listed", file: "src/storage/node-fs.ts", find: "if (segments.length > 0 && !(await disk.lstat(absolute)).isDirectory()) return [];", replace: "" }
 ];
 
 function run(mutation) {
