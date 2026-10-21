@@ -43,8 +43,10 @@ export const ZONES: Zone[] = [
   { name: 'codegen', paths: ['src/codegen/'], modules: [], uses: ['util'], deterministic: true },
   // What was sent, kept on this computer: the entries, their limits, and how they read.
   { name: 'history', paths: ['src/history/'], modules: [], uses: ['util', 'core'], deterministic: true },
+  // What other tools' files become in the model of the client (cURL, Postman, Thunder Client): text in, requests out, with a note for what was not carried over.
+  { name: 'importers', paths: ['src/importers/'], modules: [], uses: ['stages', 'util', 'core', 'format'], deterministic: true },
   { name: 'view', paths: ['src/view/'], modules: [], uses: ['util', 'core', 'format'], deterministic: true },
-  { name: 'storage', paths: ['src/storage/'], modules: [], uses: ['stages', 'util', 'core', 'format', 'mirror'] },
+  { name: 'storage', paths: ['src/storage/'], modules: [], uses: ['stages', 'util', 'core', 'format', 'mirror', 'importers'] },
   { name: 'storage-node', paths: ['src/storage/node-fs.ts'], modules: ['node:crypto', 'node:fs', 'node:path'], uses: ['io', 'util', 'storage'] },
   { name: 'io', paths: ['src/reader/', 'src/write/', 'src/discover.ts'], modules: ['node:fs', 'node:fs/promises', 'node:path'], uses: ['stages', 'util'] },
   {
@@ -53,7 +55,7 @@ export const ZONES: Zone[] = [
     modules: ['node:path'],
     uses: ['stages', 'util', 'io']
   },
-  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net', 'script', 'script-pure', 'script-consent', 'mirror', 'runner', 'codegen', 'history'] },
+  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net', 'script', 'script-pure', 'script-consent', 'mirror', 'runner', 'codegen', 'history', 'importers'] },
   // The sandbox of the scripts: the messages and the code of the API are pure; the manager starts and watches the worker; the worker is the one place that holds the engine.
   { name: 'script-pure', paths: ['src/script/protocol.ts', 'src/script/prelude.ts', 'src/script/outcome.ts'], modules: [], uses: ['util', 'core'] },
   { name: 'script', paths: ['src/script/'], modules: ['node:fs', 'node:worker_threads'], uses: ['script-pure', 'util', 'core'] },

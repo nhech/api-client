@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { TreeNode } from '../../src/view/tree';
 import type { ClientWorkspace } from './clientWorkspace';
+import type { ImportService } from './importer';
 import type { RunnerManager } from './runner';
 import { findChild } from '../../src/storage/organise';
 import type { Organiser } from './organise';
@@ -50,13 +51,14 @@ export interface CommandContext {
   collections: CollectionsTree;
   environments: EnvironmentsTree;
   organiser: Organiser;
+  importer: ImportService;
 }
 
 function fail(error: unknown): void {
   void vscode.window.showErrorMessage(`API Client: ${error instanceof Error ? error.message : String(error)}`);
 }
 
-export function registerCommands(context: vscode.ExtensionContext, { runner, workspace, collections, environments, organiser }: CommandContext): void {
+export function registerCommands(context: vscode.ExtensionContext, { runner, workspace, collections, environments, organiser, importer }: CommandContext): void {
   /** The folder or collection a new item goes into: the one the command was used on, or one the person picks. */
   const target = async (node: TreeNode | undefined, what: string): Promise<TreeNode | undefined> => {
     if (node !== undefined && (node.kind === 'collection' || node.kind === 'folder')) return node;
@@ -79,6 +81,23 @@ export function registerCommands(context: vscode.ExtensionContext, { runner, wor
   };
 
   register('apiClient.refresh', async () => { await workspace.reload(); });
+  register('apiClient.import', async () => {
+    const picked = await vscode.window.showQuickPick([
+      { label: '$(cloud-download) Thunder Client data', description: 'collections and environments, from the data folder or exported files', command: 'apiClient.importThunderData' },
+      { label: '$(package) Postman collection or environment', description: 'a file exported as JSON (v2.0 or v2.1)', command: 'apiClient.importPostman' },
+      { label: '$(terminal) cURL command', description: 'one request, from the clipboard', command: 'apiClient.importCurl' }
+    ], { title: 'Import into API Client', placeHolder: 'What do you want to bring in? Nothing is written before you confirm.' });
+    if (picked !== undefined) await vscode.commands.executeCommand(picked.command);
+  });
+  register('apiClient.importThunderData', async () => { await importer.thunder(); });
+  register('apiClient.importPostman', async () => { await importer.postman(); });
+  register('apiClient.importNotes', async () => { await importer.showNotes(); });
+  register('apiClient.importCurl', async (node?: TreeNode, given?: string) => {
+    const parent = await target(node, 'request');
+    const loaded = workspace.loaded;
+    const found = parent === undefined || loaded === undefined ? undefined : findChild(loaded, parent.path);
+    if (found !== undefined && found.kind !== 'request') await importer.curl(found, typeof given === 'string' ? given : undefined);
+  });
   register('apiClient.runCollection', async (node?: TreeNode) => {
     const picked = await target(node, 'collection or folder to run');
     if (picked !== undefined) runner.show(picked.path, picked.label);

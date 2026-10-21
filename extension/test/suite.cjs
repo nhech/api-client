@@ -1487,4 +1487,120 @@ exports.run = async function run() {
     historyServer.closeAllConnections();
     historyServer.close();
   }
+
+  // 22. Import: a Postman file, Thunder Client data and a cURL command become collections and requests of the client, with the folders and the order
+  //     they had; nothing is written before the person says yes; a credential that was typed into a request goes to the file of secret values; and
+  //     the notes say what could not be carried over.
+  const importService = test.importer;
+  const nodeByLabel = label => test.client().collections.find(node => node.label === label);
+  const importAsked = [];
+  importService.answers.confirm = async summary => { importAsked.push(summary); return true; };
+  try {
+    // 22a. A Postman collection and an environment.
+    put('imports-src/postman.json', JSON.stringify({
+      info: { name: 'Imported Shop', description: 'From Postman', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+      auth: { type: 'bearer', bearer: [{ key: 'token', value: 'postman-token-literal-1' }] },
+      item: [
+        { name: 'Last in the list', request: { method: 'GET', url: 'https://imported.test/last' } },
+        { name: 'Users', item: [
+          { name: 'Zed', request: { method: 'GET', url: 'https://imported.test/users/zed?page=2' } },
+          { name: 'Ann', request: { method: 'POST', url: 'https://imported.test/users', header: [{ key: 'X-Api-Key', value: 'postman-key-literal-2' }], body: { mode: 'raw', raw: '{"name":"ann"}', options: { raw: { language: 'json' } } } } }
+        ] }
+      ]
+    }));
+    importService.answers.postmanFile = async () => path.join(workspace, 'imports-src', 'postman.json');
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importPostman');
+    assert.deepEqual(importAsked, ['1 collection, 1 folder, 3 requests'], 'the person is told what will be written, and says yes');
+    await until(() => nodeByLabel('Imported Shop') !== undefined, 'the imported collection is in the tree');
+    const imported = nodeByLabel('Imported Shop');
+    assert.deepEqual(imported.children.map(child => [child.kind, child.label]), [['folder', 'Users'], ['request', 'Last in the list']], 'folders first, as they were');
+    assert.deepEqual(imported.children[0].children.map(child => child.label), ['Zed', 'Ann'], 'in the order of the file, not sorted');
+    const annPath = imported.children[0].children[1].path;
+    const annText = fs.readFileSync(onDisk(annPath), 'utf8');
+    assert.ok(!annText.includes('postman-key-literal-2'), 'no credential in the file of the request');
+    assert.match(annText, /\{\{secret_imported_shop_header_x_api_key\}\}/);
+    const importedDir = path.dirname(path.dirname(onDisk(annPath)));
+    for (const shared of ['collection.yml']) assert.ok(!fs.readFileSync(path.join(importedDir, shared), 'utf8').includes('postman-token-literal-1'), 'nor in the file of the collection');
+    const secrets = fs.readFileSync(path.join(importedDir, 'collection.local.yml'), 'utf8');
+    assert.match(secrets, /postman-token-literal-1/);
+    assert.match(secrets, /postman-key-literal-2/);
+
+    // 22b. The notes say what was done.
+    await vscode.commands.executeCommand('apiClient.importNotes');
+    const notesDocument = vscode.window.activeTextEditor.document;
+    assert.equal(notesDocument.uri.scheme, 'apiclient-import');
+    assert.match(notesDocument.getText(), /^# Import from Postman\n\nFound: 1 collection, 1 folder, 3 requests\.\n/);
+    assert.match(notesDocument.getText(), /2 credentials that were typed into requests were moved to secret variables of the collection/);
+
+    // 22c. A no stops it: nothing is written.
+    const before = test.client().collections.length;
+    importService.answers.confirm = async () => false;
+    await vscode.commands.executeCommand('apiClient.importPostman');
+    await sleep(300);
+    assert.equal(test.client().collections.length, before, 'the answer no wrote nothing');
+    importService.answers.confirm = async summary => { importAsked.push(summary); return true; };
+
+    // 22d. An environment file; a file that is not Postman's is refused and writes nothing.
+    put('imports-src/env.json', JSON.stringify({ name: 'Imported staging', values: [{ key: 'host', value: 'https://staging.test' }, { key: 'api_token', value: 'env-token-literal-3', type: 'secret' }], _postman_variable_scope: 'environment' }));
+    importService.answers.postmanFile = async () => path.join(workspace, 'imports-src', 'env.json');
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importPostman');
+    assert.deepEqual(importAsked, ['1 environment']);
+    await until(() => test.client().environments.some(node => node.label === 'Imported staging'), 'the imported environment is in the tree');
+    const environmentFiles = fs.readdirSync(path.join(workspace, 'api-client', 'environments'));
+    assert.ok(environmentFiles.includes('imported-staging.env.yml') && environmentFiles.includes('imported-staging.env.local.yml'));
+    assert.ok(!fs.readFileSync(path.join(workspace, 'api-client', 'environments', 'imported-staging.env.yml'), 'utf8').includes('env-token-literal-3'));
+    assert.match(fs.readFileSync(path.join(workspace, 'api-client', 'environments', 'imported-staging.env.local.yml'), 'utf8'), /env-token-literal-3/);
+    put('imports-src/not-postman.json', '{"hello":"world"}');
+    importService.answers.postmanFile = async () => path.join(workspace, 'imports-src', 'not-postman.json');
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importPostman');
+    assert.deepEqual(importAsked, [], 'a file that is not Postman\'s is not even offered');
+
+    // 22e. Thunder Client data: the folders keep what they set, and the secrets are moved.
+    put('imports-src/thunder-collection_Orders.json', JSON.stringify({
+      client: 'Thunder Client', collectionName: 'Thunder Orders', dateExported: '2021-01-01T00:00:00.000Z', version: '1.1',
+      folders: [{ _id: 'f1', name: 'Admin', containerId: '', sortNum: 10000, settings: { options: { baseUrl: 'https://admin.thunder.test' }, headers: [{ name: 'X-Tenant', value: 'acme' }] } }],
+      requests: [
+        { _id: 'r1', colId: 'c', containerId: 'f1', name: 'List admins', url: '/admins?x=1', method: 'GET', sortNum: 10000, headers: [{ name: 'Authorization', value: 'Bearer thunder-token-literal-4' }] },
+        { _id: 'r2', colId: 'c', containerId: '', name: 'Health', url: 'https://thunder.test/health', method: 'GET', sortNum: 20000 },
+        { _id: 'r3', colId: 'c', containerId: '', name: 'Socket', url: 'wss://thunder.test/ws', method: 'GET', reqType: 'ws', sortNum: 30000 }
+      ]
+    }));
+    importService.answers.thunderSource = async () => [path.join(workspace, 'imports-src', 'thunder-collection_Orders.json')];
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importThunderData');
+    assert.deepEqual(importAsked, ['1 collection, 1 folder, 2 requests']);
+    await until(() => nodeByLabel('Thunder Orders') !== undefined, 'the Thunder collection is in the tree');
+    const thunder = nodeByLabel('Thunder Orders');
+    assert.deepEqual(thunder.children.map(child => [child.kind, child.label]), [['folder', 'Admin'], ['request', 'Health']], 'the WebSocket request is left out');
+    const adminDir = onDisk(thunder.children[0].path);
+    const folderText = fs.readFileSync(path.join(adminDir, 'folder.yml'), 'utf8');
+    assert.match(folderText, /baseUrl: https:\/\/admin\.thunder\.test/);
+    assert.match(folderText, /X-Tenant/);
+    const listText = fs.readFileSync(onDisk(thunder.children[0].children[0].path), 'utf8');
+    assert.ok(!listText.includes('thunder-token-literal-4'));
+    assert.match(listText, /Bearer \{\{secret_thunder_orders_header_authorization\}\}/);
+    await vscode.commands.executeCommand('apiClient.importNotes');
+    assert.match(vscode.window.activeTextEditor.document.getText(), /1 request was left out because it cannot be sent from here/);
+
+    // 22f. A cURL command becomes a request of the collection that was picked, and its credential goes to the secret values of that collection.
+    await vscode.commands.executeCommand('apiClient.importCurl', nodeByLabel('Thunder Orders'), "curl -X POST 'https://curl.test/items?x=1' -H 'Authorization: Bearer curl-token-literal-5' -H 'Content-Type: application/json' -d '{\"a\":1}'");
+    await until(() => nodeByLabel('Thunder Orders').children.some(child => child.label === 'POST /items'), 'the request of the command is in the tree');
+    const curlNode = nodeByLabel('Thunder Orders').children.find(child => child.label === 'POST /items');
+    const curlText = fs.readFileSync(onDisk(curlNode.path), 'utf8');
+    assert.match(curlText, /method: POST/);
+    assert.match(curlText, /url: https:\/\/curl\.test\/items/);
+    assert.ok(!curlText.includes('curl-token-literal-5'));
+    assert.match(fs.readFileSync(path.join(path.dirname(onDisk(curlNode.path)), 'collection.local.yml'), 'utf8'), /curl-token-literal-5/);
+    await until(() => test.requestEditor(uriOf(curlNode.path).toString())?.isReady === true, 'the new request is open in its editor');
+    // A text that is not a command is refused and adds nothing.
+    const countBefore = nodeByLabel('Thunder Orders').children.length;
+    await vscode.commands.executeCommand('apiClient.importCurl', nodeByLabel('Thunder Orders'), 'echo hello');
+    await sleep(300);
+    assert.equal(nodeByLabel('Thunder Orders').children.length, countBefore);
+  } finally {
+    importService.answers = {};
+  }
 };

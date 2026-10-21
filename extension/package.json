@@ -117,13 +117,39 @@
         "category": "API Client"
       },
       {
+        "command": "apiClient.import",
+        "title": "Import...",
+        "category": "API Client",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "apiClient.importThunderData",
+        "title": "Import Thunder Client Data...",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.importPostman",
+        "title": "Import a Postman Collection or Environment...",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.importCurl",
+        "title": "New Request from cURL...",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.importNotes",
+        "title": "Show the Notes of the Last Import",
+        "category": "API Client"
+      },
+      {
         "command": "apiClient.importThunder",
-        "title": "Import from Thunder Client...",
+        "title": "Convert Thunder Client Data to .http Files...",
         "category": "API Client"
       },
       {
         "command": "apiClient.importThunderSteps",
-        "title": "Import from Thunder Client (step by step)...",
+        "title": "Convert Thunder Client Data to .http Files (step by step)...",
         "category": "API Client"
       },
       {
@@ -284,7 +310,7 @@
       },
       {
         "view": "apiClient.collections",
-        "contents": "No collections yet. A collection is a folder of requests with what they share: a base address, headers, authentication.\n[New Collection](command:apiClient.newCollection)\n[Import from Thunder Client](command:apiClient.importThunder)",
+        "contents": "No collections yet. A collection is a folder of requests with what they share: a base address, headers, authentication.\n[New Collection](command:apiClient.newCollection)\n[Import...](command:apiClient.import)",
         "when": "workspaceFolderCount > 0"
       },
       {
@@ -422,9 +448,29 @@
           "group": "navigation@4"
         },
         {
+          "command": "apiClient.import",
+          "when": "view == apiClient.collections",
+          "group": "navigation@5"
+        },
+        {
+          "command": "apiClient.importCurl",
+          "when": "view == apiClient.collections",
+          "group": "1_import@1"
+        },
+        {
+          "command": "apiClient.importPostman",
+          "when": "view == apiClient.collections",
+          "group": "1_import@2"
+        },
+        {
+          "command": "apiClient.importThunderData",
+          "when": "view == apiClient.collections",
+          "group": "1_import@3"
+        },
+        {
           "command": "apiClient.importThunder",
           "when": "view == apiClient.collections",
-          "group": "1_import"
+          "group": "1_import@4"
         },
         {
           "command": "apiClient.newEnvironment",

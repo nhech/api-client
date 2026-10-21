@@ -46,7 +46,8 @@ export class SecretStore {
   private readonly named = new Map<string, string>();
   private readonly taken = new Map<string, number>();
 
-  constructor(readonly moveSecrets: boolean) {}
+  /** `existing`: the variables that are already there (name to value), for a store that adds to a collection that has some: their names are not taken again, and a value that one of them already holds is used as it is. */
+  constructor(readonly moveSecrets: boolean, private readonly existing: ReadonlyMap<string, string> = new Map()) {}
 
   /** `label` says what the value is (`bearer_token`, `basic_password`, `header_authorization`); `scope` is the collection. */
   protect(scope: string, label: string, value: string): Protected {
@@ -56,11 +57,16 @@ export class SecretStore {
     const key = JSON.stringify([base, value]);
     let name = this.named.get(key);
     if (name === undefined) {
-      const count = (this.taken.get(base) ?? 0) + 1;
-      this.taken.set(base, count);
-      name = count === 1 ? base : `${base}_${count}`;
+      for (const [known, held] of this.existing) {
+        if (held === value && known.startsWith(base) && /^(?:_\d+)?$/.test(known.slice(base.length))) { name = known; break; }
+      }
+      if (name === undefined) {
+        let count = this.taken.get(base) ?? 0;
+        do { count++; name = count === 1 ? base : `${base}_${count}`; } while (this.existing.has(name) || this.variables.has(name));
+        this.taken.set(base, count);
+        this.variables.set(name, value);
+      }
       this.named.set(key, name);
-      this.variables.set(name, value);
     }
     this.moved++;
     return { text: `{{${name}}}`, moved: true, literal: false };

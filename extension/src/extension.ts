@@ -12,6 +12,7 @@ import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
 import { CookieManager } from './cookies';
+import { ImportService, NOTES_SCHEME } from './importer';
 import { HistoryService, HistoryTree, registerHistory } from './history';
 import { MirrorService } from './mirror';
 import { RunnerManager, type RunnerTestView } from './runner';
@@ -44,6 +45,8 @@ export interface ImporterTestApi {
   cookies: CookieManager;
   /** What was sent, and the view that lists it. */
   history: HistoryService;
+  /** Bringing in what other tools made: the tests answer the questions. */
+  importer: ImportService;
   historyView(): HistoryNode[];
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
@@ -115,12 +118,14 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     // The Explorer view has no items: it exists to show its welcome text, with the button that opens the panel.
     vscode.window.registerTreeDataProvider<never>(START_VIEW, { getTreeItem: item => item, getChildren: () => [] })
   );
-  registerCommands(context, { runner, workspace, collections, environments, organiser });
+  const importer = new ImportService(workspace, host, async () => candidates());
+  context.subscriptions.push(importer, vscode.workspace.registerTextDocumentContentProvider(NOTES_SCHEME, importer.notes));
+  registerCommands(context, { runner, workspace, collections, environments, organiser, importer });
   registerHistory(context, history, workspace);
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), cookies, history, historyView: () => historyTree.snapshot(), panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), cookies, history, importer, historyView: () => historyTree.snapshot(), panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 
