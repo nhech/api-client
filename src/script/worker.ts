@@ -1,3 +1,4 @@
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { parentPort } from 'node:worker_threads';
 import { isFail, newQuickJSWASMModuleFromVariant, newVariant, type QuickJSContext, type QuickJSHandle, type QuickJSWASMModule, type VmCallResult } from 'quickjs-emscripten-core';
 import variant from '@jitl/quickjs-wasmfile-release-sync';
@@ -21,6 +22,11 @@ const send = (message: FromWorker): void => port.postMessage(message);
 const LOCKDOWN = `
 for (const name of ['SharedArrayBuffer', 'Atomics', 'WeakRef', 'FinalizationRegistry', 'escape', 'unescape']) { try { delete globalThis[name]; } catch (e) { /* not there */ } }
 `;
+
+/** The hashes the API offers (what the crypto-js module of Postman scripts has), and what an argument in hexadecimal looks like. */
+const HASHES: ReadonlySet<string> = new Set(['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512']);
+const HEX_TEXT = /^(?:[0-9a-fA-F]{2})*$/;
+const MAX_HASH_HEX_CHARS = 2 * MAX_OPERATION_CHARS;
 
 /** An error that the script itself raised (or the engine raised for it: a limit, a syntax error); the worker is fine. */
 class GuestError extends Error {
@@ -97,6 +103,33 @@ async function run(id: number, source: string, input: string, limits: Limits): P
     });
     vm.setProp(vm.global, '__host', host);
     host.dispose();
+    // Hashes and random bytes are computed here, at once: the scripts of Postman call them as plain functions. Bytes go in and out as hexadecimal text.
+    const hexArgument = (handle: QuickJSHandle): string => {
+      const value = vm.getString(handle);
+      if (value.length > MAX_HASH_HEX_CHARS || !HEX_TEXT.test(value)) throw new Error('the data is not in the form the operation takes');
+      return value;
+    };
+    const counted = (): void => { if (++calls > limits.hostCalls) throw new Error(`a script may ask for at most ${limits.hostCalls} operations`); };
+    const define = (name: string, implementation: (...handles: QuickJSHandle[]) => string): void => {
+      const handle = vm.newFunction(name, (...handles) => { counted(); return vm.newString(implementation(...handles)); });
+      vm.setProp(vm.global, name, handle);
+      handle.dispose();
+    };
+    define('__hash', (algorithmHandle, dataHandle) => {
+      const algorithm = vm.getString(algorithmHandle);
+      if (!HASHES.has(algorithm)) throw new Error(`there is no hash called ${algorithm.slice(0, 20)}`);
+      return createHash(algorithm).update(Buffer.from(hexArgument(dataHandle as QuickJSHandle), 'hex')).digest('hex');
+    });
+    define('__hmac', (algorithmHandle, keyHandle, dataHandle) => {
+      const algorithm = vm.getString(algorithmHandle);
+      if (!HASHES.has(algorithm)) throw new Error(`there is no hash called ${algorithm.slice(0, 20)}`);
+      return createHmac(algorithm, Buffer.from(hexArgument(keyHandle as QuickJSHandle), 'hex')).update(Buffer.from(hexArgument(dataHandle as QuickJSHandle), 'hex')).digest('hex');
+    });
+    define('__random', countHandle => {
+      const count = vm.getNumber(countHandle as QuickJSHandle);
+      if (!Number.isInteger(count) || count < 1 || count > 1024) throw new Error('between 1 and 1024 random bytes can be asked for');
+      return randomBytes(count).toString('hex');
+    });
     const inputHandle = vm.newString(input);
     vm.setProp(vm.global, '__input', inputHandle);
     inputHandle.dispose();

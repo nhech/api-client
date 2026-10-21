@@ -47,9 +47,9 @@ export const ZONES: Zone[] = [
   },
   { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net'] },
   // The sandbox of the scripts: the messages and the code of the API are pure; the manager starts and watches the worker; the worker is the one place that holds the engine.
-  { name: 'script-pure', paths: ['src/script/protocol.ts'], modules: [], uses: ['util', 'core'] },
+  { name: 'script-pure', paths: ['src/script/protocol.ts', 'src/script/prelude.ts', 'src/script/outcome.ts'], modules: [], uses: ['util', 'core'] },
   { name: 'script', paths: ['src/script/'], modules: ['node:fs', 'node:worker_threads'], uses: ['script-pure', 'util', 'core'] },
-  { name: 'script-worker', paths: ['src/script/worker.ts'], modules: ['node:worker_threads', 'quickjs-emscripten-core', '@jitl/quickjs-wasmfile-release-sync'], uses: ['script-pure'] },
+  { name: 'script-worker', paths: ['src/script/worker.ts'], modules: ['node:crypto', 'node:worker_threads', 'quickjs-emscripten-core', '@jitl/quickjs-wasmfile-release-sync'], uses: ['script-pure'] },
   { name: 'page', paths: ['extension/src/webview/'], modules: [], uses: ['util'] },
   // The request editor in the page: Preact and CodeMirror are the only packages that go into it (dist/app.meta.json is checked against the same list), and it
   // applies the edits it sends with the same code the extension checks them with, so it may use the view zone.

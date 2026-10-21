@@ -118,6 +118,14 @@ test('A result larger than the limit, and too many operations, are refused', asy
   await failure("for (let i = 0; i < 21; i++) __host('echo', 'x');", 'error', /at most 20 operations/, ops, { hostCalls: 20 });
 });
 
+test('The hashes and the random bytes are operations too, counted with the rest', async () => {
+  assert.equal(await okResult("let n = 0; for (let i = 0; i < 20; i++) { __hash('sha256', '61'); __hmac('sha256', '6b', '61'); __random(4); n += 3; } globalThis.__result = () => n;", NO_OPS, { hostCalls: 60 }), '60');
+  await failure("for (let i = 0; i < 61; i++) __hash('sha256', '61');", 'error', /at most 60 operations/, NO_OPS, { hostCalls: 60 });
+  await failure("for (let i = 0; i < 61; i++) __hmac('sha256', '6b', '61');", 'error', /at most 60 operations/, NO_OPS, { hostCalls: 60 });
+  await failure("for (let i = 0; i < 61; i++) __random(1);", 'error', /at most 60 operations/, NO_OPS, { hostCalls: 60 });
+  await failure("__host('echo', 'x'); for (let i = 0; i < 60; i++) __hash('sha256', '61');", 'error', /at most 60 operations/, { echo: async text => text }, { hostCalls: 60 });
+});
+
 test('The script cannot reach the machine: no process, no require, no network, no way back to the host', async () => {
   const reach = "typeof process + typeof require + typeof fetch + typeof Buffer + typeof WebAssembly + typeof XMLHttpRequest + typeof setTimeout + typeof module + typeof __filename";
   assert.equal(await okResult(result(reach)), 'undefined'.repeat(9));
@@ -136,7 +144,7 @@ test('The names of the global object are the ones of the language and ours, and 
     'Object', 'Function', 'Error', 'EvalError', 'RangeError', 'ReferenceError', 'SyntaxError', 'TypeError', 'URIError', 'InternalError', 'AggregateError', 'Array', 'parseInt', 'parseFloat', 'isNaN', 'isFinite',
     'decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'Infinity', 'NaN', 'undefined', 'eval', 'Symbol', 'Number', 'Boolean', 'String', 'Math', 'Reflect', 'Date', 'RegExp', 'JSON', 'Proxy',
     'Map', 'Set', 'WeakMap', 'WeakSet', 'ArrayBuffer', 'DataView', 'Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array', 'Float32Array', 'Float64Array',
-    'BigInt', 'BigInt64Array', 'BigUint64Array', 'Float16Array', 'Promise', 'globalThis', 'Iterator', '__host', '__input', '__result'
+    'BigInt', 'BigInt64Array', 'BigUint64Array', 'Float16Array', 'Promise', 'globalThis', 'Iterator', '__host', '__input', '__result', '__hash', '__hmac', '__random'
   ]);
   assert.ok(['console', 'print', 'scriptArgs', 'setTimeout', 'std', 'os'].every(name => !names.includes(name)), 'the host functions the standalone interpreter has are not there');
   const strangers = names.filter(name => !allowed.has(name));
