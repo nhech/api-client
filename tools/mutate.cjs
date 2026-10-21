@@ -90,7 +90,21 @@ const MUTATIONS = [
   { id: "M68", rule: "YAML: the block header tells how many line breaks end the string", file: "src/format/yaml/emit.ts", find: "const header = trailing === 0 ? '|-' : trailing === 1 ? '|' : '|+';", replace: "const header = trailing === 0 ? '|' : trailing === 1 ? '|-' : '|+';" },
   { id: "M69", rule: "YAML: true, false and whole numbers are written plain", file: "src/format/yaml/emit.ts", find: "return READABLE.test(text) ||", replace: "return false ||" },
   { id: "M70", rule: "YAML: a string that looks like a date is quoted when written", file: "src/format/yaml/emit.ts", find: "  /^\\d{4}-\\d\\d?-\\d\\d?(?:[Tt ].*)?$/,\n", replace: "" },
-  { id: "M71", rule: "YAML: a value that starts with a brace is quoted when written", file: "src/format/yaml/emit.ts", find: "const PLAIN_START = /^[\\p{L}\\p{N}_$/.]/u;", replace: "const PLAIN_START = /^[\\p{L}\\p{N}_$/.{\\[]/u;" }
+  { id: "M71", rule: "YAML: a value that starts with a brace is quoted when written", file: "src/format/yaml/emit.ts", find: "const PLAIN_START = /^[\\p{L}\\p{N}_$/.]/u;", replace: "const PLAIN_START = /^[\\p{L}\\p{N}_$/.{\\[]/u;" },
+  { id: "M72", rule: "Core: the nearest base URL wins", file: "src/core/inherit.ts", find: "baseUrlFrom = level.name; break; }", replace: "baseUrlFrom = level.name; }" },
+  { id: "M73", rule: "Core: the nearest authentication that was chosen wins", file: "src/core/inherit.ts", find: "authFrom = level.name; break; }", replace: "authFrom = level.name; }" },
+  { id: "M74", rule: "Core: header names are compared without regard to case", file: "src/core/inherit.ts", find: "const named = new Set(rows.map(row => row.name.toLowerCase()));", replace: "const named = new Set(rows.map(row => row.name));" },
+  { id: "M75", rule: "Core: a disabled nearer header removes the inherited one", file: "src/core/inherit.ts", find: "const named = new Set(rows.map(row => row.name.toLowerCase()));", replace: "const named = new Set(rows.filter(row => row.enabled).map(row => row.name.toLowerCase()));" },
+  { id: "M76", rule: "Core: an assertion that an outer level already has is not added again", file: "src/core/inherit.ts", find: "|| seen.has(line.expr)", replace: "" },
+  { id: "M77", rule: "Core: only the nearest levels count", file: "src/core/inherit.ts", find: "const levels = truncated ? chain.slice(chain.length - MAX_LEVELS) : chain;", replace: "const levels = chain;" },
+  { id: "M78", rule: "Core: the request's own settings are nearer than every level", file: "src/core/inherit.ts", find: "mergeSettings(workspace, ...levels.map(level => level.container.settings), request.settings)", replace: "mergeSettings(workspace, request.settings, ...levels.map(level => level.container.settings))" },
+  { id: "M79", rule: "Core: a URL that starts with a variable is not given a base URL", file: "src/core/inherit.ts", find: "|| url.startsWith('{{')", replace: "" },
+  { id: "M80", rule: "Schema: a file of a newer version is refused", file: "src/format/schema/document.ts", find: "if (version > current) {", replace: "if (version > current + 100) {" },
+  { id: "M81", rule: "Schema: an unknown key inside a nested mapping is reported", file: "src/format/schema/read.ts", find: "for (const key of this.rest().keys()) this.reader.warn(", replace: "for (const key of ([] as string[])) this.reader.warn(" },
+  { id: "M82", rule: "Schema: an enabled row is written without the switch", file: "src/format/schema/common.ts", find: ".bool('enabled', row.enabled, true)", replace: ".bool('enabled', row.enabled, false)" },
+  { id: "M83", rule: "Schema: a request has a parallel .http file unless it says otherwise", file: "src/format/schema/files.ts", find: "mirror: fields.bool('mirror', true)", replace: "mirror: fields.bool('mirror', false)" },
+  { id: "M84", rule: "Schema: a request needs a name", file: "src/format/schema/files.ts", find: "if (name.trim() === '') fields.reader.error('name',", replace: "if (name.trim() === '' && false) fields.reader.error('name'," },
+  { id: "M85", rule: "Core: an identifier sorts by time", file: "src/core/clock.ts", find: "CROCKFORD[time % 32]", replace: "CROCKFORD[time % 31]" }
 ];
 
 function run(mutation) {
