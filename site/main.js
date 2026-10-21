@@ -1,4 +1,4 @@
-// API Client Importer landing page: progressive enhancement only. Every feature here is optional.
+// HTTP Files Importer landing page: progressive enhancement only. Every feature here is optional.
 // The inline head script adds the "js" class; this file adds "js-ready" once the theme toggle and the
 // menu work. Without "js-ready" at DOMContentLoaded the head script removes "js" again, so the page
 // falls back to the no-JS layout when this file does not load or fails early.

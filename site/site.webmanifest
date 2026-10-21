@@ -1,6 +1,6 @@
 {
   "name": "{{NAME}}",
-  "short_name": "API Client Importer",
+  "short_name": "HTTP Files Importer",
   "description": "Move Thunder Client requests to plain .http files.",
   "start_url": "./",
   "scope": "./",

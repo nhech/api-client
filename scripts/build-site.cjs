@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 
 // The product name, the address of the page and the repository. Change them here only: pages use the {{NAME}}, {{SITE_URL}} and
 // {{REPO_URL}} placeholders (and scripts/deploy-site.cjs reads the address from here).
-const NAME = 'API Client Importer';
+const NAME = 'HTTP Files Importer';
 const SITE_URL = 'https://api-client.longtd.me/';
 const REPO_URL = 'https://github.com/nhech/api-client';
 const OG_IMAGE = { file: 'og.jpg', type: 'image/jpeg', width: 1200, height: 630 };
@@ -22,9 +22,18 @@ const version = manifest.version;
 const nodeFloor = /^>=\s*(\d+(?:\.\d+)?)/.exec(manifest.engines.node);
 const vscodeFloor = /^\^?(\d+\.\d+)/.exec(extensionManifest.engines.vscode);
 if (!nodeFloor || !vscodeFloor) throw new Error('The Node.js or VS Code minimum could not be read from the manifests.');
+// The extension's id and its Marketplace page come from the extension's manifest. Set MARKETPLACE_LISTED to true when the listing is live
+// (check that MARKETPLACE_URL opens it first): the build then drops every <!-- unlisted -->...<!-- /unlisted --> block (the "not on the
+// Marketplace yet" notes) and keeps every <!-- listed -->...<!-- /listed --> block (the install buttons, the one-line install command and the
+// structured data that point at the listing). While false, only the markers of the first kind are removed and the second kind is dropped.
+const EXTENSION_ID = `${extensionManifest.publisher}.${extensionManifest.name}`;
+const MARKETPLACE_URL = `https://marketplace.visualstudio.com/items?itemName=${EXTENSION_ID}`;
+const MARKETPLACE_LISTED = false;
+const UNLISTED_BLOCK = /<!-- unlisted -->([\s\S]*?)<!-- \/unlisted -->/g;
+const LISTED_BLOCK = /<!-- listed -->([\s\S]*?)<!-- \/listed -->/g;
 const placeholders = {
   NAME, SITE_URL, REPO_URL, VERSION: version, NODE_MINIMUM: nodeFloor[1], VSCODE_MINIMUM: vscodeFloor[1],
-  KEYWORDS: manifest.keywords.join(', ')
+  EXTENSION_ID, MARKETPLACE_URL, KEYWORDS: manifest.keywords.join(', ')
 };
 const notDeployed = new Set(['og', 'deploy', 'README.md']); // top-level entries of site/ that stay source-only
 const templated = new Set(['.html', '.xml', '.txt', '.webmanifest']);
@@ -150,7 +159,9 @@ function build() {
     fs.mkdirSync(path.dirname(to), { recursive: true });
     if (templated.has(path.extname(file))) {
       const text = fs.readFileSync(from, 'utf8')
-        .replace(/\{\{([A-Z_]+)\}\}/g, (match, name) => (name in placeholders ? placeholders[name] : match));
+        .replace(/\{\{([A-Z_]+)\}\}/g, (match, name) => (name in placeholders ? placeholders[name] : match))
+        .replace(UNLISTED_BLOCK, (match, inner) => (MARKETPLACE_LISTED ? '' : inner))
+        .replace(LISTED_BLOCK, (match, inner) => (MARKETPLACE_LISTED ? inner : ''));
       fs.writeFileSync(to, text);
     } else fs.copyFileSync(from, to);
   }
@@ -310,6 +321,7 @@ function validate() {
     if (!textTypes.has(extension)) continue;
     const text = fs.readFileSync(path.join(output, file), 'utf8');
     if (/\{\{[A-Z_]+\}\}/.test(text)) fail(`${file}: unreplaced {{placeholder}}`);
+    if (/<!-- \/?(?:un)?listed -->/.test(text)) fail(`${file}: unbalanced <!-- listed --> or <!-- unlisted --> marker`);
     if (extension === '.css') {
       for (const match of text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) {
         if (/^(?:data:|#)/.test(match[2])) continue;
@@ -370,6 +382,8 @@ console.log(JSON.stringify({
   output: 'site-dist',
   version,
   siteUrl: SITE_URL,
+  marketplaceUrl: MARKETPLACE_URL,
+  marketplaceListed: MARKETPLACE_LISTED,
   files: result.files.size,
   bytes,
   pages: [...result.pages.keys()],

@@ -94,6 +94,15 @@ async function verify() {
     const response = await request(asset);
     check(`asset ${asset}`, response.status === 200 && type.test(response.headers['content-type'] || '') && response.headers['content-security-policy'], `${response.status} ${response.headers['content-type'] || ''}`);
   }
+  // The CSS and JS URLs of the page carry a content hash and are cached for a year; the same files without it are checked again after an hour.
+  const hashed = /"(styles\.css\?v=[0-9a-f]{10})"/.exec(home.body.toString('utf8'));
+  check('hashed asset URL in the page', hashed, 'styles.css?v=<hash> not found in the home page');
+  if (hashed) {
+    const long = await request(`/${hashed[1]}`);
+    check('hashed asset cached for a year', /max-age=31536000/.test(long.headers['cache-control'] || '') && /immutable/.test(long.headers['cache-control'] || ''), long.headers['cache-control']);
+    const short = await request('/styles.css');
+    check('plain asset rechecked after an hour', /max-age=3600/.test(short.headers['cache-control'] || ''), short.headers['cache-control']);
+  }
   const missing = await request('/does-not-exist');
   check('missing path 404 page', missing.status === 404 && missing.body.toString('utf8').includes('<h1'), `${missing.status}`);
   const hidden = await request('/.generated/security-headers.conf');
