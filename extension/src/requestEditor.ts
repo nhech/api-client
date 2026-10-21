@@ -5,7 +5,7 @@ import { locate, variablesOf } from '../../src/engine/prepare';
 import { readRequest, writeRequest } from '../../src/format/schema';
 import type { YMap } from '../../src/format/yaml';
 import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
-import { parseToHost, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
+import { parseToHost, type OAuthStatusView, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
 import { configureAppPanel } from './appPanel';
 import { RequestRunner, type SendEnvironment } from './sender';
 
@@ -41,6 +41,10 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
   /** Messages of the page are handled one after the other, so a send never reads the file before the edit that came before it has been applied. */
   private chain: Promise<void> = Promise.resolve();
   private readonly runner: RequestRunner;
+  /** A try to get an access token, which the Cancel of the page ends. */
+  private tokenRun: AbortController | undefined;
+  /** What the page was last told about the token, so that the same thing is not said again at every change. */
+  private lastToken = '';
   readonly violations: string[] = [];
   private readonly subscriptions: vscode.Disposable[] = [];
 
@@ -56,6 +60,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
         if (this.selfChanges > 0) { this.selfChanges--; return; }
         this.rev++;
         this.post({ type: 'doc', cause: event.reason === vscode.TextDocumentChangeReason.Undo || event.reason === vscode.TextDocumentChangeReason.Redo ? 'undo' : 'disk', ...this.state() });
+        void this.postToken();
       })
     );
   }
@@ -93,8 +98,8 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
   }
 
   private post(message: ToView): void {
-    // The list of variables comes whenever the files change; "what the page was last told" is about the file and the send, so it is left out.
-    if (message.type !== 'vars') this.last = message;
+    // The list of variables and the state of the token come whenever the files change; "what the page was last told" is about the file and the send, so they are left out.
+    if (message.type !== 'vars' && message.type !== 'oauth') this.last = message;
     this.recent.push(message);
     if (this.recent.length > 50) this.recent.shift();
     void this.panel.webview.postMessage(message);
@@ -104,7 +109,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     const message = parseToHost(raw);
     if (message === undefined) return Promise.resolve();
     // Cancelling does not wait for what came before it.
-    if (message.type === 'cancel') { this.runner.cancel(); return Promise.resolve(); }
+    if (message.type === 'cancel') { this.runner.cancel(); this.tokenRun?.abort(); return Promise.resolve(); }
     const run = this.chain.then(() => this.handle(message));
     this.chain = run.catch(() => undefined);
     return run;
@@ -124,6 +129,41 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     const path = this.relativePath();
     const collection = loaded === undefined || path === undefined ? undefined : locate(loaded, path)?.collection.path;
     this.post({ type: 'vars', ...(loaded === undefined || path === undefined ? { vars: [], complete: false } : variablesOf(loaded, path, this.env.workspace.activeEnvironmentId, this.env.runtime.scope(this.env.contextOf(collection ?? '')))) });
+    void this.postToken();
+  }
+
+  /** Tells the page whether the request has an access token, when the authentication that applies to it is OAuth 2.0. */
+  private async postToken(failure?: string): Promise<void> {
+    const path = this.relativePath();
+    const input = path === undefined ? undefined : this.env.oauthInput(path, this.state().request);
+    if (input === undefined || input.auth.kind !== 'oauth2') { this.postStatus({ applies: false, state: 'none' }); return; }
+    const status = await this.env.oauth.status(input);
+    this.postStatus({ applies: true, ...status, ...(failure === undefined ? {} : { message: failure }) });
+  }
+
+  private postStatus(status: OAuthStatusView): void {
+    const text = JSON.stringify(status);
+    if (text === this.lastToken) return;
+    this.lastToken = text;
+    this.post({ type: 'oauth', status });
+  }
+
+  /** Gets an access token now, or forgets the one that is kept. */
+  private async token(action: 'get' | 'clear'): Promise<void> {
+    const path = this.relativePath();
+    const input = path === undefined ? undefined : this.env.oauthInput(path, this.state().request);
+    if (input === undefined || input.auth.kind !== 'oauth2') return;
+    if (action === 'clear') { await this.env.oauth.forget(input); await this.postToken(); return; }
+    if (this.tokenRun !== undefined) return;
+    const run = new AbortController();
+    this.tokenRun = run;
+    this.postStatus({ applies: true, state: 'busy' });
+    try {
+      const outcome = await this.env.oauth.token({ ...input, signal: run.signal });
+      await this.postToken(outcome.kind === 'failed' ? outcome.message : undefined);
+    } finally {
+      this.tokenRun = undefined;
+    }
   }
 
   private async handle(message: ToHost): Promise<void> {
@@ -146,6 +186,8 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
       if (this.violations.length < 20) this.violations.push(message.text);
     } else if (message.type === 'copyResponse') {
       await this.runner.copy(message.pretty);
+    } else if (message.type === 'oauth') {
+      await this.token(message.action);
     }
   }
 
@@ -157,7 +199,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
       return;
     }
     // The send runs on its own; messages that come while it runs (an edit, a cancel) are handled as they arrive.
-    void this.runner.start(path, state.request);
+    void this.runner.start(path, state.request).then(() => this.postToken());
   }
 
   private async edit(rev: number, ops: Parameters<typeof applyEditOps>[1]): Promise<void> {
@@ -186,10 +228,12 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     }
     this.rev++;
     this.post({ type: 'doc', cause: 'self', ...this.state() });
+    void this.postToken();
   }
 
   dispose(): void {
     this.runner.dispose();
+    this.tokenRun?.abort();
     for (const subscription of this.subscriptions) subscription.dispose();
   }
 }

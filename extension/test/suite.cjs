@@ -934,4 +934,191 @@ exports.run = async function run() {
     test.mirror.confirm = undefined;
   }
   await until(() => fs.existsSync(mirrorFile('quiet.http')), 'with the mode on again the file is written');
+
+  // 17. OAuth 2.0: a request whose authentication is OAuth gets an access token before it is sent: client credentials, a refresh when the token runs
+  //     out, a password, or the authorization code with PKCE (the browser is stood in for by the test); the server is asked about once, a refusal sends
+  //     nothing, a wrong secret is explained, and no token is written into a file.
+  const fetchText = url => new Promise((resolve, reject) => {
+    http2.get(url, res => {
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+    }).on('error', reject);
+  });
+  const grants = [];
+  const apiCalls = [];
+  const challenges = new Map();
+  const oauthServer = http2.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      const send = (status, json) => { res.statusCode = status; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(json)); };
+      if (req.url === '/api') { apiCalls.push(req.headers.authorization); send(200, { ok: true }); return; }
+      if (req.url !== '/token') { send(404, {}); return; }
+      const form = new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
+      const grant = form.get('grant_type');
+      const basic = req.headers.authorization ?? '';
+      grants.push({ grant, basic, form: Object.fromEntries(form) });
+      if (grant === 'client_credentials') {
+        if (basic !== 'Basic ' + Buffer.from('cid:csecret').toString('base64')) { send(401, { error: 'invalid_client', error_description: 'bad secret', access_token: 'must-not-be-shown' }); return; }
+        send(200, { access_token: 'cc-token-1', token_type: 'bearer', expires_in: 20, refresh_token: 'rt-1' });
+      } else if (grant === 'refresh_token') {
+        send(form.get('refresh_token') === 'rt-1' ? 200 : 400, form.get('refresh_token') === 'rt-1' ? { access_token: 'cc-token-2', token_type: 'Bearer', expires_in: 3600 } : { error: 'invalid_grant' });
+      } else if (grant === 'password') {
+        send(200, { access_token: 'pw-token-1', token_type: 'Bearer', expires_in: 3600 });
+      } else if (grant === 'authorization_code') {
+        const challenge = challenges.get(form.get('code'));
+        const verifier = form.get('code_verifier') ?? '';
+        const expected = require('node:crypto').createHash('sha256').update(verifier).digest('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        send(form.get('code') === 'good-code' && challenge === expected && form.get('client_id') === 'public-client' ? 200 : 400, form.get('code') === 'good-code' && challenge === expected ? { access_token: 'code-token-1', token_type: 'Bearer', expires_in: 3600 } : { error: 'invalid_grant', error_description: 'verifier does not match' });
+      } else send(400, { error: 'unsupported_grant_type' });
+    });
+  });
+  await new Promise(resolve => oauthServer.listen(0, '127.0.0.1', resolve));
+  const oauthBase = 'http://127.0.0.1:' + oauthServer.address().port;
+  const oauthRequest = (name, id, auth) => ['schema: 1', 'id: ' + id, 'name: ' + name, 'url: ' + oauthBase + '/api', 'auth:', ...auth.map(line => '  ' + line), ''].join('\n');
+  const asked = [];
+  let hostAnswer = 'allow';
+  test.oauth.answer = async question => { asked.push(question); return hostAnswer; };
+  try {
+    put('api-client/collections/shop/oauth-cc.req.yml', oauthRequest('OAuth cc', '01J9Z4V0N2XK7Q3M8T5R6Y1B41', ['kind: oauth2', 'grant: client_credentials', 'pkce: false', 'tokenUrl: ' + oauthBase + '/token', 'clientId: cid', 'clientSecret: csecret', 'scope: read']));
+    put('api-client/collections/shop/oauth-bad.req.yml', oauthRequest('OAuth bad', '01J9Z4V0N2XK7Q3M8T5R6Y1B42', ['kind: oauth2', 'grant: client_credentials', 'pkce: false', 'tokenUrl: ' + oauthBase + '/token', 'clientId: cid', 'clientSecret: wrong']));
+    put('api-client/collections/shop/oauth-pw.req.yml', oauthRequest('OAuth pw', '01J9Z4V0N2XK7Q3M8T5R6Y1B43', ['kind: oauth2', 'grant: password', 'pkce: false', 'tokenUrl: ' + oauthBase + '/token', 'clientId: cid', 'clientSecret: csecret', 'username: ann', 'password: pw']));
+    put('api-client/collections/shop/oauth-code.req.yml', oauthRequest('OAuth code', '01J9Z4V0N2XK7Q3M8T5R6Y1B44', ['kind: oauth2', 'grant: authorization_code', 'pkce: true', 'authUrl: ' + oauthBase + '/authorize', 'tokenUrl: ' + oauthBase + '/token', 'clientId: public-client', 'scope: openid']));
+    put('api-client/collections/shop/oauth-other.req.yml', oauthRequest('OAuth other', '01J9Z4V0N2XK7Q3M8T5R6Y1B45', ['kind: oauth2', 'grant: client_credentials', 'pkce: false', 'tokenUrl: ' + oauthBase.replace('127.0.0.1', 'localhost') + '/token', 'clientId: cid', 'clientSecret: csecret']));
+    put('api-client/collections/shop/oauth-insecure.req.yml', oauthRequest('OAuth insecure', '01J9Z4V0N2XK7Q3M8T5R6Y1B46', ['kind: oauth2', 'grant: client_credentials', 'pkce: false', 'tokenUrl: http://auth.example.test/token', 'clientId: cid', 'clientSecret: csecret']));
+    await until(() => ['OAuth cc', 'OAuth bad', 'OAuth pw', 'OAuth code', 'OAuth other', 'OAuth insecure'].every(label => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === label)), 'the OAuth requests are in the tree');
+    const openFor = async name => {
+      const uri = uriOf('api-client/collections/shop/' + name);
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'apiClient.request');
+      await until(() => test.requestEditor(uri.toString())?.isReady === true, name + ' is open');
+      return test.requestEditor(uri.toString());
+    };
+    const answerOf = async (view, run) => {
+      const count = () => view.messages().filter(message => message.type === 'response' || message.type === 'failed' || message.type === 'cancelled').length;
+      const before = count();
+      await run();
+      await until(() => count() > before, 'an answer');
+      return view.messages().filter(message => message.type === 'response' || message.type === 'failed' || message.type === 'cancelled').at(-1);
+    };
+
+    // 17a. Client credentials: the server is asked about once, the token is fetched, sent as a bearer token, and hidden in what is shown of the request.
+    const cc = await openFor('oauth-cc.req.yml');
+    const first = await answerOf(cc, () => cc.receive({ type: 'send' }));
+    assert.equal(first.type, 'response');
+    assert.deepEqual(asked.map(question => question.what), ['send its credentials to']);
+    assert.deepEqual(grants.map(item => item.grant), ['client_credentials']);
+    assert.equal(grants[0].form.scope, 'read');
+    assert.equal(apiCalls.at(-1), 'Bearer cc-token-1');
+    assert.equal(first.response.sent.headers.find(([name]) => name === 'Authorization')[1], '[redacted]');
+    assert.ok(!JSON.stringify(first.response).includes('cc-token-1'));
+
+    // 17b. The token ran out (it lasted 20 seconds, less than the 30 that are kept in hand): a refresh gives the next one; then it is kept.
+    const second = await answerOf(cc, () => cc.receive({ type: 'send' }));
+    assert.equal(second.type, 'response');
+    assert.deepEqual(grants.map(item => item.grant), ['client_credentials', 'refresh_token']);
+    assert.equal(apiCalls.at(-1), 'Bearer cc-token-2');
+    await answerOf(cc, () => cc.receive({ type: 'send' }));
+    assert.deepEqual(grants.map(item => item.grant), ['client_credentials', 'refresh_token'], 'a token that is good is not asked for again');
+    assert.equal(apiCalls.at(-1), 'Bearer cc-token-2');
+    assert.equal(asked.length, 1, 'the server was asked about once');
+
+    // 17c. A wrong secret is explained with what the server said, and nothing is sent to the API.
+    const callsBefore = apiCalls.length;
+    const bad = await openFor('oauth-bad.req.yml');
+    const refused = await answerOf(bad, () => bad.receive({ type: 'send' }));
+    assert.equal(refused.type, 'failed');
+    assert.equal(refused.code, 'oauth');
+    assert.match(refused.message, /^The server refused the request: invalid_client \(bad secret\)\.$/);
+    assert.ok(!JSON.stringify(refused).includes('must-not-be-shown'));
+    assert.equal(apiCalls.length, callsBefore);
+
+    // 17d. The password grant, with the username and password of the settings.
+    const pw = await openFor('oauth-pw.req.yml');
+    assert.equal((await answerOf(pw, () => pw.receive({ type: 'send' }))).type, 'response');
+    assert.equal(grants.at(-1).form.username, 'ann');
+    assert.equal(apiCalls.at(-1), 'Bearer pw-token-1');
+
+    // 17e. The authorization code with PKCE: the browser is told where to go, the answer comes back to this computer, the code is exchanged with the verifier.
+    const code = await openFor('oauth-code.req.yml');
+    let browsed;
+    test.oauth.openBrowser = async address => {
+      browsed = new URL(address);
+      assert.equal(browsed.origin + browsed.pathname, oauthBase + '/authorize');
+      assert.equal(browsed.searchParams.get('response_type'), 'code');
+      assert.equal(browsed.searchParams.get('client_id'), 'public-client');
+      assert.equal(browsed.searchParams.get('code_challenge_method'), 'S256');
+      challenges.set('good-code', browsed.searchParams.get('code_challenge'));
+      const target = new URL(browsed.searchParams.get('redirect_uri'));
+      assert.equal(target.hostname, '127.0.0.1');
+      const wrong = await fetchText(target.origin + target.pathname + '?code=evil&state=not-the-state');
+      assert.equal(wrong.status, 400, 'an answer with another state is not accepted');
+      const right = await fetchText(target.origin + target.pathname + '?code=good-code&state=' + encodeURIComponent(browsed.searchParams.get('state')));
+      assert.equal(right.status, 200);
+    };
+    const signedIn = await answerOf(code, () => code.receive({ type: 'send' }));
+    assert.equal(signedIn.type, 'response', JSON.stringify(signedIn));
+    assert.equal(apiCalls.at(-1), 'Bearer code-token-1');
+    assert.equal(grants.at(-1).grant, 'authorization_code');
+    assert.equal(grants.at(-1).basic, '', 'a public client sends no secret');
+    assert.match(grants.at(-1).form.code_verifier, /^[A-Za-z0-9_-]{43}$/);
+    test.oauth.openBrowser = undefined;
+
+    // 17f. A server that was not allowed gets nothing; an address that is not https is refused before anything is sent.
+    hostAnswer = 'refuse';
+    const grantsBefore = grants.length;
+    const other = await openFor('oauth-other.req.yml');
+    const notAllowed = await answerOf(other, () => other.receive({ type: 'send' }));
+    assert.equal(notAllowed.type, 'failed');
+    assert.match(notAllowed.message, /was not allowed/);
+    assert.equal(grants.length, grantsBefore);
+    assert.deepEqual(asked.at(-1), { host: 'localhost:' + oauthServer.address().port, what: 'send its credentials to' });
+    hostAnswer = 'allow';
+    const insecure = await openFor('oauth-insecure.req.yml');
+    const clear = await answerOf(insecure, () => insecure.receive({ type: 'send' }));
+    assert.equal(clear.type, 'failed');
+    assert.match(clear.message, /The token URL has to start with https/);
+    assert.equal(grants.length, grantsBefore);
+
+    // 17g. Forgetting makes the server be asked about again and a new token be fetched; no file holds a token.
+    const askedBefore = asked.length;
+    await vscode.commands.executeCommand('apiClient.forgetTokens');
+    await answerOf(cc, () => cc.receive({ type: 'send' }));
+    assert.equal(asked.length, askedBefore + 1);
+    assert.equal(grants.at(-1).grant, 'client_credentials');
+    for (const name of fs.readdirSync(mirrorDir)) {
+      const full = path.join(mirrorDir, name);
+      if (fs.statSync(full).isFile()) assert.ok(!/cc-token|pw-token|code-token|rt-1/.test(fs.readFileSync(full, 'utf8')), name + ' holds no token');
+    }
+    // 17h. The page is told whether the request has a token, and can get one or forget it without sending.
+    const statuses = () => cc.messages().filter(message => message.type === 'oauth').map(message => message.status);
+    await until(() => statuses().length > 0, 'the page was told about the token');
+    assert.deepEqual(statuses().at(-1).applies, true);
+    await cc.receive({ type: 'oauth', action: 'clear' });
+    await until(() => statuses().at(-1).state === 'none', 'forgotten');
+    const grantsBeforeGet = grants.length;
+    await cc.receive({ type: 'oauth', action: 'get' });
+    await until(() => statuses().at(-1).state === 'valid' || statuses().at(-1).state === 'expired', 'a token was fetched without sending the request');
+    assert.equal(grants.length, grantsBeforeGet + 1);
+    assert.equal(grants.at(-1).grant, 'client_credentials');
+    assert.ok(!JSON.stringify(cc.messages()).includes('cc-token'), 'the token is not in anything the page was told');
+    assert.equal(statuses().some(status => status.state === 'busy'), true, 'and it was told that the token was being fetched');
+    const bad2 = await openFor('oauth-bad.req.yml');
+    await bad2.receive({ type: 'oauth', action: 'get' });
+    await until(() => bad2.messages().filter(message => message.type === 'oauth').at(-1)?.status.message !== undefined, 'the reason is told');
+    assert.match(bad2.messages().filter(message => message.type === 'oauth').at(-1).status.message, /invalid_client/);
+    const plainView = await (async () => {
+      const uri = uriOf('api-client/collections/shop/tested.req.yml');
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'apiClient.request');
+      await until(() => test.requestEditor(uri.toString())?.isReady === true, 'a request without OAuth is open');
+      return test.requestEditor(uri.toString());
+    })();
+    await until(() => plainView.messages().some(message => message.type === 'oauth'), 'told too');
+    assert.equal(plainView.messages().filter(message => message.type === 'oauth').at(-1).status.applies, false, 'a request that does not use OAuth has nothing to show');
+  } finally {
+    test.oauth.answer = undefined;
+    test.oauth.openBrowser = undefined;
+    oauthServer.closeAllConnections();
+    oauthServer.close();
+  }
 };

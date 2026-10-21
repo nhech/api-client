@@ -105,7 +105,7 @@ function Editor(props: { request: Request; port: HostPort }) {
       <Tabs tabs={tabs} active={tab} onSelect={setTab} label="Request">
         {tab === 'query' ? <><KeyValueGrid rows={r.query} path={['query']} label="Query parameters" namePlaceholder="Parameter" />{r.pathParams.length > 0 ? <><h3>Path parameters</h3><KeyValueGrid rows={r.pathParams} path={['pathParams']} label="Path parameters" /></> : null}</> : null}
         {tab === 'headers' ? <KeyValueGrid rows={r.headers} path={['headers']} label="Headers" namePlaceholder="Header" /> : null}
-        {tab === 'auth' ? <AuthEditor auth={r.auth} what="request" /> : null}
+        {tab === 'auth' ? <AuthEditor auth={r.auth} what="request" port={props.port} /> : null}
         {tab === 'body' ? <BodyTab body={r.body} send={send} /> : null}
         {tab === 'scripts' ? <ScriptsForm scripts={r.scripts} what="request" /> : null}
         {tab === 'tests' ? <TestsForm tests={r.tests} captures={r.captures} /> : null}

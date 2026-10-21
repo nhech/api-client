@@ -163,6 +163,11 @@
         "category": "API Client"
       },
       {
+        "command": "apiClient.forgetTokens",
+        "title": "Forget Access Tokens and Allowed Token Servers",
+        "category": "API Client"
+      },
+      {
         "command": "apiClient.forgetScripts",
         "title": "Forget Which Scripts Were Allowed",
         "category": "API Client"

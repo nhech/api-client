@@ -12,6 +12,7 @@ import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
 import { MirrorService } from './mirror';
 import { SendEnvironment } from './sender';
+import type { OAuthService } from './oauth';
 import type { ScriptService } from './scripts';
 import { CollectionsTree, EnvironmentsTree } from './trees';
 import { REPORT_SCHEME, ReportDocuments, VscodeHost } from './vscodeHost';
@@ -31,6 +32,8 @@ export interface ImporterTestApi {
   scripts: ScriptService;
   /** The .http files next to the requests. */
   mirror: MirrorService;
+  /** The access tokens of OAuth 2.0: the tests answer the questions and stand for the browser. */
+  oauth: OAuthService;
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
@@ -87,6 +90,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     vscode.window.registerCustomEditorProvider(ENVIRONMENT_VIEW_TYPE, environmentEditors, editorOptions),
     vscode.window.registerCustomEditorProvider(CONTAINER_VIEW_TYPE, containerEditors, editorOptions),
     vscode.commands.registerCommand('apiClient.clearVariables', () => { sending.clearVariables(); }),
+    vscode.commands.registerCommand('apiClient.forgetTokens', async () => { await sending.oauth.forgetAll(); void vscode.window.showInformationMessage('API Client: the access tokens and the servers that were allowed are forgotten. You are asked again before credentials are sent.'); }),
     vscode.commands.registerCommand('apiClient.forgetScripts', async () => { await sending.scripts.forgetAll(); void vscode.window.showInformationMessage('API Client: no script is allowed to run any more. You are asked again before the next one runs.'); }),
     reports, workspace, collections, environments, collections.view, environmentsView, historyView, status, workspace.onDidChange(showStatus),
     vscode.workspace.registerTextDocumentContentProvider(REPORT_SCHEME, reports),
@@ -99,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { scripts: sending.scripts, mirror, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 

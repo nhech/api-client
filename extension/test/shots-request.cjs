@@ -151,6 +151,16 @@ exports.run = async function run() {
     await broken.receive({ type: 'send' });
     await answer(broken, 'failed');
     await shot('request-script-failed', 1000, 600, 1200);
+    // OAuth 2.0: the settings of the authentication and whether the request has an access token.
+    put('api-client/collections/pet-store/pets/oauth.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1ABJ', 'name: List with OAuth', 'url: /pets', 'auth:', '  kind: oauth2', '  grant: client_credentials', '  pkce: false', '  tokenUrl: https://auth.example.com/oauth/token', '  clientId: pet-store-client', '  clientSecret: "{{clientSecret}}"', '  scope: pets.read', ''].join('\n'));
+    for (let waited = 0; waited < 10000; waited += 100) {
+      const pets = test.client().collections[0]?.children.find(node => node.label === 'Pets');
+      if (pets && pets.children.some(node => node.label === 'List with OAuth')) break;
+      await sleep(100);
+    }
+    await open('pets/oauth.req.yml');
+    await sleep(800);
+    await shot('request-oauth', 1400, 860, 1200, clickTab('Auth', false));
   } finally {
     server.closeAllConnections();
     server.close();

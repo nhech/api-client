@@ -18,6 +18,7 @@ import { buildResponseView, decodeBodyText, formatJson, formatXml, testSubject, 
 import { printable } from '../../src/util/chars';
 import { addOutput, emptyReport, hasReport, requestForScripts, responseForScripts, scriptInput, sentForScripts, withRequestChanges, type ScriptPhase, type ScriptReport } from '../../src/view/scripts';
 import { realClock, type ClientWorkspace } from './clientWorkspace';
+import { OAuthService, type TokenRequestInput } from './oauth';
 import { scriptOperations } from './scriptOps';
 import { ScriptService } from './scripts';
 
@@ -39,13 +40,30 @@ export class SendEnvironment implements vscode.Disposable {
   readonly onDidChangeVariables = this.changed.event;
   /** Whether scripts may run, and the engine they run in. */
   readonly scripts: ScriptService;
+  /** The access tokens of the requests that use OAuth 2.0. */
+  readonly oauth: OAuthService;
   private readonly spillDir: string;
 
   constructor(context: vscode.ExtensionContext, readonly workspace: ClientWorkspace) {
     this.scripts = new ScriptService(context);
+    this.oauth = new OAuthService(context);
     this.spillDir = join(context.globalStorageUri.fsPath, 'spill');
     // A response that was spilled to a file belongs to a page that is gone when the extension starts again.
     void disk.rm(this.spillDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+
+  /** What a collection is called in what is kept on this computer about it (what scripts and servers were allowed): the workspace folder and the folder of the collection. */
+  collectionKey(collectionPath: string): string {
+    return `${this.workspace.folder()?.uri.toString() ?? ''}#${collectionPath}`;
+  }
+
+  /** What the OAuth service needs to know about a request: its collection, the authentication that applies to it (its own or inherited), the variables, and how to connect. */
+  oauthInput(path: string, request: Request): Omit<TokenRequestInput, 'signal'> | undefined {
+    const loaded = this.workspace.loaded;
+    if (loaded === undefined) return undefined;
+    const collection = locate(loaded, path)?.collection.path ?? '';
+    const prepared = prepareSend({ loaded, path, request, environmentId: this.workspace.activeEnvironmentId, clock: realClock, runtime: this.runtime.scope(this.contextOf(collection)), resolveFile: () => undefined });
+    return prepared === undefined ? undefined : { collection: this.collectionKey(prepared.collection.path), auth: prepared.effective.auth, scopes: prepared.scopes, proxy: this.proxy(), tls: prepared.options.tls };
   }
 
   /** The context a request is in, for the variables that were saved: the active environment and the collection it is in. */
@@ -170,8 +188,9 @@ export class RequestRunner implements vscode.Disposable {
     if (loaded === undefined) { this.fail(id, 'invalid-request', 'No folder is open, so there are no collections to send from.'); return; }
     const collectionPath = locate(loaded, path)?.collection.path ?? '';
     const context = this.env.contextOf(collectionPath);
-    const prepare = (current: Request): Prepared | undefined => prepareSend({
+    const prepare = (current: Request, oauthToken?: { accessToken: string; tokenType: string }): Prepared | undefined => prepareSend({
       loaded, path, request: current, environmentId: this.env.workspace.activeEnvironmentId, clock: realClock, runtime: this.env.runtime.scope(context),
+      ...(oauthToken === undefined ? {} : { oauthToken }),
       resolveFile: (collection, relative) => {
         const folder = this.env.workspace.folder();
         return folder === undefined ? undefined : confinedFile(join(folder.uri.fsPath, ...collection.split('/')), relative);
@@ -195,8 +214,7 @@ export class RequestRunner implements vscode.Disposable {
       let current = request;
       let allowed = false;
       if (scripted) {
-        const folder = this.env.workspace.folder();
-        const permission = await this.env.scripts.permit(`${folder?.uri.toString() ?? ''}#${prepared.collection.path}`, scriptsToRun(prepared));
+        const permission = await this.env.scripts.permit(this.env.collectionKey(prepared.collection.path), scriptsToRun(prepared));
         if (permission.kind === 'cancel') { this.post({ type: 'cancelled', id }); return; }
         if (permission.kind === 'skip') report.notes.push(permission.note);
         else allowed = true;
@@ -214,6 +232,15 @@ export class RequestRunner implements vscode.Disposable {
         const again = prepare(current);
         if (again === undefined) { this.fail(id, 'invalid-request', 'The request is not in a collection that is loaded any more.', '', [], report); return; }
         prepared = again;
+      }
+      // OAuth 2.0: the access token that is kept, a refreshed one or a new one (which may need the person in the browser); the request is built again with it.
+      if (prepared.effective.auth.kind === 'oauth2' && prepared.problems.length === 0) {
+        const outcome = await this.env.oauth.token({ collection: this.env.collectionKey(prepared.collection.path), auth: prepared.effective.auth, scopes: prepared.scopes, signal: controller.signal, proxy: this.env.proxy(), tls: prepared.options.tls });
+        if (outcome.kind === 'cancelled') { this.post({ type: 'cancelled', id }); return; }
+        if (outcome.kind === 'failed') { this.fail(id, 'oauth', outcome.message, outcome.hint, [], hasReport(report) ? report : undefined); return; }
+        const withToken = prepare(current, outcome.token);
+        if (withToken === undefined) { this.fail(id, 'invalid-request', 'The request is not in a collection that is loaded any more.', '', [], hasReport(report) ? report : undefined); return; }
+        prepared = withToken;
       }
       if (prepared.problems.length > 0) { this.refuse(id, prepared, hasReport(report) ? report : undefined); return; }
       const warnings = [...prepared.built.warnings];

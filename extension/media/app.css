@@ -148,3 +148,8 @@ pre.log-list { margin: 0; padding: 6px 8px; max-height: 60vh; overflow: auto; }
 .log.warn { color: var(--vscode-editorWarning-foreground); }
 .log.error { color: var(--vscode-errorForeground); }
 .log.debug, .log.info { color: var(--vscode-descriptionForeground); }
+
+/* The access token of an OAuth 2.0 request. */
+.token { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.token .tools { display: flex; align-items: center; gap: 12px; }
+button.link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
