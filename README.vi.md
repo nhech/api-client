@@ -52,7 +52,7 @@ Thunder Client lưu dữ liệu ở (VS Code; Cursor, VSCodium... thì đổi `C
 
 Dùng Git sync của Thunder Client thì trỏ vào thư mục `thunder-tests`. Muốn xem *hình dạng* dữ liệu mà không lộ nội dung: [`tools/thunder-structure.cjs`](tools/README.md).
 
-**VS Code:** dựng extension rồi cài từ file: `npm run ext:build`, `cd extension && npm run package`, `code --install-extension ../.artifacts/http-files-importer.vsix`. Chạy lệnh **HTTP Files Importer: Import from Thunder Client...** trong Command Palette (hoặc bấm nút ở mục "HTTP Files Importer" trong Explorer): một **panel** hiện ra, gợi ý thư mục dữ liệu tìm thấy, cho xem đã đọc được gì và cái gì cần chú ý, cho chọn công cụ đích, thư mục và chính sách, và chỉ ghi khi bạn bấm **Import**. Có bản hỏi từng bước bằng Command Palette: **Import from Thunder Client (step by step)...**. Hủy ở bước nào cũng không ghi gì.
+**VS Code:** cài **HTTP Files Importer** từ [Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.http-files-importer) (tìm trong Extensions, hoặc `ext install longtd.http-files-importer`); hoặc dựng từ mã nguồn rồi cài từ file: `npm run ext:build`, `cd extension && npm run package`, `code --install-extension ../.artifacts/http-files-importer.vsix`. Chạy lệnh **HTTP Files Importer: Import from Thunder Client...** trong Command Palette (hoặc bấm nút ở mục "HTTP Files Importer" trong Explorer): một **panel** hiện ra, gợi ý thư mục dữ liệu tìm thấy, cho xem đã đọc được gì và cái gì cần chú ý, cho chọn công cụ đích, thư mục và chính sách, và chỉ ghi khi bạn bấm **Import**. Có bản hỏi từng bước bằng Command Palette: **Import from Thunder Client (step by step)...**. Hủy ở bước nào cũng không ghi gì.
 
 ![Panel của importer trong VS Code](docs/images/panel-review.png)
 
@@ -73,7 +73,7 @@ Dữ liệu collection có thể đến từ bất kỳ ai nên importer coi nó
 
 - **Dựng từ thông tin công khai và việc đọc mã của extension, thử bằng dữ liệu tự dựng cho khớp.** Tác giả chưa có thư mục dữ liệu v4 thật để thử. Nếu dữ liệu của bạn nhập sai, hãy mở issue kèm kết quả của [`tools/thunder-structure.cjs`](tools/README.md) (chỉ in cấu trúc, không in giá trị).
 - **Chưa có runtime:** `# @assert` và `# @capture` được ghi ra nhưng chưa có gì chạy chúng.
-- Extension đang ở bản preview, chưa có trên Marketplace.
+- Extension đang ở bản preview (0.1.0 trên Marketplace); công cụ dòng lệnh chưa có trên npm.
 
 ## Phát triển
 

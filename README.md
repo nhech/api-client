@@ -82,7 +82,7 @@ If you use Thunder Client's Git sync, point the command at your `thunder-tests` 
 
 ### VS Code
 
-Build and install the extension from a clone (it is not on the Marketplace):
+Install **HTTP Files Importer** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.http-files-importer) (Extensions view, search for it, or `ext install longtd.http-files-importer`). To build it from a clone instead:
 
 ```sh
 npm run ext:build
@@ -198,7 +198,7 @@ node samples/rest-client-check/run.cjs <the humao.rest-client .vsix you download
 - **No runtime.** `# @assert` and `# @capture` are written but nothing in this repository runs them.
 - **Speed.** Measured on a desktop PC, a dry run takes about a quarter of a second for 1,000 requests, one second for 10,000 and four seconds for 50,000, and writing 50,000 requests takes six seconds (about 360 MiB of memory). The conversion runs in one piece on the thread of the VS Code extension host, so the editor pauses for that long on a very large collection, and a reading in progress can be cancelled only between files. Writing is one file at a time (50,000 body files take about a minute).
 - Variable names with `-` or `.` are kept as Thunder Client has them; httpYac reads them as JavaScript, and the importer neutralises the dotted ones.
-- The VS Code extension is a preview and is not on the Marketplace yet.
+- The VS Code extension is a preview (version 0.1.0 on the Marketplace); the command line is not on npm.
 
 ## Development
 

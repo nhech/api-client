@@ -28,7 +28,7 @@ if (!nodeFloor || !vscodeFloor) throw new Error('The Node.js or VS Code minimum 
 // structured data that point at the listing). While false, only the markers of the first kind are removed and the second kind is dropped.
 const EXTENSION_ID = `${extensionManifest.publisher}.${extensionManifest.name}`;
 const MARKETPLACE_URL = `https://marketplace.visualstudio.com/items?itemName=${EXTENSION_ID}`;
-const MARKETPLACE_LISTED = false;
+const MARKETPLACE_LISTED = true;
 const UNLISTED_BLOCK = /<!-- unlisted -->([\s\S]*?)<!-- \/unlisted -->/g;
 const LISTED_BLOCK = /<!-- listed -->([\s\S]*?)<!-- \/listed -->/g;
 const placeholders = {
