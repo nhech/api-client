@@ -388,4 +388,84 @@ exports.run = async function run() {
     server.closeAllConnections();
     server.close();
   }
+
+  // 11. Organising what the side bar shows: rename, copy, move (with the order), refuse what makes no sense, and delete; the editors that
+  //     have the files open are shown again at the new place or closed, and a file with unsaved changes is never touched.
+  const organiser = test.client().organiser;
+  const org = 'api-client/collections/org';
+  const onDisk = relative => path.join(workspace, ...relative.split('/'));
+  const uriOf = relative => vscode.Uri.file(onDisk(relative));
+  const readFile = relative => fs.readFileSync(onDisk(relative), 'utf8');
+  put(org + '/collection.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B01\nname: Org\n');
+  put(org + '/a/folder.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B02\nname: A\n');
+  put(org + '/one.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B03\nname: One\nurl: http://x.test/1\n');
+  put(org + '/a/two.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B04\nname: Two\nurl: http://x.test/2\n');
+  const orgNode = () => test.client().collections.find(node => node.label === 'Org');
+  await until(() => orgNode()?.children.length === 2, 'the new collection is loaded');
+  const openEditor = async relative => {
+    await vscode.commands.executeCommand('vscode.openWith', uriOf(relative), 'apiClient.request');
+    await until(() => test.requestEditor(uriOf(relative).toString())?.isReady === true, relative + ' is open');
+  };
+
+  // 11a. Renaming a request renames its file, keeps its identifier, and shows the editor again at the new place.
+  await openEditor(org + '/one.req.yml');
+  assert.equal(await organiser.rename(org + '/one.req.yml', 'Uno'), org + '/uno.req.yml');
+  assert.ok(!fs.existsSync(onDisk(org + '/one.req.yml')), 'the old file is gone');
+  assert.match(readFile(org + '/uno.req.yml'), /^schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B03\nname: Uno\n/);
+  await until(() => test.requestEditor(uriOf(org + '/uno.req.yml').toString())?.isReady === true, 'the editor is shown again at the new place');
+  assert.equal(test.requestEditor(uriOf(org + '/one.req.yml').toString()), undefined, 'and not at the old one');
+  await until(() => orgNode().children.some(child => child.label === 'Uno'), 'the tree shows the new name');
+
+  // 11b. A file with unsaved changes is not touched, and nothing is done.
+  await openEditor(org + '/a/two.req.yml');
+  const twoDocument = await vscode.workspace.openTextDocument(uriOf(org + '/a/two.req.yml'));
+  const comment = new vscode.WorkspaceEdit();
+  comment.insert(twoDocument.uri, new vscode.Position(0, 0), '# unsaved\n');
+  await vscode.workspace.applyEdit(comment);
+  assert.equal(twoDocument.isDirty, true);
+  await assert.rejects(organiser.rename(org + '/a/two.req.yml', 'Zwei'), /two\.req\.yml has changes that are not saved/);
+  await assert.rejects(organiser.remove([org + '/a']), /not saved/, 'neither is a folder with a file like that deleted');
+  assert.ok(fs.existsSync(onDisk(org + '/a/two.req.yml')) && !readFile(org + '/a/two.req.yml').includes('Zwei'), 'nothing was changed');
+  await twoDocument.save();
+
+  // 11c. A copy is next to the original, with another identifier.
+  const copied = await organiser.duplicate(org + '/uno.req.yml');
+  assert.equal(copied, org + '/uno-copy.req.yml');
+  assert.match(readFile(copied), /\nname: Uno copy\n/);
+  assert.ok(!readFile(copied).includes('01J9Z4V0N2XK7Q3M8T5R6Y1B03'), 'with a new identifier');
+
+  // 11d. Moving a request next to another one puts it there, writes the order, and the open editor follows.
+  assert.equal(await organiser.drop([org + '/uno.req.yml'], org + '/a/two.req.yml'), undefined);
+  assert.ok(fs.existsSync(onDisk(org + '/a/uno.req.yml')) && !fs.existsSync(onDisk(org + '/uno.req.yml')));
+  assert.match(readFile(org + '/a/folder.yml'), /\norder:\n {2}- uno\n {2}- two\n/);
+  await until(() => test.requestEditor(uriOf(org + '/a/uno.req.yml').toString())?.isReady === true, 'the editor follows the file into the folder');
+  await until(() => orgNode().children.find(child => child.label === 'A')?.children.map(child => child.label).join() === 'Uno,Two', 'the tree shows the order');
+
+  // 11e. What makes no sense is refused with a sentence; a drop on itself does nothing.
+  assert.match(await organiser.drop([org + '/a'], org + '/a/two.req.yml'), /into itself/);
+  assert.match(await organiser.drop([org], org + '/a'), /collection cannot be moved/);
+  assert.equal(await organiser.drop([org + '/a/uno.req.yml'], org + '/a/uno.req.yml'), undefined);
+  assert.ok(fs.existsSync(onDisk(org + '/a/uno.req.yml')));
+
+  // 11f. Deleting a folder deletes what is inside it and closes its editors.
+  await organiser.remove([org + '/a', org + '/a/two.req.yml']);
+  assert.ok(!fs.existsSync(onDisk(org + '/a')), 'the folder is gone');
+  await until(() => test.requestEditor(uriOf(org + '/a/uno.req.yml').toString()) === undefined, 'its editors are closed');
+  await until(() => orgNode().children.map(child => child.label).join() === 'Uno copy', 'the tree shows what is left');
+
+  // 11g. Environments: rename moves the file (and the one of its secrets), copy, and deleting the active one leaves none active.
+  put('api-client/environments/org.env.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B05\nname: Org env\nvars:\n  - name: token\n    value: ""\n    secret: true\n');
+  put('api-client/environments/org.env.local.yml', 'schema: 1\nvalues:\n  token: keep-this-secret\n');
+  await until(() => test.client().environments.some(node => node.label === 'Org env'), 'the environment is loaded');
+  const renamedEnvironment = await organiser.rename('api-client/environments/org.env.yml', 'Staging');
+  assert.equal(renamedEnvironment, 'api-client/environments/staging.env.yml');
+  assert.ok(!fs.existsSync(onDisk('api-client/environments/org.env.yml')) && !fs.existsSync(onDisk('api-client/environments/org.env.local.yml')), 'both old files are gone');
+  assert.match(readFile('api-client/environments/staging.env.local.yml'), /token: keep-this-secret/, 'the secret came along');
+  const environmentCopy = await organiser.duplicate(renamedEnvironment);
+  assert.equal(environmentCopy, 'api-client/environments/staging-copy.env.yml');
+  assert.match(readFile('api-client/environments/staging-copy.env.local.yml'), /token: keep-this-secret/);
+  await test.client().workspace.setActiveEnvironment('01J9Z4V0N2XK7Q3M8T5R6Y1B05');
+  await organiser.remove([renamedEnvironment]);
+  assert.ok(!fs.existsSync(onDisk(renamedEnvironment)) && !fs.existsSync(onDisk('api-client/environments/staging.env.local.yml')), 'the secrets go with it');
+  assert.equal(test.client().workspace.activeEnvironmentId, undefined, 'and it is no longer the active one');
 };

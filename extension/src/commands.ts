@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import type { TreeNode } from '../../src/view/tree';
 import type { ClientWorkspace } from './clientWorkspace';
+import type { Organiser } from './organise';
 import { REQUEST_VIEW_TYPE } from './requestEditor';
-import { OPEN_REQUEST_COMMAND, type CollectionsTree } from './trees';
+import { OPEN_REQUEST_COMMAND, type CollectionsTree, type EnvironmentsTree } from './trees';
 
 /**
  * The commands of the side bar: create, open, filter, refresh and choose the environment. Each one reads from the loaded
@@ -35,13 +36,15 @@ function containers(nodes: readonly TreeNode[], prefix = ''): { label: string; n
 export interface CommandContext {
   workspace: ClientWorkspace;
   collections: CollectionsTree;
+  environments: EnvironmentsTree;
+  organiser: Organiser;
 }
 
 function fail(error: unknown): void {
   void vscode.window.showErrorMessage(`API Client: ${error instanceof Error ? error.message : String(error)}`);
 }
 
-export function registerCommands(context: vscode.ExtensionContext, { workspace, collections }: CommandContext): void {
+export function registerCommands(context: vscode.ExtensionContext, { workspace, collections, environments, organiser }: CommandContext): void {
   /** The folder or collection a new item goes into: the one the command was used on, or one the person picks. */
   const target = async (node: TreeNode | undefined, what: string): Promise<TreeNode | undefined> => {
     if (node !== undefined && (node.kind === 'collection' || node.kind === 'folder')) return node;
@@ -120,6 +123,42 @@ export function registerCommands(context: vscode.ExtensionContext, { workspace, 
     await workspace.reload();
     await workspace.setActiveEnvironment(created.environment.id);
   });
+  /** The entries a command of the side bar is meant for: the one it was used on (with the others selected with it), or what is selected in the view that has the focus. */
+  const chosen = (node: TreeNode | undefined, selected: readonly TreeNode[] | undefined, kinds: readonly string[]): TreeNode[] => {
+    const fallback = [...(collections.view?.selection ?? []), ...(environments.view?.selection ?? [])];
+    const list = node === undefined ? fallback : selected !== undefined && selected.some(item => item.id === node.id) ? [...selected] : [node];
+    return list.filter(item => kinds.includes(item.kind));
+  };
+  const ORGANISABLE = ['collection', 'folder', 'request', 'environment'] as const;
+
+  register('apiClient.rename', async (node?: TreeNode, selected?: TreeNode[]) => {
+    const [entry] = chosen(node, selected, ORGANISABLE);
+    if (entry === undefined) return;
+    const name = await askName(`New name of the ${entry.kind}`, entry.label);
+    if (name === undefined || name === entry.label) return;
+    await organiser.rename(entry.path, name);
+  });
+  register('apiClient.duplicate', async (node?: TreeNode, selected?: TreeNode[]) => {
+    for (const entry of chosen(node, selected, ORGANISABLE)) await organiser.duplicate(entry.path);
+  });
+  register('apiClient.delete', async (node?: TreeNode, selected?: TreeNode[]) => {
+    const entries = chosen(node, selected, ORGANISABLE);
+    if (entries.length === 0) return;
+    const names = entries.slice(0, 8).map(entry => `${entry.label}${entry.description === '' ? '' : ` (${entry.description})`}`).join('\n') + (entries.length > 8 ? `\n... and ${entries.length - 8} more` : '');
+    const answer = await vscode.window.showWarningMessage(entries.length === 1 ? `Delete "${entries[0]?.label ?? ''}"?` : `Delete ${entries.length} items?`, { modal: true, detail: `${names}\n\nThe files are deleted from the disk, with everything inside a folder or collection. Git can bring them back if they were committed.` }, 'Delete');
+    if (answer !== 'Delete') return;
+    await organiser.remove(entries.map(entry => entry.path));
+  });
+  register('apiClient.moveTo', async (node?: TreeNode, selected?: TreeNode[]) => {
+    const entries = chosen(node, selected, ['folder', 'request']);
+    if (entries.length === 0) return;
+    const places = containers(collections.snapshot()).filter(place => !entries.some(entry => place.node.path === entry.path || place.node.path.startsWith(`${entry.path}/`)));
+    const place = await vscode.window.showQuickPick(places, { placeHolder: 'Move to which folder or collection?' });
+    if (place === undefined) return;
+    const reason = await organiser.drop(entries.map(entry => entry.path), place.node.path);
+    if (reason !== undefined) void vscode.window.showWarningMessage(`API Client: ${reason}`);
+  });
+
   register('apiClient.setEnvironment', async (node?: TreeNode) => {
     const loaded = workspace.loaded;
     if (loaded === undefined) return;

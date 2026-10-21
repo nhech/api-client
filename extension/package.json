@@ -123,6 +123,26 @@
         "command": "apiClient.importThunderSteps",
         "title": "Import from Thunder Client (step by step)...",
         "category": "API Client"
+      },
+      {
+        "command": "apiClient.rename",
+        "title": "Rename...",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.duplicate",
+        "title": "Duplicate",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.delete",
+        "title": "Delete...",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.moveTo",
+        "title": "Move to...",
+        "category": "API Client"
       }
     ],
     "views": {
@@ -201,6 +221,22 @@
         {
           "command": "apiClient.clearFilter",
           "when": "apiClient.filtering"
+        },
+        {
+          "command": "apiClient.rename",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.duplicate",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.delete",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.moveTo",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -285,6 +321,41 @@
           "command": "apiClient.revealInExplorer",
           "when": "view == apiClient.environments",
           "group": "9_manage@1"
+        },
+        {
+          "command": "apiClient.rename",
+          "when": "view == apiClient.collections && viewItem =~ /^(collection|folder|request)$/",
+          "group": "3_modify@1"
+        },
+        {
+          "command": "apiClient.duplicate",
+          "when": "view == apiClient.collections && viewItem =~ /^(collection|folder|request)$/",
+          "group": "3_modify@2"
+        },
+        {
+          "command": "apiClient.moveTo",
+          "when": "view == apiClient.collections && viewItem =~ /^(folder|request)$/",
+          "group": "3_modify@3"
+        },
+        {
+          "command": "apiClient.delete",
+          "when": "view == apiClient.collections && viewItem =~ /^(collection|folder|request)$/",
+          "group": "3_modify@9"
+        },
+        {
+          "command": "apiClient.rename",
+          "when": "view == apiClient.environments && viewItem =~ /^environment/",
+          "group": "3_modify@1"
+        },
+        {
+          "command": "apiClient.duplicate",
+          "when": "view == apiClient.environments && viewItem =~ /^environment/",
+          "group": "3_modify@2"
+        },
+        {
+          "command": "apiClient.delete",
+          "when": "view == apiClient.environments && viewItem =~ /^environment/",
+          "group": "3_modify@9"
         }
       ]
     },
@@ -309,6 +380,19 @@
           }
         ],
         "priority": "default"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "apiClient.rename",
+        "key": "f2",
+        "when": "focusedView == apiClient.collections || focusedView == apiClient.environments"
+      },
+      {
+        "command": "apiClient.delete",
+        "key": "delete",
+        "mac": "cmd+backspace",
+        "when": "focusedView == apiClient.collections || focusedView == apiClient.environments"
       }
     ]
   },

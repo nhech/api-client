@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
 import { collectionsTree, environmentsTree, findNode, type Collapse, type IconName, type TreeNode } from '../../src/view/tree';
 import type { ClientWorkspace } from './clientWorkspace';
+import type { Organiser } from './organise';
 
 /** Opens a request in its editor; registered in extension.ts. */
 export const OPEN_REQUEST_COMMAND = 'apiClient.openRequest';
+/** What a drag in the collections view carries: the paths of the requests and folders. */
+export const DRAG_MIME = 'application/vnd.code.tree.apiclient.collections';
 
 const ICONS: Record<IconName, string> = {
   library: 'library', folder: 'folder', request: 'circle-filled', environment: 'symbol-variable', 'environment-active': 'check', warning: 'warning', info: 'info'
@@ -85,8 +88,30 @@ abstract class FilesTree implements vscode.TreeDataProvider<TreeNode>, vscode.Di
   }
 }
 
-export class CollectionsTree extends FilesTree {
+export class CollectionsTree extends FilesTree implements vscode.TreeDragAndDropController<TreeNode> {
   private text = '';
+  readonly dragMimeTypes = [DRAG_MIME];
+  readonly dropMimeTypes = [DRAG_MIME];
+
+  constructor(workspace: ClientWorkspace, private readonly organiser: Organiser) {
+    super(workspace);
+  }
+
+  handleDrag(source: readonly TreeNode[], dataTransfer: vscode.DataTransfer): void {
+    const paths = source.filter(node => node.kind === 'request' || node.kind === 'folder').map(node => node.path);
+    if (paths.length > 0) dataTransfer.set(DRAG_MIME, new vscode.DataTransferItem(paths));
+  }
+
+  async handleDrop(target: TreeNode | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
+    const carried: unknown = dataTransfer.get(DRAG_MIME)?.value;
+    if (!Array.isArray(carried) || !carried.every((path): path is string => typeof path === 'string')) return;
+    try {
+      const reason = await this.organiser.drop(carried, target?.path);
+      if (reason !== undefined) void vscode.window.showWarningMessage(`API Client: ${reason}`);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`API Client: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   get filter(): string {
     return this.text;

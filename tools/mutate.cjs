@@ -229,7 +229,16 @@ const MUTATIONS = [
   { id: "M209", rule: "Inherit: spaces before an address do not make it relative", file: "src/core/inherit.ts", find: "const start = url.trimStart();", replace: "const start = url;" },
   { id: "M210", rule: "Cookies: a header that is too long is not a cookie", file: "src/core/cookies.ts", find: "if (header.length > JAR_LIMITS.headerBytes) return undefined;", replace: "" },
   { id: "M211", rule: "Protocol: a report of the policy is cut", file: "src/view/request-protocol.ts", find: "text: text.slice(0, 200)", replace: "text" },
-  { id: "M212", rule: "Tabs: a request with a body opens on it", file: "src/view/tabs.ts", find: "if (request.body.kind !== 'none') return 'body';", replace: "" }
+  { id: "M212", rule: "Tabs: a request with a body opens on it", file: "src/view/tabs.ts", find: "if (request.body.kind !== 'none') return 'body';", replace: "" },
+  { id: "M213", rule: "Organise: a collection cannot be moved into another", file: "src/storage/organise.ts", find: "if (found.some(node => node.kind === 'collection')) return", replace: "if (false) return" },
+  { id: "M214", rule: "Organise: a folder dragged with its content moves once", file: "src/storage/organise.ts", find: "other !== node && other.kind !== 'request' && node.path.startsWith(`${other.path}/`)", replace: "other !== node && node.path.startsWith(other.path)" },
+  { id: "M215", rule: "Organise: dropped on a request goes into its folder", file: "src/storage/organise.ts", find: "target.kind === 'request' ? (findParent(loaded, target.path) as ContainerNode).path : target.path", replace: "target.path" },
+  { id: "M216", rule: "Organise: a folder cannot go into its own subfolder", file: "src/storage/organise.ts", find: "(toDir === node.path || toDir.startsWith(`${node.path}/`))", replace: "(toDir === node.path)" },
+  { id: "M217", rule: "Organise: dropped on a request goes before it", file: "src/storage/organise.ts", find: "const beforeSlug = target.kind === 'request' ? target.slug : undefined;", replace: "const beforeSlug = undefined;" },
+  { id: "M218", rule: "Organise: a drop on what is being moved does nothing", file: "src/storage/organise.ts", find: "nodes.some(node => node.path === target.path)) return { ok: false, reason: '' };", replace: "false) return { ok: false, reason: '' };" },
+  { id: "M219", rule: "Organise: moved entries are put before the chosen one", file: "src/storage/organise.ts", find: "const index = at < 0 ? rest.length : at;", replace: "const index = rest.length;" },
+  { id: "M220", rule: "Organise: a moved entry is not listed twice", file: "src/storage/organise.ts", find: "const rest = existing.filter(slug => !moved.includes(slug));", replace: "const rest = [...existing];" },
+  { id: "M221", rule: "Organise: a parent is found for an entry at any depth", file: "src/storage/organise.ts", find: "if (child.kind !== 'request') {\n        const found = walk(child);", replace: "if (child.kind !== 'request') {\n        const found = walk(child) && undefined;" }
 ];
 
 function run(mutation) {

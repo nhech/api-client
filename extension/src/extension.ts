@@ -6,6 +6,7 @@ import { runImportFlow } from '../../src/host';
 import type { FlowResult } from '../../src/host';
 import type { TreeNode } from '../../src/view/tree';
 import { ClientWorkspace } from './clientWorkspace';
+import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
 import { SendEnvironment } from './sender';
@@ -25,7 +26,7 @@ const platform = (): 'win32' | 'darwin' | 'linux' => (process.platform === 'win3
 export interface ImporterTestApi {
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
-  client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void };
+  client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
   /** The open editor of a request file, by the address of the file. */
   requestEditor(uri: string): RequestEditorTestView | undefined;
 }
@@ -43,10 +44,12 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   }));
 
   const workspace = new ClientWorkspace(context);
-  const collections = new CollectionsTree(workspace);
+  const organiser = new Organiser(workspace);
+  const collections = new CollectionsTree(workspace, organiser);
   const environments = new EnvironmentsTree(workspace);
-  collections.view = vscode.window.createTreeView('apiClient.collections', { treeDataProvider: collections, showCollapseAll: true, canSelectMany: true });
-  const environmentsView = vscode.window.createTreeView('apiClient.environments', { treeDataProvider: environments });
+  collections.view = vscode.window.createTreeView('apiClient.collections', { treeDataProvider: collections, showCollapseAll: true, canSelectMany: true, dragAndDropController: collections });
+  const environmentsView = vscode.window.createTreeView('apiClient.environments', { treeDataProvider: environments, canSelectMany: true });
+  environments.view = environmentsView;
   // The history is shown here when requests are sent; the view is empty until then.
   const historyView = vscode.window.createTreeView<never>('apiClient.history', { treeDataProvider: { getTreeItem: item => item, getChildren: () => [] } });
 
@@ -74,11 +77,11 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     // The Explorer view has no items: it exists to show its welcome text, with the button that opens the panel.
     vscode.window.registerTreeDataProvider<never>(START_VIEW, { getTreeItem: item => item, getChildren: () => [] })
   );
-  registerCommands(context, { workspace, collections });
+  registerCommands(context, { workspace, collections, environments, organiser });
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text) }), requestEditor: uri => requests.open.get(uri) }
+    ? { panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri) }
     : undefined;
 }
 
