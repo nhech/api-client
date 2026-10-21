@@ -6,6 +6,7 @@ import { Choice, Field, KeyValueGrid, Tabs, type TabSpec } from './components';
 import { defaultRequestTab } from '../../../../src/view/tabs';
 import { DocumentPage } from './Pages';
 import { ResponsePane } from './ResponsePane';
+import { ScriptsForm } from './Scripts';
 import { SettingsForm } from './SettingsForm';
 import { TestsForm } from './TestsForm';
 import { confirmed, edit, flushNow, notice, request, screen, sending, sendNow, type HostPort } from './store';
@@ -86,7 +87,7 @@ function Editor(props: { request: Request; port: HostPort }) {
   const running = sending.value !== undefined;
   const tabs: TabSpec[] = [
     { id: 'query', label: 'Query', badge: countRows(r.query) }, { id: 'headers', label: 'Headers', badge: countRows(r.headers) }, { id: 'auth', label: 'Auth', badge: r.auth.kind === 'inherit' || r.auth.kind === 'none' ? '' : '\u2022' },
-    { id: 'body', label: 'Body', badge: r.body.kind === 'none' ? '' : '\u2022' }, { id: 'tests', label: 'Tests', badge: countRows(r.tests.map(row => ({ enabled: row.enabled, name: row.expr })).concat(r.captures.map(row => ({ enabled: row.enabled, name: row.expr })))) },
+    { id: 'body', label: 'Body', badge: r.body.kind === 'none' ? '' : '\u2022' }, { id: 'scripts', label: 'Scripts', badge: r.scripts.pre.trim() === '' && r.scripts.post.trim() === '' ? '' : '\u2022' }, { id: 'tests', label: 'Tests', badge: countRows(r.tests.map(row => ({ enabled: row.enabled, name: row.expr })).concat(r.captures.map(row => ({ enabled: row.enabled, name: row.expr })))) },
     { id: 'settings', label: 'Settings', badge: Object.keys(r.settings).length === 0 ? '' : String(Object.keys(r.settings).length) },
     { id: 'docs', label: 'Docs', badge: r.docs === '' ? '' : '\u2022' }
   ];
@@ -106,6 +107,7 @@ function Editor(props: { request: Request; port: HostPort }) {
         {tab === 'headers' ? <KeyValueGrid rows={r.headers} path={['headers']} label="Headers" namePlaceholder="Header" /> : null}
         {tab === 'auth' ? <AuthEditor auth={r.auth} what="request" /> : null}
         {tab === 'body' ? <BodyTab body={r.body} send={send} /> : null}
+        {tab === 'scripts' ? <ScriptsForm scripts={r.scripts} what="request" /> : null}
         {tab === 'tests' ? <TestsForm tests={r.tests} captures={r.captures} /> : null}
         {tab === 'settings' ? <SettingsForm settings={r.settings} path={['settings']} what="request" /> : null}
         {tab === 'docs' ? <div class="editor-box"><CodeEditor value={r.docs} language="text" label="Notes on this request" placeholder="Notes for yourself and your team" onChange={value => edit({ op: 'set', path: ['docs'], value })} onBlur={flushNow} /></div> : null}

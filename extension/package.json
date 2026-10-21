@@ -42,7 +42,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
-      "description": "Importing writes files into the workspace and reads data from other folders, so it needs a trusted workspace."
+      "description": "Importing and creating write files into the workspace, collections come from other people, and their scripts run on this computer, so it needs a trusted workspace."
     },
     "virtualWorkspaces": {
       "supported": false,
@@ -158,6 +158,11 @@
       {
         "command": "apiClient.clearVariables",
         "title": "Clear Saved Variables",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.forgetScripts",
+        "title": "Forget Which Scripts Were Allowed",
         "category": "API Client"
       }
     ],
@@ -396,6 +401,12 @@
     "configuration": {
       "title": "API Client",
       "properties": {
+        "apiClient.scripts.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "machine",
+          "markdownDescription": "Run the scripts of requests, folders and collections, after you have allowed them. Turn it off to send requests without ever running a script."
+        },
         "apiClient.root": {
           "type": "string",
           "default": "api-client",

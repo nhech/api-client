@@ -113,6 +113,44 @@ exports.run = async function run() {
     await open('pets/get-pet.req.yml');
     await sleep(800);
     await shot('request-variables', 1000, 420, 1200);
+
+    // Scripts: the tab where they are written, what they wrote to the console and tested, and a script that stops the request.
+    test.scripts.answer = async () => 'allow';
+    put('api-client/collections/pet-store/pets/scripted.req.yml', [
+      'schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1ABG', 'name: List with scripts', 'url: /pets', 'query:', '  - name: limit', '    value: 10',
+      'scripts:',
+      '  pre: |',
+      "    // Ask for the same page again, and say who is asking.",
+      "    pm.environment.set('requestedAt', new Date().toISOString());",
+      "    pm.request.headers.add({ key: 'X-Requested-At', value: pm.environment.get('requestedAt') });",
+      "    console.log('sending', pm.request.method, pm.request.url.toString());",
+      '  post: |',
+      "    const body = pm.response.json();",
+      "    pm.test('answers 200', () => pm.expect(pm.response.code).to.equal(200));",
+      "    pm.test('has four pets', () => pm.expect(body.pets).to.have.length(4));",
+      "    pm.test('first pet is a cat', () => pm.expect(body.pets[0].tag).to.equal('cat'));",
+      "    pm.environment.set('firstPet', body.pets[0].name);",
+      "    console.warn('the first pet is', body.pets[0].name);",
+      ''
+    ].join('\n'));
+    put('api-client/collections/pet-store/pets/broken.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABH\nname: Script that fails\nurl: /pets\nscripts:\n  pre: |\n    console.log("about to fail");\n    pm.environment.get("missing").toUpperCase();\n');
+    for (let waited = 0; waited < 10000; waited += 100) {
+      const pets = test.client().collections[0]?.children.find(node => node.label === 'Pets');
+      if (pets && pets.children.some(node => node.label === 'List with scripts') && pets.children.some(node => node.label === 'Script that fails')) break;
+      await sleep(100);
+    }
+    await vscode.commands.executeCommand('workbench.view.extension.apiClient');
+    const scripted = await open('pets/scripted.req.yml');
+    await sleep(800);
+    await shot('request-scripts', 1400, 860, 1200, clickTab('Scripts', false));
+    await scripted.receive({ type: 'send' });
+    await answer(scripted, 'response');
+    await shot('response-console', 1400, 860, 1200, clickTab('Console', true));
+    await shot('response-script-tests', 1400, 860, 1200, clickTab('Tests', true));
+    const broken = await open('pets/broken.req.yml');
+    await broken.receive({ type: 'send' });
+    await answer(broken, 'failed');
+    await shot('request-script-failed', 1000, 600, 1200);
   } finally {
     server.closeAllConnections();
     server.close();

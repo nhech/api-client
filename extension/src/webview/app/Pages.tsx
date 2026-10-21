@@ -4,6 +4,7 @@ import type { Finding } from '../../../../src/format/schema';
 import { AuthEditor } from './AuthEditor';
 import { CodeEditor } from './CodeEditor';
 import { KeyValueGrid, Tabs, type TabSpec } from './components';
+import { ScriptsForm } from './Scripts';
 import { SettingsForm } from './SettingsForm';
 import { ExpressionList } from './Expressions';
 import { checkTest, TestsHelp } from './TestsForm';
@@ -65,7 +66,7 @@ function ContainerPage(props: { container: Container; kind: 'collection' | 'fold
   const c = props.container;
   const tabs: TabSpec[] = [
     { id: 'general', label: 'General' }, { id: 'headers', label: 'Headers', badge: countRows(c.headers) }, { id: 'auth', label: 'Auth', badge: c.auth.kind === 'inherit' || c.auth.kind === 'none' ? '' : '•' },
-    { id: 'vars', label: 'Variables', badge: countRows(c.vars) }, { id: 'tests', label: 'Tests', badge: countRows(c.tests.map(row => ({ enabled: row.enabled, name: row.expr }))) }, { id: 'settings', label: 'Settings', badge: Object.keys(c.settings).length === 0 ? '' : String(Object.keys(c.settings).length) }
+    { id: 'vars', label: 'Variables', badge: countRows(c.vars) }, { id: 'scripts', label: 'Scripts', badge: c.scripts.pre.trim() === '' && c.scripts.post.trim() === '' ? '' : '\u2022' }, { id: 'tests', label: 'Tests', badge: countRows(c.tests.map(row => ({ enabled: row.enabled, name: row.expr }))) }, { id: 'settings', label: 'Settings', badge: Object.keys(c.settings).length === 0 ? '' : String(Object.keys(c.settings).length) }
   ];
   const where = props.kind === 'collection' ? 'the collection' : 'the folder';
   return (
@@ -92,6 +93,7 @@ function ContainerPage(props: { container: Container; kind: 'collection' | 'fold
             {c.vars.some(variable => variable.secret) ? <label class="check"><input type="checkbox" checked={reveal} onChange={event => setReveal((event.target as HTMLInputElement).checked)} /><span>Show the values of secret variables</span></label> : null}
           </>
         ) : null}
+        {tab === 'scripts' ? <ScriptsForm scripts={c.scripts} what={props.kind} /> : null}
         {tab === 'tests' ? (
           <>
             <p class="hint">Checked after every request in {where}, together with the tests of the request itself.</p>

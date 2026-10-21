@@ -31,6 +31,7 @@
         "node:stream",
         "node:stream/promises",
         "node:tls",
+        "node:worker_threads",
         "node:zlib",
         "vscode"
       ]

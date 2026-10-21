@@ -4,6 +4,7 @@ import type { VariableInfo } from '../../../../src/core/vars';
 import { applyEditOps, applyOps, containerCodec, ENVIRONMENT_CODEC } from '../../../../src/view/edit';
 import type { AppScreen, DocumentState, EditOp, RequestState, ToHost, ToView } from '../../../../src/view/request-protocol';
 import type { ResponseView } from '../../../../src/view/response';
+import type { ScriptReport } from '../../../../src/view/scripts';
 
 /**
  * The state of the page. The extension owns the file; the page keeps a copy that it changes at once when the person types (so
@@ -45,7 +46,7 @@ export const variables = signal<{ vars: VariableInfo[]; complete: boolean }>({ v
 export const sending = signal<{ id: number; since: number } | undefined>(undefined);
 /** The last answer, or why there is none. Both are cleared when the next send begins. */
 export const response = signal<ResponseView | undefined>(undefined);
-export const failure = signal<{ code: string; message: string; hint: string; warnings: string[] } | undefined>(undefined);
+export const failure = signal<{ code: string; message: string; hint: string; warnings: string[]; scripts?: ScriptReport } | undefined>(undefined);
 
 const FLUSH_DELAY_MS = 250;
 let host: Host | undefined;
@@ -178,7 +179,7 @@ export function receive(message: ToView): void {
   }
   if (message.type === 'failed') {
     sending.value = undefined;
-    failure.value = { code: message.code, message: message.message, hint: message.hint, warnings: message.warnings };
+    failure.value = { code: message.code, message: message.message, hint: message.hint, warnings: message.warnings, ...(message.scripts === undefined ? {} : { scripts: message.scripts }) };
     return;
   }
   if (message.type === 'cancelled') {

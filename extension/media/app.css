@@ -30,7 +30,7 @@ button { font: inherit; cursor: pointer; }
 .banner.info { background: var(--vscode-inputValidation-infoBackground); border-color: var(--vscode-inputValidation-infoBorder); }
 
 .tabs { display: flex; flex-direction: column; min-height: 0; }
-.tab-list { display: flex; gap: 2px; border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-contrastBorder, transparent)); }
+.tab-list { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-contrastBorder, transparent)); }
 .tab { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--vscode-foreground); opacity: 0.75; padding: 6px 12px; }
 .tab:hover { opacity: 1; }
 .tab.active { opacity: 1; border-bottom-color: var(--vscode-focusBorder); }
@@ -139,3 +139,12 @@ details.help code, .hint code { font-family: var(--vscode-editor-font-family); b
 .result-fail { color: var(--vscode-testing-iconFailed, var(--vscode-errorForeground)); font-weight: 600; }
 
 table.data td.nowrap { white-space: nowrap; overflow-wrap: normal; }
+
+/* The scripts of a request and what they wrote to the console. */
+.console { display: flex; flex-direction: column; gap: 4px; }
+.console p { margin: 4px 0; }
+pre.log-list { margin: 0; padding: 6px 8px; max-height: 60vh; overflow: auto; }
+.log { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); }
+.log.warn { color: var(--vscode-editorWarning-foreground); }
+.log.error { color: var(--vscode-errorForeground); }
+.log.debug, .log.info { color: var(--vscode-descriptionForeground); }

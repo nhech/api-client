@@ -702,4 +702,135 @@ exports.run = async function run() {
     testServer.closeAllConnections();
     testServer.close();
   }
+
+  // 15. Scripts: nothing runs until the person has allowed the very text that will run; then a script before the request sets a variable and a header,
+  //     a script after the answer tests and saves, a changed script is asked about again, and what was set is never written into the files.
+  const seenScripts = [];
+  const scriptServer = http2.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      seenScripts.push({ url: req.url, stamp: req.headers['x-stamp'] });
+      res.setHeader('Content-Type', 'application/json');
+      res.end('{"ok":true,"token":"script-token-1"}');
+    });
+  });
+  await new Promise(resolve => scriptServer.listen(0, '127.0.0.1', resolve));
+  const scriptBase = 'http://127.0.0.1:' + scriptServer.address().port;
+  const questions = [];
+  let nextAnswer = 'allow';
+  test.scripts.answer = async pending => { questions.push(pending.map(item => item.status + ':' + item.phase)); return nextAnswer; };
+  const scriptedFile = version => [
+    'schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B21', 'name: Scripted', 'url: "' + scriptBase + '/scripted"',
+    'scripts:',
+    '  pre: |',
+    "    pm.environment.set('stamp', 'from-script-" + version + "');",
+    "    pm.request.headers.add({ key: 'X-Stamp', value: pm.environment.get('stamp') });",
+    "    console.log('before', pm.info.requestName);",
+    '  post: |',
+    "    pm.test('status is 200', () => pm.expect(pm.response.code).to.equal(200));",
+    "    pm.environment.set('access_token', pm.response.json().token);",
+    "    console.log('after', pm.response.code);",
+    ''
+  ].join('\n');
+  const scriptedPath = path.join(workspace, 'api-client', 'collections', 'shop', 'scripted.req.yml');
+  try {
+    put('api-client/collections/shop/scripted.req.yml', scriptedFile('one'));
+    await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Scripted'), 'the scripted request is in the tree');
+    await vscode.commands.executeCommand('apiClient.clearVariables');
+    const scripted = await (async () => {
+      const uri = uriOf('api-client/collections/shop/scripted.req.yml');
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'apiClient.request');
+      await until(() => test.requestEditor(uri.toString())?.isReady === true, 'the scripted request is open');
+      return test.requestEditor(uri.toString());
+    })();
+    const answers = () => scripted.messages().filter(message => message.type === 'response' || message.type === 'failed' || message.type === 'cancelled');
+    const sendAndWait = async () => {
+      const before = answers().length;
+      await scripted.receive({ type: 'send' });
+      await until(() => answers().length > before, 'the answer to the scripted request');
+      return answers().at(-1);
+    };
+
+    // 15a. Not allowed yet: the question names both scripts, and a "send without scripts" sends the request as it is written.
+    nextAnswer = 'skip';
+    const skipped = await sendAndWait();
+    assert.equal(skipped.type, 'response');
+    assert.deepEqual(questions, [['new:pre', 'new:post']], 'both scripts were asked about, as new');
+    assert.equal(seenScripts.at(-1).stamp, undefined, 'the script before the request did not run');
+    assert.ok(skipped.response.scripts.notes.some(note => /did not run.*not been allowed/.test(note)), 'and the pane says so');
+    assert.deepEqual(skipped.response.scripts.logs, []);
+
+    // 15b. Allowed: the script before the request set a header and a variable, the script after the answer tested and saved, and the console has both.
+    nextAnswer = 'allow';
+    const ran = await sendAndWait();
+    assert.equal(ran.type, 'response');
+    assert.equal(questions.length, 2, 'asked once more');
+    assert.equal(seenScripts.at(-1).stamp, 'from-script-one', 'the header the script added went out');
+    const report = ran.response.scripts;
+    assert.deepEqual(report.logs.map(item => [item.phase, item.level, item.text]), [['pre', 'log', 'before Scripted'], ['post', 'log', 'after 200']]);
+    assert.deepEqual(report.tests.map(item => [item.phase, item.name, item.passed]), [['post', 'status is 200', true]]);
+    assert.deepEqual(report.saved.map(item => [item.variable, item.scope, item.secret, item.value]), [['stamp', 'active', false, 'from-script-one'], ['access_token', 'active', true, '']]);
+    assert.deepEqual(report.errors, []);
+    assert.ok(!JSON.stringify(report).includes('script-token-1'), 'the value of the secret is not in what is said about the run');
+
+    // 15c. The same text is not asked about again; what the scripts set is in the variables of the next request, and in no file.
+    const again = await sendAndWait();
+    assert.equal(again.type, 'response');
+    assert.equal(questions.length, 2, 'not asked again');
+    for (const name of fs.readdirSync(path.join(workspace, 'api-client', 'collections', 'shop'))) {
+      const full = path.join(workspace, 'api-client', 'collections', 'shop', name);
+      if (fs.statSync(full).isFile()) assert.ok(!fs.readFileSync(full, 'utf8').includes('script-token-1'), name + ' holds no value that a script set');
+    }
+    assert.ok(scripted.messages().filter(message => message.type === 'vars').at(-1).vars.some(item => item.name === 'stamp' && item.source === 'this run'), 'the page knows the variable a script set');
+
+    // 15d. A change of the text asks again, naming it as changed; refusing it calls the send off; allowing it runs the new text.
+    put('api-client/collections/shop/scripted.req.yml', scriptedFile('two'));
+    await until(() => scripted.messages().some(message => message.type === 'doc' && message.request?.scripts?.pre.includes('from-script-two')), 'the editor has the changed script');
+    nextAnswer = 'cancel';
+    const sentBefore = seenScripts.length;
+    const refused = await sendAndWait();
+    assert.equal(refused.type, 'cancelled', 'the send was called off');
+    assert.equal(seenScripts.length, sentBefore, 'and nothing was sent');
+    assert.deepEqual(questions.at(-1), ['changed:pre'], 'only the script that changed was asked about: the other has the text that was allowed');
+    nextAnswer = 'allow';
+    const second = await sendAndWait();
+    assert.equal(second.type, 'response');
+    assert.equal(seenScripts.at(-1).stamp, 'from-script-two');
+
+    // 15e. A script that throws before the request stops it: nothing is sent, and the failure says which script and what it said.
+    put('api-client/collections/shop/scripted.req.yml', scriptedFile('three').replace("pm.environment.set('stamp'", "null.nothing; pm.environment.set('stamp'"));
+    await until(() => scripted.messages().some(message => message.type === 'doc' && message.request?.scripts?.pre.includes('null.nothing')), 'the editor has the script that throws');
+    const sentThen = seenScripts.length;
+    const failed = await sendAndWait();
+    assert.equal(failed.type, 'failed');
+    assert.equal(failed.code, 'script-error');
+    assert.equal(failed.message, 'A script failed before the request was sent.');
+    assert.match(failed.scripts.errors[0].message, /null|nothing/, 'what the script said is in the report');
+    assert.equal(seenScripts.length, sentThen, 'the request was not sent');
+    assert.ok(failed.scripts.errors.length === 1 && failed.scripts.errors[0].phase === 'pre');
+
+    // 15f. Forgetting what was allowed asks again for the same text; turning scripts off in the settings sends without asking.
+    put('api-client/collections/shop/scripted.req.yml', scriptedFile('one'));
+    await until(() => scripted.messages().some(message => message.type === 'doc' && message.request?.scripts?.pre.includes('from-script-one') && !message.request.scripts.pre.includes('null.nothing')), 'the editor has the first script again');
+    await vscode.commands.executeCommand('apiClient.forgetScripts');
+    const asked = questions.length;
+    await sendAndWait();
+    assert.equal(questions.length, asked + 1, 'asked again after forgetting');
+    const settings = vscode.workspace.getConfiguration('apiClient');
+    await settings.update('scripts.enabled', false, vscode.ConfigurationTarget.Global);
+    try {
+      const off = await sendAndWait();
+      assert.equal(off.type, 'response');
+      assert.equal(questions.length, asked + 1, 'not asked when scripts are off');
+      assert.ok(off.response.scripts.notes.some(note => /turned off/.test(note)));
+      assert.equal(seenScripts.at(-1).stamp, undefined);
+    } finally {
+      await settings.update('scripts.enabled', undefined, vscode.ConfigurationTarget.Global);
+    }
+    assert.equal(fs.readFileSync(scriptedPath, 'utf8'), scriptedFile('one'), 'the file of the request is as it was written');
+  } finally {
+    test.scripts.answer = undefined;
+    scriptServer.closeAllConnections();
+    scriptServer.close();
+  }
 };

@@ -4,6 +4,7 @@ import type { Language } from './CodeEditor';
 import { CodeViewer } from './CodeViewer';
 import { Tabs, type TabSpec } from './components';
 import { ImageView } from './ImageView';
+import { ScriptConsole } from './Scripts';
 import { failure, response, sending, type HostPort } from './store';
 
 /** The answer to a request: the status line, the body, the headers, the cookies, what was sent, and where the time went. */
@@ -122,23 +123,34 @@ function SentPane(props: { view: ResponseView }) {
   );
 }
 
+/** The tests of the request and of the scripts together: how many ran and how many passed (a test a script skipped is neither). */
+export function countTests(view: ResponseView): { total: number; passed: number } {
+  const scripted = (view.scripts?.tests ?? []).filter(test => !test.skipped);
+  return { total: view.tests.length + scripted.length, passed: view.tests.filter(test => test.ok).length + scripted.filter(test => test.passed).length };
+}
+
 function TestsPane(props: { view: ResponseView }) {
-  const { tests, saved } = props.view;
-  const passed = tests.filter(test => test.ok).length;
+  const { tests } = props.view;
+  const scripted = props.view.scripts?.tests ?? [];
+  const saved = [...props.view.saved, ...(props.view.scripts?.saved ?? [])];
+  const { total, passed } = countTests(props.view);
   return (
     <>
-      {tests.length === 0 ? <p class="hint">This request has no tests. Add some in the Tests tab of the request.</p> : (
+      {total === 0 && scripted.length === 0 ? <p class="hint">This request has no tests. Add some in the Tests tab of the request.</p> : (
         <>
-          <p class="status-line" role="status"><strong class={passed === tests.length ? 'result-pass' : 'result-fail'}>{passed} of {tests.length} passed</strong></p>
+          <p class="status-line" role="status"><strong class={passed === total ? 'result-pass' : 'result-fail'}>{passed} of {total} passed</strong></p>
           <table class="data" aria-label="Test results">
             <thead><tr><th scope="col">Result</th><th scope="col">Test</th><th scope="col">From</th><th scope="col">Details</th></tr></thead>
-            <tbody>{tests.map(test => <tr><td class={test.ok ? 'result-pass nowrap' : 'result-fail nowrap'}>{test.ok ? 'Passed' : 'Failed'}</td><td class="cell">{test.expr}</td><td class="nowrap">{test.from}</td><td>{test.message}</td></tr>)}</tbody>
+            <tbody>
+              {tests.map(test => <tr><td class={test.ok ? 'result-pass nowrap' : 'result-fail nowrap'}>{test.ok ? 'Passed' : 'Failed'}</td><td class="cell">{test.expr}</td><td class="nowrap">{test.from}</td><td>{test.message}</td></tr>)}
+              {scripted.map(test => <tr><td class={test.skipped ? 'nowrap' : test.passed ? 'result-pass nowrap' : 'result-fail nowrap'}>{test.skipped ? 'Skipped' : test.passed ? 'Passed' : 'Failed'}</td><td class="cell">{test.name}</td><td class="nowrap">script {test.phase === 'pre' ? 'before' : 'after'}</td><td>{test.skipped ? '' : test.message}</td></tr>)}
+            </tbody>
           </table>
         </>
       )}
       {saved.length > 0 ? (
         <>
-          <h3>Saved from the response</h3>
+          <h3>Saved variables</h3>
           <table class="data" aria-label="Saved variables">
             <thead><tr><th scope="col">Result</th><th scope="col">Variable</th><th scope="col">Value</th></tr></thead>
             <tbody>{saved.map(item => (
@@ -158,11 +170,14 @@ function TestsPane(props: { view: ResponseView }) {
 function Answer(props: { view: ResponseView; port: HostPort }) {
   const [tab, setTab] = useState('body');
   const view = props.view;
-  const passed = view.tests.filter(test => test.ok).length;
-  const hasTests = view.tests.length > 0 || view.saved.length > 0;
+  const { total, passed } = countTests(view);
+  const report = view.scripts;
+  const hasTests = total > 0 || view.saved.length > 0 || (report?.tests.length ?? 0) > 0 || (report?.saved.length ?? 0) > 0;
+  const hasConsole = report !== undefined && (report.logs.length > 0 || report.errors.length > 0 || report.skipped);
   const tabs: TabSpec[] = [
     { id: 'body', label: 'Body' }, { id: 'headers', label: 'Headers', badge: String(view.headers.length) }, { id: 'cookies', label: 'Cookies', badge: view.cookies.length === 0 ? '' : String(view.cookies.length) },
-    ...(hasTests ? [{ id: 'tests', label: 'Tests', badge: view.tests.length === 0 ? '' : `${passed}/${view.tests.length}` }] : []),
+    ...(hasTests ? [{ id: 'tests', label: 'Tests', badge: total === 0 ? '' : `${passed}/${total}` }] : []),
+    ...(hasConsole ? [{ id: 'console', label: 'Console', badge: (report?.errors.length ?? 0) > 0 ? '!' : '' }] : []),
     { id: 'request', label: 'Request' }, { id: 'timeline', label: 'Timeline' }
   ];
   return (
@@ -173,15 +188,18 @@ function Answer(props: { view: ResponseView; port: HostPort }) {
         <span>{formatSize(view.size)}</span>
         <span class="muted">HTTP/{view.httpVersion}</span>
         {view.onDisk ? <span class="muted">kept in a file</span> : null}
-        {view.tests.length > 0 ? <span class={passed === view.tests.length ? 'result-pass' : 'result-fail'}>{passed === view.tests.length ? 'All' : `${passed} of`} {view.tests.length} {view.tests.length === 1 ? 'test' : 'tests'} passed</span> : null}
+        {total > 0 ? <span class={passed === total ? 'result-pass' : 'result-fail'}>{passed === total ? 'All' : `${passed} of`} {total} {total === 1 ? 'test' : 'tests'} passed</span> : null}
+        {(report?.errors.length ?? 0) > 0 ? <span class="result-fail">{report?.errors.length} {report?.errors.length === 1 ? 'script failed' : 'scripts failed'}</span> : null}
       </p>
       {view.warnings.map(warning => <div class="banner warning" role="status"><span>{warning}</span></div>)}
+      {(report?.notes ?? []).map(note => <div class="banner warning" role="status"><span>{note}</span></div>)}
       <Tabs tabs={tabs} active={tab} onSelect={setTab} label="Response">
         {tab === 'body' ? <BodyPane body={view.body} truncated={view.truncated} port={props.port} /> : null}
         {tab === 'headers' ? <Table head={['Name', 'Value']} rows={view.headers} label="Response headers" empty="The response has no headers." /> : null}
         {tab === 'cookies' ? <Table head={['Name', 'Value', 'Domain', 'Path', 'Expires', 'Flags']} label="Cookies set by the response" empty="The response sets no cookies."
           rows={view.cookies.map(cookie => [cookie.name, cookie.value, cookie.domain, cookie.path, cookie.expires, [cookie.secure ? 'Secure' : '', cookie.httpOnly ? 'HttpOnly' : '', cookie.sameSite === '' ? '' : `SameSite=${cookie.sameSite}`].filter(flag => flag !== '').join(' ')])} /> : null}
         {tab === 'tests' ? <TestsPane view={view} /> : null}
+        {tab === 'console' && report !== undefined ? <ScriptConsole report={report} /> : null}
         {tab === 'request' ? <SentPane view={view} /> : null}
         {tab === 'timeline' ? <Timeline view={view} /> : null}
       </Tabs>
@@ -201,6 +219,7 @@ export function ResponsePane(props: { port: HostPort }) {
           <p><strong>{failed.message}</strong></p>
           {failed.hint !== '' ? <p>{failed.hint}</p> : null}
           {failed.warnings.map(warning => <p class="hint">{warning}</p>)}
+          {failed.scripts !== undefined ? <ScriptConsole report={failed.scripts} /> : null}
         </div>
       ) : null}
       {answer !== undefined ? <Answer view={answer} port={props.port} /> : null}

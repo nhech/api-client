@@ -11,6 +11,7 @@ import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
 import { SendEnvironment } from './sender';
+import type { ScriptService } from './scripts';
 import { CollectionsTree, EnvironmentsTree } from './trees';
 import { REPORT_SCHEME, ReportDocuments, VscodeHost } from './vscodeHost';
 import { WizardPanel } from './wizardPanel';
@@ -25,6 +26,8 @@ const platform = (): 'win32' | 'darwin' | 'linux' => (process.platform === 'win3
 
 /** What the tests of the extension may reach. It exists only when the test runner asks for it, so no other extension can drive an import. */
 export interface ImporterTestApi {
+  /** The consent to run scripts: the tests answer the question for the person. */
+  scripts: ScriptService;
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
@@ -80,6 +83,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     vscode.window.registerCustomEditorProvider(ENVIRONMENT_VIEW_TYPE, environmentEditors, editorOptions),
     vscode.window.registerCustomEditorProvider(CONTAINER_VIEW_TYPE, containerEditors, editorOptions),
     vscode.commands.registerCommand('apiClient.clearVariables', () => { sending.clearVariables(); }),
+    vscode.commands.registerCommand('apiClient.forgetScripts', async () => { await sending.scripts.forgetAll(); void vscode.window.showInformationMessage('API Client: no script is allowed to run any more. You are asked again before the next one runs.'); }),
     reports, workspace, collections, environments, collections.view, environmentsView, historyView, status, workspace.onDidChange(showStatus),
     vscode.workspace.registerTextDocumentContentProvider(REPORT_SCHEME, reports),
     vscode.commands.registerCommand(IMPORT_COMMAND, async (): Promise<void> => { WizardPanel.show(context, host, await candidates()); }),
@@ -91,7 +95,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 
