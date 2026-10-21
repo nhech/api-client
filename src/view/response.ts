@@ -443,7 +443,7 @@ export function buildResponseView(input: ResponseViewInput): ResponseView {
   return {
     status: response.status, statusText: printable(response.statusText), httpVersion: printable(response.httpVersion),
     headers: response.headers.map(([name, value]) => [printable(name), printable(value)]),
-    body, size: response.size, wireBytes: response.wireBytes, timings: response.timings, redirects: response.redirects,
+    body, size: response.size, wireBytes: response.wireBytes, timings: response.timings, redirects: response.redirects.map(hop => ({ ...hop, url: printable(redactValues(hop.url, input.redactions)) })),
     finalUrl: printable(redactValues(response.finalUrl, input.redactions)), tls: response.tls, warnings, cookies,
     sent: describeSent(response.sent, input.redactions), tests: [...(input.tests ?? [])], saved: (input.captures ?? []).map(savedView),
     ...(input.scripts === undefined ? {} : { scripts: input.scripts }), truncated: response.truncated, onDisk: response.body.kind === 'file'

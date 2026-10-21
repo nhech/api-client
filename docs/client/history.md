@@ -14,7 +14,7 @@ The setting `apiClient.history.mode` (user or remote settings only: a workspace 
 
 Whatever is kept has been made safe first, by text rules:
 
-- a value that the request was built from as a secret (a secret variable, a token from OAuth) is `[redacted]` wherever it shows up;
+- a value that the request was built from as a secret (a secret variable, a token from OAuth) is `[redacted]` wherever it shows up, as typed and as it was put into an address or a form (percent-encoded, with a plus for a space, in lower case hex);
 - a header whose name says it is secret (`Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Amz-Security-Token`, ...) is `[redacted]`;
 - a query parameter, a field of a JSON body or of a form whose name says it is secret (`api_key`, `access_token`, `accessToken`, `password`, `client_secret`, ...) is `[redacted]`;
 - the user name and the password in an address, and a fragment, are not kept.

@@ -106,8 +106,8 @@ test('The request of the Code tab is what would be sent, with the secrets writte
   assert.deepEqual(multipart.body, { kind: 'multipart', parts: [{ name: 'n', value: '[redacted]' }, { name: 'f', file: './a.pdf', filename: 'a.pdf', contentType: 'application/pdf' }] });
   const odd = codeRequestFrom(wire({ url: `https://h.test/${String.fromCharCode(10)}x`, headers: [[`X${String.fromCharCode(0)}`, `a${String.fromCharCode(27)}b`]] }), secrets);
   assert.deepEqual([odd.url, odd.headers], ['https://h.test/?x', [['X?', 'a?b']]]);
-  assert.deepEqual(codeNotes(['A warning.'], secrets), ['A warning.', 'Secret values are written as [redacted]: put them back before running the code.']);
-  assert.deepEqual(codeNotes([], []), []);
+  assert.deepEqual(codeNotes(['A warning.'], true), ['A warning.', 'Secret values are written as [redacted]: put them back before running the code.']);
+  assert.deepEqual(codeNotes([], false), []);
 });
 
 // ---- the two that can be run here ----
@@ -184,4 +184,17 @@ test('The Python code is Python, and the C-like languages have their strings clo
     const result = spawnSync('python', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: code, encoding: 'utf8' });
     assert.equal(result.status, 0, `${name}: ${result.stderr}`);
   }
+});
+
+test('The Code tab covers a secret by what it is called and by how it was written into the address, not only by the values that the request was built from', () => {
+  const typed = codeRequestFrom(wire({ headers: [['Authorization', 'Bearer typed-token-abcdef'], ['X-Api-Key', 'literal-key-1234567890'], ['Accept', 'application/json'], ['X-Trace', 'abc']], url: 'https://api.test/files/u%2F42%3Fk%3DSECRETPART?sig=aB%2BcD%2FeF%3D%3DsecretSig&api_key=named-secret-1&page=2&redirect=a+b' }), ['u/42?k=SECRETPART', 'aB+cD/eF==secretSig']);
+  assert.deepEqual(typed.headers.slice(0, 4), [['Authorization', 'Bearer [redacted]'], ['X-Api-Key', '[redacted]'], ['Accept', 'application/json'], ['X-Trace', 'abc']]);
+  assert.equal(typed.url, 'https://api.test/files/[redacted]?sig=[redacted]&api_key=[redacted]&page=2&redirect=a+b', 'the encoded forms of a secret value, and a parameter that is named like a secret');
+  const body = codeRequestFrom(wire({ body: { kind: 'bytes', bytes: bytes('{"user":"ann","password":"typed-pw-123","access_token":"t-1"}') } }), []);
+  assert.deepEqual(body.body, { kind: 'text', text: '{"user":"ann","password":"[redacted]","access_token":"[redacted]"}' });
+  const form = codeRequestFrom(wire({ headers: [['Content-Type', 'application/x-www-form-urlencoded']], body: { kind: 'bytes', bytes: bytes('user=ann&password=typed-pw-123&client_secret=s-1') } }), []);
+  assert.deepEqual(form.body, { kind: 'form', fields: [['user', 'ann'], ['password', '[redacted]'], ['client_secret', '[redacted]']] });
+  const multipart = codeRequestFrom(wire({ body: { kind: 'multipart', boundary: 'b', parts: [{ name: 'title', value: 'plain' }, { name: 'api_key', value: 'typed-key-123' }] } }), []);
+  assert.deepEqual(multipart.body, { kind: 'multipart', parts: [{ name: 'title', value: 'plain' }, { name: 'api_key', value: '[redacted]' }] });
+  assert.deepEqual(codeNotes([], typed.headers.some(([, value]) => value.includes('[redacted]'))), ['Secret values are written as [redacted]: put them back before running the code.']);
 });

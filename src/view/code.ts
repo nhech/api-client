@@ -1,4 +1,4 @@
-import { REDACTED, redactValues } from '../core/redact';
+import { hideSecrets, hideUrl, isSecretName, REDACTED, redactedValue, redactValues } from '../core/redact';
 import type { CodeBody, CodeRequest } from '../codegen';
 import type { WireRequest } from '../engine/types';
 import { printable } from '../util/chars';
@@ -22,11 +22,19 @@ function decodeForm(text: string): [string, string][] | undefined {
   return pairs;
 }
 
+/** The value of a header for the code: a credential keeps its scheme (`Bearer [redacted]`), so that the person knows what to put back. */
+function headerForCode(name: string, value: string, redactions: readonly string[]): string {
+  if (!isSecretName(name)) return redactedValue(name, value, redactions);
+  const scheme = /^(?:Bearer|Basic|Digest|Token|OAuth|Negotiate|NTLM)\s+/i.exec(value);
+  return `${scheme === null ? '' : scheme[0]}${REDACTED}`;
+}
+
 export function codeRequestFrom(wire: WireRequest, redactions: readonly string[]): CodeRequest {
   const hide = (text: string): string => printable(redactValues(text, redactions));
-  const headers = wire.headers.map(([name, value]): [string, string] => [printable(name), hide(value)]);
+  // A secret is covered by what it is (a value the request was built from) and by what it is called (a header, a field, a parameter): a token that was typed straight into a header is no variable.
+  const headers = wire.headers.map(([name, value]): [string, string] => [printable(name), printable(headerForCode(name, value, redactions))]);
   const type = wire.headers.find(([name]) => name.toLowerCase() === 'content-type')?.[1] ?? '';
-  const request: CodeRequest = { method: printable(wire.method), url: hide(wire.url), headers };
+  const request: CodeRequest = { method: printable(wire.method), url: printable(hideUrl(wire.url, redactions)), headers };
   const body = wire.body;
   if (body === undefined) return request;
   let shown: CodeBody;
@@ -34,14 +42,14 @@ export function codeRequestFrom(wire: WireRequest, redactions: readonly string[]
   else if (body.kind === 'multipart') {
     shown = { kind: 'multipart', parts: body.parts.map(part => (part.filePath !== undefined
       ? { name: printable(part.name), file: `./${printable(baseName(part.filePath))}`, ...(part.filename === undefined ? {} : { filename: printable(part.filename) }), ...(part.contentType === undefined ? {} : { contentType: printable(part.contentType) }) }
-      : { name: printable(part.name), value: hide(part.value ?? ''), ...(part.contentType === undefined ? {} : { contentType: printable(part.contentType) }) })) };
+      : { name: printable(part.name), value: printable(redactedValue(part.name, part.value ?? '', redactions)), ...(part.contentType === undefined ? {} : { contentType: printable(part.contentType) }) })) };
   } else {
     let text: string | undefined;
     try { text = textDecoder.decode(body.bytes); } catch { text = undefined; }
     if (text === undefined) shown = { kind: 'binary', size: body.bytes.length };
     else {
       const fields = type.toLowerCase().startsWith('application/x-www-form-urlencoded') ? decodeForm(text) : undefined;
-      shown = fields === undefined ? { kind: 'text', text: hide(text) } : { kind: 'form', fields: fields.map(([name, value]): [string, string] => [hide(name), hide(value)]) };
+      shown = fields === undefined ? { kind: 'text', text: printable(hideSecrets(text, redactions)) } : { kind: 'form', fields: fields.map(([name, value]): [string, string] => [hide(name), printable(redactedValue(name, value, redactions))]) };
     }
   }
   request.body = shown;
@@ -49,8 +57,8 @@ export function codeRequestFrom(wire: WireRequest, redactions: readonly string[]
 }
 
 /** What to tell the person about the code, in a line each. */
-export function codeNotes(warnings: readonly string[], redactions: readonly string[]): string[] {
+export function codeNotes(warnings: readonly string[], redacted: boolean): string[] {
   const notes = warnings.map(printable);
-  if (redactions.length > 0) notes.push(`Secret values are written as ${REDACTED}: put them back before running the code.`);
+  if (redacted) notes.push(`Secret values are written as ${REDACTED}: put them back before running the code.`);
   return notes;
 }

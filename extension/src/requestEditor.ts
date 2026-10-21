@@ -6,6 +6,7 @@ import { readRequest, writeRequest } from '../../src/format/schema';
 import type { YMap } from '../../src/format/yaml';
 import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
 import { generateCode } from '../../src/codegen/languages';
+import { REDACTED } from '../../src/core/redact';
 import { codeNotes, codeRequestFrom } from '../../src/view/code';
 import { parseToHost, type OAuthStatusView, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
 import { configureAppPanel } from './appPanel';
@@ -153,9 +154,9 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     if (prepared === undefined) { this.lastCode = ''; this.post({ type: 'code', language, text: '', notes: ['This request is not in a collection that is loaded, so it cannot be written as code.'] }); return; }
     const warnings = [...prepared.problems, ...prepared.built.warnings];
     if (prepared.built.unresolved.length > 0) warnings.push(`These variables have no value, so they are written as they stand: ${prepared.built.unresolved.join(', ')}.`);
-    if (prepared.problems.length > 0) { this.lastCode = ''; this.post({ type: 'code', language, text: '', notes: codeNotes(warnings, []) }); return; }
+    if (prepared.problems.length > 0) { this.lastCode = ''; this.post({ type: 'code', language, text: '', notes: codeNotes(warnings, false) }); return; }
     this.lastCode = generateCode(language, codeRequestFrom(prepared.built.wire, prepared.built.redactions)) ?? '';
-    this.post({ type: 'code', language, text: this.lastCode, notes: codeNotes(warnings, prepared.built.redactions) });
+    this.post({ type: 'code', language, text: this.lastCode, notes: codeNotes(warnings, this.lastCode.includes(REDACTED)) });
   }
 
   private postStatus(status: OAuthStatusView): void {

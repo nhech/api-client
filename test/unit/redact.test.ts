@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { basicCredential, CREDENTIAL_HEADERS, isSecretName, redactedValue, redactValues, REDACTED } from '../../src/core/redact';
+import { basicCredential, CREDENTIAL_HEADERS, isSecretName, redactedValue, redactValues, REDACTED, secretForms } from '../../src/core/redact';
 
 test('Which header and parameter names are secret', () => {
   for (const name of ['Authorization', 'authorization', 'Proxy-Authorization', 'Cookie', 'Set-Cookie', 'X-Api-Key', 'x-api-key', 'api_key', 'apikey', 'ApiKey', 'access_token', 'refresh-token', 'X-Auth-Token', 'client_secret', 'password', 'Passwd', 'X-Session-Id', 'session', 'token', 'x-csrf-token', 'X-Signature', 'Bearer', 'private-key', 'credentials', 'secrets']) {
@@ -35,4 +35,18 @@ test('A Basic credential is the base64 of user:password, for any characters', ()
   assert.equal(basicCredential('aladdin', 'opensesame'), 'YWxhZGRpbjpvcGVuc2VzYW1l');
   assert.equal(basicCredential('', ''), 'Og==');
   assert.equal(basicCredential('user', 'p\u00e4ss:w\u00f6rd'), Buffer.from('user:p\u00e4ss:w\u00f6rd', 'utf8').toString('base64'));
+});
+
+test('A secret is covered in the forms it takes once a send has put it into an address or a form', () => {
+  const secret = 'aB+cD/eF==secret Sig!';
+  assert.deepEqual([...secretForms('plain-word')], ['plain-word']);
+  const forms = secretForms(secret);
+  for (const form of ['aB%2BcD%2FeF%3D%3Dsecret%20Sig!', 'aB%2BcD%2FeF%3D%3Dsecret+Sig!', 'aB%2BcD%2FeF%3D%3Dsecret+Sig%21', 'aB%2bcD%2feF%3d%3dsecret%20Sig!']) {
+    assert.ok(forms.includes(form), form);
+  }
+  const text = 'https://x.test/a/aB%2BcD%2FeF%3D%3Dsecret%20Sig!?k=aB%2BcD%2FeF%3D%3Dsecret+Sig%21&raw=aB+cD/eF==secret Sig!&low=aB%2bcD%2feF%3d%3dsecret%20Sig!';
+  assert.equal(redactValues(text, [secret]), 'https://x.test/a/[redacted]?k=[redacted]&raw=[redacted]&low=[redacted]');
+  assert.equal(redactValues('abc', ['abc']), 'abc', 'a value shorter than four characters is not searched for');
+  assert.equal(redactValues('x%ZZy', ['%ZZ12']), 'x%ZZy', 'a value with no encoding of its own does not break');
+  assert.equal(redactValues('a\ud800b', ['a\ud800b1']), 'a\ud800b', 'a lone surrogate has no encoding and does not break');
 });

@@ -1,4 +1,4 @@
-import { isSecretName, REDACTED, redactedValue, redactValues } from '../core/redact';
+import { hideSecrets, hideUrl, redactedValue, redactValues } from '../core/redact';
 import { printable } from '../util/chars';
 import { HISTORY_LIMITS, type HistoryDetail, type HistoryEntry } from './entries';
 
@@ -11,53 +11,13 @@ import { HISTORY_LIMITS, type HistoryDetail, type HistoryEntry } from './entries
  */
 export type HistoryMode = 'off' | 'metadata' | 'full';
 
+// The rules that cover the secrets of an address and of a body are in core/redact.ts, where the Code tab uses them too.
+export { hideSecrets, hideUrl };
+
 export const readMode = (value: unknown): HistoryMode => (value === 'off' || value === 'full' ? value : 'metadata');
 
 /** How far past the limit a body is read before the secrets are covered, so that a secret that straddles the limit is covered whole. */
 const SLACK_CHARS = 1024;
-
-/** A name written in camel case ("accessToken") as the words that the rule for secret names knows ("access_token"). */
-const words = (name: string): string => name.replace(/([a-z0-9])([A-Z])/g, '$1_$2');
-const secretField = (name: string): boolean => isSecretName(words(name));
-
-function decoded(text: string): string {
-  try { return decodeURIComponent(text.replace(/\+/g, ' ')); } catch { return text; }
-}
-
-/** The address without what is secret in it: the user and password, the secret values, and the value of a parameter whose name is secret. */
-export function hideUrl(url: string, redactions: readonly string[]): string {
-  let out = redactValues(url, redactions);
-  out = out.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i, (_match, scheme: string) => `${scheme}${REDACTED}@`);
-  const hash = out.indexOf('#');
-  const fragment = hash < 0 ? '' : '#';
-  if (hash >= 0) out = out.slice(0, hash);
-  const question = out.indexOf('?');
-  if (question >= 0) {
-    const query = out.slice(question + 1).split('&').map(piece => {
-      const equals = piece.indexOf('=');
-      return equals < 0 || !secretField(decoded(piece.slice(0, equals))) ? piece : `${piece.slice(0, equals + 1)}${REDACTED}`;
-    });
-    out = `${out.slice(0, question + 1)}${query.join('&')}`;
-  }
-  return printable(out + fragment);
-}
-
-/** A string value of a JSON text whose key says it is secret: `"access_token": "..."`. */
-const JSON_FIELD = /"((?:[^"\\\r\n]|\\.){1,100})"(\s*:\s*)"(?:[^"\\\r\n]|\\.)*"/g;
-
-/** The text of a body with the secrets covered: the values that are known, and the fields (of JSON or of a form) whose names say they are secret. */
-export function hideSecrets(text: string, redactions: readonly string[]): string {
-  const covered = redactValues(text, redactions);
-  const json = covered.replace(JSON_FIELD, (match, key: string, separator: string) => (secretField(key) ? `"${key}"${separator}"${REDACTED}"` : match));
-  const pieces = json.trim().split('&');
-  if (json.length > 0 && pieces.every(piece => /^[^\s=]{1,100}=\S*$/.test(piece))) {
-    return pieces.map(piece => {
-      const equals = piece.indexOf('=');
-      return secretField(decoded(piece.slice(0, equals))) ? `${piece.slice(0, equals + 1)}${REDACTED}` : piece;
-    }).join('&');
-  }
-  return json;
-}
 
 /** The first characters of a body, with the secrets covered; `cut` says that there was more. A body is never cut in the middle of a character. */
 function bodyOf(text: string, redactions: readonly string[]): { text: string; cut: boolean } {

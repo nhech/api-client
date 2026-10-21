@@ -204,3 +204,8 @@ test('The cookies a response sets are listed with their attributes; a header tha
     { name: 'temp', value: '1', domain: '', path: '', expires: 'Session', secure: false, httpOnly: false, sameSite: '' }
   ]);
 });
+
+test('The addresses of the redirects that were followed hide the secrets too, as the final address does', () => {
+  const result = view({ redirects: [{ url: 'https://api.test/start?api_key=sekret-value-1&page=2', status: 302 }, { url: 'https://other.test/next\u202e?x=1', status: 307 }] });
+  assert.deepEqual(result.redirects, [{ url: 'https://api.test/start?api_key=[redacted]&page=2', status: 302 }, { url: 'https://other.test/next?x=1'.replace('next', 'next?'), status: 307 }]);
+});

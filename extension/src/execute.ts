@@ -2,7 +2,7 @@ import { promises as disk } from 'node:fs';
 import { join } from 'node:path';
 import { runCaptures, runTests, type CaptureResult, type TestResult } from '../../src/core/assert';
 import type { Request } from '../../src/core/model';
-import { isSecretName } from '../../src/core/redact';
+import { isSecretName, redactValues } from '../../src/core/redact';
 import type { RuntimeContext } from '../../src/core/runtime';
 import { resolveText, secretValues, snapshotVariables, type VarValue } from '../../src/core/vars';
 import { confinedFile } from '../../src/engine/files';
@@ -105,7 +105,7 @@ async function runStage(env: SendEnvironment, phase: ScriptPhase, input: { prepa
     ...(input.iteration === undefined ? {} : { iteration: { index: input.iteration.index, count: input.iteration.count, data: { ...input.iteration.data } } })
   }), scriptOperations({ options: prepared.options, signal: input.signal, proxy: env.proxy(), jar: prepared.effective.settings.cookies ? env.jar : undefined }), { signal: input.signal });
   if (!run.ok) {
-    if (run.kind !== 'cancelled') report.errors.push({ phase, from: 'scripts', name: 'Error', message: printable(run.message) });
+    if (run.kind !== 'cancelled') report.errors.push({ phase, from: 'scripts', name: 'Error', message: printable(redactValues(run.message, [...prepared.built.redactions, ...secretValues(prepared.scopes)])) });
     return run;
   }
   addOutput(report, phase, run.output, [...prepared.built.redactions, ...secretValues(prepared.scopes)]);
@@ -158,7 +158,7 @@ export async function executeRequest(env: SendEnvironment, path: string, request
   }
   if (allowed && prepared.effective.preScripts.length > 0) {
     const before = await runStage(env, 'pre', { prepared, request: current, answer: undefined, report, signal, context, iteration: options.iteration });
-    if (!before.ok) return signal.aborted ? { kind: 'cancelled' } : failed('script-error', before.message, 'The request was not sent. Fix the script, or turn scripts off in the settings (apiClient.scripts.enabled) to send without them.', [], report);
+    if (!before.ok) return signal.aborted ? { kind: 'cancelled' } : failed('script-error', redactValues(before.message, [...prepared.built.redactions, ...secretValues(prepared.scopes)]), 'The request was not sent. Fix the script, or turn scripts off in the settings (apiClient.scripts.enabled) to send without them.', [], report);
     if (before.output.error !== null) return failed('script-error', 'A script failed before the request was sent.', 'The request was not sent. What the script said is below.', [], report);
     if (before.output.skip) return failed('skipped', 'A script asked not to send this request.', '', [], report);
     if (before.output.request !== undefined) current = withRequestChanges(current, before.output.request);
