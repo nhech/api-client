@@ -28,7 +28,7 @@ export const ZONES: Zone[] = [
     modules: ['node:http', 'node:https', 'node:tls', 'node:net', 'node:zlib', 'node:stream', 'node:stream/promises', 'node:fs', 'node:crypto', 'node:path'],
     uses: ['core', 'util']
   },
-  { name: 'view', paths: ['src/view/'], modules: [], uses: ['util', 'core'], deterministic: true },
+  { name: 'view', paths: ['src/view/'], modules: [], uses: ['util', 'core', 'format'], deterministic: true },
   { name: 'storage', paths: ['src/storage/'], modules: [], uses: ['stages', 'util', 'core', 'format'] },
   { name: 'storage-node', paths: ['src/storage/node-fs.ts'], modules: ['node:crypto', 'node:fs', 'node:path'], uses: ['io', 'util', 'storage'] },
   { name: 'io', paths: ['src/reader/', 'src/write/', 'src/discover.ts'], modules: ['node:fs', 'node:fs/promises', 'node:path'], uses: ['stages', 'util'] },

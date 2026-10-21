@@ -12,7 +12,7 @@ import { BANNED_EVERYWHERE, ZONES, type Zone } from '../support/zones';
  */
 const repository = join(__dirname, '..', '..', '..');
 const walk = (directory: string): string[] =>
-  readdirSync(join(repository, directory), { recursive: true, encoding: 'utf8' }).filter(file => file.endsWith('.ts')).map(file => `${directory}/${file.replaceAll('\\', '/')}`);
+  readdirSync(join(repository, directory), { recursive: true, encoding: 'utf8' }).filter(file => file.endsWith('.ts') || file.endsWith('.tsx')).map(file => `${directory}/${file.replaceAll('\\', '/')}`);
 const sources = [...walk('src'), ...walk('extension/src')].map(file => ({ file, text: readFileSync(join(repository, ...file.split('/')), 'utf8') }));
 
 /** Source without comments; module names in import statements are still there. */
@@ -36,7 +36,7 @@ function importsOf(text: string): Import[] {
   const found: Import[] = [];
   // Where each import or export statement starts, and whether it says `type` right after the keyword.
   const starts = [...source.matchAll(/(?:^|[;}\n])\s*(?:import|export)\s+(type\s+)?/g)].map(match => ({ at: match.index ?? 0, typeOnly: match[1] !== undefined }));
-  for (const match of source.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)) {
+  for (const match of source.matchAll(/(?<![\w'"`])from\s*['"]([^'"]+)['"]/g)) {
     const own = starts.filter(start => start.at <= (match.index ?? 0)).at(-1);
     found.push({ specifier: match[1] ?? '', typeOnly: own?.typeOnly ?? false, dynamic: false });
   }
@@ -51,7 +51,7 @@ function importsOf(text: string): Import[] {
 const normalizeModule = (specifier: string): string => (builtinModules.includes(specifier) ? `node:${specifier}` : specifier);
 const resolveRelative = (file: string, specifier: string): string | undefined => {
   const target = posix.normalize(posix.join(dirname(file), specifier));
-  return [`${target}.ts`, `${target}/index.ts`].find(candidate => existsSync(join(repository, ...candidate.split('/'))));
+  return [`${target}.ts`, `${target}.tsx`, `${target}/index.ts`].find(candidate => existsSync(join(repository, ...candidate.split('/'))));
 };
 
 test('There are sources to guard', () => {

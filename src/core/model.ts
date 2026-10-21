@@ -160,6 +160,37 @@ export interface WorkspaceFile {
 
 export const emptyScripts = (): Scripts => ({ pre: '', post: '' });
 
+export type AuthKind = Auth['kind'];
+export type BodyKind = Body['kind'];
+export const AUTH_KINDS: readonly AuthKind[] = ['inherit', 'none', 'bearer', 'basic', 'apikey', 'oauth2'];
+export const BODY_KINDS: readonly BodyKind[] = ['none', 'text', 'json', 'xml', 'form', 'multipart', 'graphql', 'binary'];
+
+/** An authentication of a kind with its fields empty, for when the person chooses the kind. */
+export function newAuth(kind: AuthKind): Auth {
+  switch (kind) {
+    case 'bearer': return { kind, token: '', prefix: 'Bearer' };
+    case 'basic': return { kind, username: '', password: '' };
+    case 'apikey': return { kind, name: '', value: '', in: 'header' };
+    case 'oauth2':
+      return { kind, grant: 'authorization_code', pkce: true, authUrl: '', tokenUrl: '', clientId: '', clientSecret: '', scope: '', audience: '', username: '', password: '', redirectUrl: '', clientAuth: 'header', extra: [] };
+    default: return { kind };
+  }
+}
+
+/** A body of a kind, empty, for when the person chooses the kind. */
+export function newBody(kind: BodyKind): Body {
+  switch (kind) {
+    case 'text': return { kind, contentType: 'text/plain', text: '' };
+    case 'json':
+    case 'xml': return { kind, text: '' };
+    case 'form': return { kind, fields: [] };
+    case 'multipart': return { kind, parts: [] };
+    case 'graphql': return { kind, query: '', variables: '' };
+    case 'binary': return { kind, file: '' };
+    default: return { kind };
+  }
+}
+
 export const newRequest = (id: Id, name: string): Request => ({
   id, name, docs: '', method: 'GET', url: '', query: [], pathParams: [], headers: [], auth: { kind: 'inherit' }, body: { kind: 'none' },
   scripts: emptyScripts(), tests: [], captures: [], settings: {}, mirror: true

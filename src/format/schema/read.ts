@@ -180,6 +180,8 @@ export class Out {
   }
 
   bool(key: string, value: boolean, fallback: boolean): this {
+    // Only a real boolean is written: a value of another type from an edit is refused here and not read as true.
+    if (typeof value !== 'boolean') throw new TypeError(`${key} must be true or false`);
     if (value !== fallback) this.map.set(key, value ? 'true' : 'false');
     return this;
   }

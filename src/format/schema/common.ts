@@ -166,7 +166,11 @@ export function decodeSettings(parent: Fields, key: string): SettingsOverride {
 
 export function encodeSettings(settings: SettingsOverride): YMap {
   const out = new Out();
-  const flag = (key: string, value: boolean | undefined): void => { if (value !== undefined) out.put(key, value ? 'true' : 'false'); };
+  const flag = (key: string, value: boolean | undefined): void => {
+    if (value === undefined) return;
+    if (typeof value !== 'boolean') throw new TypeError(`${key} must be true or false`);
+    out.put(key, value ? 'true' : 'false');
+  };
   out.int('timeoutMs', settings.timeoutMs);
   flag('followRedirects', settings.followRedirects);
   out.int('maxRedirects', settings.maxRedirects);
