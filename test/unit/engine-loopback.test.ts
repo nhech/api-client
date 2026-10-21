@@ -11,7 +11,8 @@ interface Answer { status: number; body: string; headers: Record<string, string 
 function get(url: string, options: { host?: string; method?: string } = {}): Promise<Answer> {
   return new Promise((resolve, reject) => {
     const target = new URL(url);
-    const req = httpRequest({ host: target.hostname, port: target.port, path: `${target.pathname}${target.search}`, method: options.method ?? 'GET', headers: options.host === undefined ? {} : { Host: options.host }, agent: false }, res => {
+    // An address of IPv6 is written in brackets in an URL and without them for the connection (Linux does not look up the bracketed form).
+    const req = httpRequest({ host: target.hostname.replace(/^\[|\]$/g, ''), port: target.port, path: `${target.pathname}${target.search}`, method: options.method ?? 'GET', headers: options.host === undefined ? {} : { Host: options.host }, agent: false }, res => {
       const chunks: Buffer[] = [];
       res.on('data', chunk => chunks.push(chunk as Buffer));
       res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8'), headers: res.headers }));
