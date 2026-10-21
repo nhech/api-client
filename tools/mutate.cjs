@@ -173,7 +173,11 @@ const MUTATIONS = [
   { id: "M151", rule: "Cookies: the longest path goes first", file: "src/core/cookies.ts", find: "b.path.length - a.path.length ||", replace: "" },
   { id: "M152", rule: "Cookies: a domain holds a limited number", file: "src/core/cookies.ts", find: "if (sameDomain.length > JAR_LIMITS.cookiesPerDomain) {", replace: "if (sameDomain.length > JAR_LIMITS.cookiesPerDomain * 1000) {" },
   { id: "M153", rule: "Redaction: a short value is not searched for in text", file: "src/core/redact.ts", find: "values = [...new Set(secrets.filter(value => value.length >= MIN_SECRET_LENGTH))]", replace: "values = [...new Set(secrets.filter(value => value.length >= 1))]" },
-  { id: "M154", rule: "Redaction: the cookie is a credential that does not cross origins", file: "src/core/redact.ts", find: "['authorization', 'proxy-authorization', 'cookie']", replace: "['authorization', 'proxy-authorization']" }
+  { id: "M154", rule: "Redaction: the cookie is a credential that does not cross origins", file: "src/core/redact.ts", find: "['authorization', 'proxy-authorization', 'cookie']", replace: "['authorization', 'proxy-authorization']" },
+  { id: "M155", rule: "View: a filter searches the address of a request too", file: "src/view/tree.ts", find: "[node.request.name, node.request.method, node.request.url].some(", replace: "[node.request.name, node.request.method].some(" },
+  { id: "M156", rule: "View: a folder that matches by name shows everything in it", file: "src/view/tree.ts", find: "const sub = containerNode(child, own ? '' : filter);", replace: "const sub = containerNode(child, filter);" },
+  { id: "M157", rule: "View: with a filter only the matches are shown, not the files that cannot be read", file: "src/view/tree.ts", find: "if (wanted === '') {\n    for (const broken", replace: "if (true) {\n    for (const broken" },
+  { id: "M158", rule: "View: only the active environment is marked", file: "src/view/tree.ts", find: "const active = activeId !== undefined && node.environment.id === activeId;", replace: "const active = activeId !== undefined;" }
 ];
 
 function run(mutation) {
