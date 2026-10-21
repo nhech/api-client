@@ -1,204 +1,189 @@
-# HTTP Files Importer
+# API Client
 
 [![CI](https://github.com/nhech/api-client/actions/workflows/ci.yml/badge.svg)](https://github.com/nhech/api-client/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Import [Thunder Client](https://www.thunderclient.com/) collections and environments into plain **`.http` files** that open in [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client), [httpYac](https://marketplace.visualstudio.com/items?itemName=anweber.vscode-httpyac) and the [JetBrains HTTP Client](https://www.jetbrains.com/help/idea/http-client-in-product-code-editor.html).
+A free, **local-first API client for Visual Studio Code**. Your requests are plain files in your repository: no account, no limits on collections or requests, no telemetry, no server of ours. You write a request, press Send, and read the answer next to it. The same files are what Git shows in a pull request.
 
-Everything runs on your machine: no account, no network, no telemetry. Your requests stay in files you can read, diff and commit.
+The extension sends the requests **you** send, and, for a request that uses OAuth 2.0, the requests to the token server and the sign-in you configured. Nothing else leaves your machine.
 
-> Not affiliated with or endorsed by Thunder Client. The name is used only to say which data format is read.
+> Not affiliated with or endorsed by Thunder Client, Postman, REST Client, httpYac or JetBrains. The names are used only to say which data formats are read or written.
+
+![A request and its answer side by side, with the collections, environments and history in the side bar](docs/images/request-dark.png)
 
 - [What you get](#what-you-get)
 - [Quick start](#quick-start)
-- [Output layout](#output-layout)
-- [Choosing the tool you write for](#choosing-the-tool-you-write-for)
-- [What is converted, and what is not](#what-is-converted-and-what-is-not)
+- [The files](#the-files)
+- [Variables, environments and secrets](#variables-environments-and-secrets)
+- [Authentication](#authentication)
+- [Tests and captures](#tests-and-captures)
+- [Scripts](#scripts)
+- [The collection runner](#the-collection-runner)
+- [Importing, and the `.http` copy](#importing-and-the-http-copy)
+- [Code, cookies and history](#code-cookies-and-history)
+- [Settings](#settings)
 - [Safety](#safety)
-- [Tried against the real tools](#tried-against-the-real-tools)
 - [Known limits](#known-limits)
-- [Development](#development)
-- [Documentation](#documentation) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [License](#license)
+- [Development](#development) · [Documentation](#documentation) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [License](#license)
 
 Vietnamese: [README.vi.md](README.vi.md).
 
 ## What you get
 
-- **Reads Thunder Client data directly from disk**, read-only: the v4 layout (`collections/tc_col_*.json`, `environments/tc_env_*.json`), the older v3 layout (`thunderclient.json`, `thunderCollection.json`, `thunderEnvironment.json`) and exported `.json` files. You do not need to be signed in to anything.
-- **Folders, ordering, inheritance.** Headers, authentication, base URL and tests set on a collection or folder are written into each request, as Thunder Client applies them.
-- **Plain `.http` output**, one file per folder, with the environment files each tool reads.
-- **Secrets stay out of Git.** Literal tokens, passwords and keys are replaced by `{{variables}}`; their values go to a private file that is added to `.gitignore` and written with mode `0600`.
-- **A report** (`IMPORT_REPORT.md`) of what was imported, what was left out and why, and what you still have to do. It lists names and places only, never a value.
-- **Safe by construction.** The data of a collection somebody else made cannot add a request to the file, read a file of yours or run code when you press Send (see [Safety](#safety)).
-- **Three ways to run it:** a command line, a VS Code command (**HTTP Files Importer: Import from Thunder Client...**), and a library.
+- **A request editor and a response pane side by side.** Method and address, then Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, a binary file), Scripts, Settings, Docs and Code. The answer has its body (pretty or raw; pictures are shown), headers, cookies, tests, the console of your scripts, the request as it was sent and a timeline (name lookup, connection, TLS, waiting, download).
+- **Collections, folders and environments in the side bar**, native trees with drag and drop, rename, duplicate, move, filter, keyboard shortcuts and the colours of your theme. A folder or a collection sets what its requests share: a base address, headers, authentication, variables, tests, scripts and settings; the nearest one wins.
+- **Requests are files.** One YAML file per request, folders for folders, the order of a folder kept in its file, bodies and scripts as readable blocks, so a change shows up line by line in a diff. A `.http` copy is written next to each request for the people who use REST Client, httpYac or the JetBrains client.
+- **Variables and environments** with secret values kept out of Git. `{{name}}` in the address, headers, body, authentication; dynamic words such as `{{$guid}}`; a status bar item to change the environment.
+- **Authentication:** inherit, none, bearer, basic, API key, and **OAuth 2.0** (client credentials, password, authorization code with PKCE, refresh), with the token kept in the secret storage of VS Code.
+- **Tests and captures** as one-line rules (`status == 200`, `json $.id exists`, `token = json $.access_token`) and **JavaScript scripts before and after a request** (a subset of the `pm` API of Postman), run in a sandbox and only after you allowed the exact text.
+- **A collection runner** with passes, a pause, a CSV or JSON data file, the stop at the first failure, and a JSON and a JUnit report.
+- **Imports** from Thunder Client, Postman (collections and environments) and cURL (copy a command, paste it as a request).
+- **The Code tab** writes the request as cURL, PowerShell, JavaScript (fetch or axios), Python, Go, C#, PHP or Java, with the secrets left out.
+- **Cookies and history**, and, for each request, folder or collection, redirects, timeouts, TLS verification and response limits. The proxy is the one of VS Code (`http.proxy`, `http.noProxy`) or of the environment (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`).
+- **You can edit the files by hand.** *Open as Text* opens the YAML of any request, and the editor follows what you type.
 
 ## Quick start
 
-Requirements: Node.js 22 or newer. The package is not published to npm yet, so build it from a clone:
+Install **API Client** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.api-client) (Extensions view, search for it, or `ext install longtd.api-client`), or from Open VSX. It needs VS Code 1.100 or newer, a **trusted** local workspace (it is off in Restricted Mode, in the browser and in virtual workspaces) and runs where your files are (also over Remote SSH, WSL and containers, which have not been tried by hand yet).
+
+1. Open a folder and the **API Client** icon in the Activity Bar. *New Collection...* creates `api-client/collections/<name>/`.
+2. *New Request...* on the collection. Type an address, press **Ctrl+Enter** (**Cmd+Enter** on a Mac) or the Send button.
+3. *New Environment...*, add `baseUrl` and use `{{baseUrl}}/pets` in your requests; pick the environment in the status bar.
+4. Commit the `api-client/` folder. Values of secret variables are in `*.local.yml` files that the folder's own `.gitignore` keeps out of Git.
+
+From a clone, to build the extension yourself:
 
 ```sh
 git clone https://github.com/nhech/api-client.git
 cd api-client
 npm ci --ignore-scripts
-npm run build
-```
-
-### Command line
-
-Without `--write` nothing is written: you get the report and the list of files.
-
-```sh
-# dry run on a Thunder Client data folder (or on exported .json files)
-node dist/cli.js "<Thunder Client data folder>"
-
-# write the files into ./api of the current folder, for REST Client (the default)
-node dist/cli.js "<Thunder Client data folder>" --write
-
-# other tools, another folder, keep literal secrets where they are
-node dist/cli.js export.json --target jetbrains --workspace ~/my-project --out requests --write
-node dist/cli.js "<data folder>" --policy skip-existing --no-move-secrets --write
-```
-
-| Option | Meaning |
-|---|---|
-| `--write` | write the files (default: dry run) |
-| `--workspace <folder>` | folder the files are written in (default: the current folder) |
-| `--out <folder>` | folder inside the workspace that receives the files (default: `api`) |
-| `--policy <p>` | `new-folder` (default: a folder that has files is never touched, `api-2` is used), `skip-existing` or `overwrite` |
-| `--target <tool>` | `rest-client` (default), `httpyac` or `jetbrains` |
-| `--no-move-secrets` | keep literal secrets in the shared files (they are reported) |
-
-Exit code `0` done, `1` the import failed, `2` wrong usage.
-
-Where Thunder Client keeps its data (VS Code; for Cursor, VSCodium and others change `Code`):
-
-| System | Folder |
-|---|---|
-| Windows | `%APPDATA%\Code\User\globalStorage\rangav.vscode-thunder-client` |
-| macOS | `~/Library/Application Support/Code/User/globalStorage/rangav.vscode-thunder-client` |
-| Linux | `~/.config/Code/User/globalStorage/rangav.vscode-thunder-client` |
-
-If you use Thunder Client's Git sync, point the command at your `thunder-tests` folder instead. To see the *shape* of your data without exposing any of it, run [`tools/thunder-structure.cjs`](tools/README.md).
-
-### VS Code
-
-Install **HTTP Files Importer** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.http-files-importer) (Extensions view, search for it, or `ext install longtd.http-files-importer`). To build it from a clone instead:
-
-```sh
 npm run ext:build
-cd extension && npm run package        # writes ../.artifacts/http-files-importer.vsix
-code --install-extension ../.artifacts/http-files-importer.vsix
+cd extension && npm run package        # writes ../.artifacts/api-client.vsix
+code --install-extension ../.artifacts/api-client.vsix
 ```
 
-Run **HTTP Files Importer: Import from Thunder Client...** from the Command Palette, or open the **HTTP Files Importer** section of the Explorer and press the button. It opens a panel: it suggests the Thunder Client folder it finds, shows what was read and what needs your attention, lets you choose the tool, the target folder and what to do if it already has files, and writes only when you press **Import**. A step-by-step version with Command Palette questions is **HTTP Files Importer: Import from Thunder Client (step by step)...** Cancelling at any step writes nothing.
-
-![The importer panel in VS Code: what was read, the options, and the Import button](docs/images/panel-review.png) With REST Client as the target it also fills in the REST Client settings for you (see below).
-
-## Output layout
+## The files
 
 ```
-api/
-  <Collection>/
-    index.http              requests at the top of the collection
-    <Folder>.http           requests of a folder
-    <Folder>/<Sub>.http     sub-folders
-    _bodies/body-0001.txt   a body that cannot stay inside a .http file (see Safety)
-  http-client.env.json              shared variables, one entry per environment
-  http-client.private.env.json      secrets and machine-local variables (not for Git)
-  rest-client.settings.json         REST Client target only: the same variables as a VS Code setting
-  rest-client.private.settings.json REST Client target only: the secrets (not for Git)
-  IMPORT_REPORT.md                  what was done
+api-client/
+  workspace.yml                 variables and settings of the whole workspace
+  .gitignore                    keeps the *.local.yml files out of Git
+  collections/
+    petstore/
+      collection.yml            base address, headers, auth, variables, tests, scripts, settings, order
+      collection.local.yml      values of secret variables of the collection (not for Git, mode 0600)
+      pets/
+        folder.yml              what a folder sets, and the order of its requests
+        list-pets.req.yml       one request
+        list-pets.http          the .http copy, generated, do not edit
+  environments/
+    dev.env.yml                 the variables of an environment
+    dev.env.local.yml           its secrets (not for Git)
 ```
 
-A request block:
+A request, as it is on disk:
 
-```http
-### Create pet
-# @name Create_pet
-# @capture petId = json $.id
-# @assert status == 201
-# @assert json $.id isNumber
-POST {{baseUrl}}/pets
-Accept: application/json
-Content-Type: application/json
-Authorization: Bearer {{secret_pet_store_bearer_token}}
-
-{
-  "name": "Rex"
-}
+```yaml
+schema: 1
+id: 01J9Z4V0N2XK7Q3M8T5R6Y1ABC
+name: Create pet
+method: POST
+url: '{{baseUrl}}/pets'
+headers:
+  - name: Content-Type
+    value: application/json
+auth:
+  kind: bearer
+  token: '{{token}}'
+body:
+  kind: json
+  text: |-
+    {
+      "name": "Rex"
+    }
+tests:
+  - expr: status == 201
+captures:
+  - expr: petId = json $.id
 ```
 
-Thunder Client tests become `# @assert` and `# @capture` comment lines (grammar in [the spec](docs/SPEC.vi.md), section 6.2a). All three tools ignore them as comments, so the request still runs; a runtime that understands them can check responses and chain values. There is no such runtime in this repository.
+The reader is a strict subset of YAML (no anchors, aliases, tags or flow collections, no duplicate keys, limits on size and depth), so a file that came from somebody else is data and nothing else. A file that does not follow it is reported with the line, and *Open as Text* works on every request.
 
-## Choosing the tool you write for
+## Variables, environments and secrets
 
-The three tools read the same requests but differ in two places, so the files are written for one of them (`--target`, or the "Written for" item in VS Code). Import again to write for another.
+`{{name}}` is replaced by the value from the nearest scope that has it: what a capture or a script set while requests ran, then the variables of the folders and the collection from the nearest outwards, then the active environment, then the workspace. Dynamic words are looked up in a fixed table (`{{$guid}}`, `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt a b}}`, `{{$randomBoolean}}`, `{{$randomString}}`, `{{$randomEmail}}`). Nothing between `{{ }}` is ever evaluated, so a request from a cloned repository cannot run code through a variable. In the editor, known variables, unknown ones and dynamic ones are marked, with the value on hover and completion after `{{`.
 
-| | REST Client | httpYac | JetBrains |
-|---|---|---|---|
-| Reads `http-client.env.json` | no (see below) | yes | yes |
-| `{{#guid}}` of Thunder Client | `{{$guid}}` | `{{$guid}}` | `{{$uuid}}` |
-| `{{#number, a, b}}` (both ends included) | `{{$randomInt a b+1}}` | `{{$randomInt a b+1}}` | `{{$random.integer(a, b+1)}}` |
-| `{{#dateISO}}` | `{{$datetime iso8601}}` | `{{$datetime iso8601}}` | `{{$isoTimestamp}}` |
-| `{{#date}}` (milliseconds) | left as is | `{{$timestamp}}` | left as is |
+A variable can be marked **secret**. Its value is stored in the `*.local.yml` file next to the shared file (the `.gitignore` of the client folder is kept effective), and it is hidden wherever something is shown or written down: the history, the Code tab, the `.http` copy, reports, the console, error messages. A name that looks like a secret (`token`, `password`, `api_key`...) that a script or capture sets is a secret from then on.
 
-Other Thunder Client dynamic variables (`#name`, `#string`, `#email`, `#bool`, `#enum`) have no exact equivalent and are left as they are and listed in the report. The `b+1` is deliberate: all three tools stop before the upper bound, Thunder Client does not.
+What requests and scripts set while they run lives in memory, belongs to the collection that set it, and is never written to a file. *Clear Saved Variables* forgets it.
 
-**REST Client keeps its variables in a VS Code setting**, not in `http-client.env.json`. For that target the importer also writes the variables as `rest-client.settings.json` (shareable) and `rest-client.private.settings.json` (secrets), and the VS Code command **fills the settings in for you**: the variables go to the workspace settings, the secrets to your user settings, and that setting is added to `settingsSync.ignoredSettings` so the secrets are not synced. It goes through the VS Code configuration API, so comments in your `settings.json` stay, and nothing you already have is replaced: a variable that exists with another value is kept and named in the final message. From the command line, paste the two files yourself (the report tells you how).
+## Authentication
 
-## What is converted, and what is not
+Set on a request, a folder or a collection, and inherited: **none**, **bearer**, **basic**, **API key** (in a header or in the query), **OAuth 2.0**. For OAuth the Auth tab shows whether there is a token, with *Get a token* and *Forget the token*. The first time a collection is to send credentials to a token server, you are asked, naming the server; credentials are only sent over https (or to this computer). See [docs/client/oauth.md](docs/client/oauth.md).
 
-| Thunder Client | Result |
+## Tests and captures
+
+One line each, in a small grammar that is read by code that knows nothing else (a line that is not in it is a failed test with the reason, never something that is run):
+
+```
+status == 200
+duration < 500
+header content-type includes json
+body includes ok
+json $.items exists
+petId = json $.id                 a capture: saves a variable for the next request
+```
+
+The Tests tab of the answer shows each result. Regular expressions run in an engine of their own that cannot be made to loop forever.
+
+## Scripts
+
+A request, folder or collection can hold a script that runs before the request and one that runs after the answer, in JavaScript with a subset of the Postman API (`pm.variables`, `pm.environment`, `pm.request`, `pm.response`, `pm.test`, `pm.expect`, `pm.sendRequest`, `pm.cookies`, `postman.setNextRequest`...).
+
+A script can read every variable it is given, secrets included, and send them anywhere. So **nothing runs until you have said yes to the exact text**, in a question that shows each script; any change to a script (a pull, a branch switch, an edit) asks again, and an import never grants it. Scripts run in QuickJS compiled to WebAssembly in a worker thread, with limits on time, memory, output and calls, and can reach nothing but a short list of operations that the extension checks. Read [docs/client/scripts.md](docs/client/scripts.md) before you allow one, and the residual risk in [SECURITY.md](SECURITY.md). `apiClient.scripts.enabled` turns scripts off altogether.
+
+## The collection runner
+
+![The collection runner with its options, the results and the buttons that save the report](docs/images/runner.png)
+
+*Run Collection or Folder* runs the requests in the order of the side bar, shows each result as it comes (passed, failed, error, skipped; the tests with their messages) and saves a report as JSON or JUnit XML. Options: passes, a pause between requests, stop at the first failure, and a data file (CSV or JSON, one row for each pass). Scripts can steer the run with `setNextRequest` and `skipRequest`. See [docs/client/runner.md](docs/client/runner.md).
+
+## Importing, and the `.http` copy
+
+*Import...* reads what other tools made and writes nothing until you say yes: **Thunder Client** data (collections, folders with what they set, requests, environments), **Postman** collections v2.0 and v2.1 and environments, and a **cURL** command from the clipboard. A credential that is typed into an imported request becomes a secret variable of the collection. What could not be carried over is a list of notes, one command away. Nothing an importer reads is run. See [docs/client/import.md](docs/client/import.md).
+
+Each request has a generated **`.http` copy** next to it (setting `apiClient.mirror.mode`: `on`, `off` or `gitignored`). It never holds a secret or anything the other tools would run or read; a copy you edited is never overwritten, and you can take its edits into the request, show the difference, discard them or keep the file as your own. See [docs/client/mirror.md](docs/client/mirror.md).
+
+The older converter, which turns Thunder Client data straight into `.http` files for REST Client, httpYac or the JetBrains client (a command and a command line), is still here: [docs/converter.md](docs/converter.md).
+
+## Code, cookies and history
+
+- **Code** tab: the request as it would be sent now, in nine languages; nothing is sent and every secret is `[redacted]` ([docs/client/code-and-cookies.md](docs/client/code-and-cookies.md)).
+- **Cookies**: kept per site and sent back to the same site; persistent ones in the secret storage of VS Code; the list never shows a value.
+- **History**: by day, newest first, on this computer for this workspace, at most 200 entries for 30 days; by default only a line for each send (`apiClient.history.mode`: `metadata`, `full` or `off`) ([docs/client/history.md](docs/client/history.md)).
+
+## Settings
+
+| Setting | Meaning |
 |---|---|
-| Collections, folders, request order | folders and files, in the order Thunder Client shows them (ties settled by name) |
-| Method, URL, query parameters, path parameters | request line; disabled parameters become `# [disabled query]` comments |
-| Headers | headers; Thunder Client's own default `Accept` and `User-Agent` are dropped; disabled ones are comments |
-| Bodies: JSON, text, XML, form, multipart (with files), GraphQL | bodies; a GraphQL body is a JSON envelope |
-| Authentication: bearer, basic | an `Authorization` header (`Bearer <token>`, `Basic <user> <password>`) |
-| Tests | `# @assert` lines; `set-env-var` becomes `# @capture` |
-| Inheritance from folder and collection | written into each request |
-| Environments (shared, named, local, default) | environment files; `global` + `local` variables go to the private file |
-| Encrypted variables | an empty entry in the private file to fill in again (never decrypted) |
-| Scripts | kept as comments, never run |
-| OAuth 2.0, AWS, digest, NTLM | not converted; a note names the setting keys, never their values |
-| WebSocket, SSE, gRPC requests | skipped and listed in the report |
-| History, responses, cookies, request settings | skipped |
+| `apiClient.root` | the folder of the workspace that holds the client's files (default `api-client`) |
+| `apiClient.mirror.mode` | the `.http` copies: `on` (default), `off`, `gitignored` |
+| `apiClient.history.mode` | `metadata` (default), `full`, `off` (a machine setting: a repository cannot change it) |
+| `apiClient.scripts.enabled` | run scripts after you allowed them (a machine setting) |
 
-Every finding has a stable code (`TC-…`) listed in the spec, section 7.
+Timeouts, redirects, TLS verification, response size limits, cookies and the redirect to a private network are settings of a request, a folder or a collection (the Settings tab), inherited like everything else.
 
 ## Safety
 
-The data of a collection can come from anyone, so the importer treats it as hostile:
-
-- **Reading** is read-only; it never follows a link out of the folder, and has limits on file size, count, nesting and string length. Data is parsed as plain JSON and never executed.
-- **Nothing can add a line to the file.** Values on one line cannot carry a line break; free text in comments can never start a directive; a body is written inline only if no tool would read one of its lines as something else.
-- **A body line that starts with `#`, `//`, `<` or `>`** is read by the tools as a comment, a file include or a response handler. REST Client drops the first two silently, and `< ./file` makes REST Client, httpYac and JetBrains send that file. Such a body is therefore saved in `_bodies/` and read from there as it is.
-- **Text between `{{ }}` that is not a plain variable name** is made harmless (`{ { … } }`). httpYac runs it as JavaScript and REST Client, httpYac and JetBrains can read environment variables from it.
-- **Writing** goes through a staging folder and is undone on failure or cancel; paths cannot leave the target folder; links are never followed; `.gitignore` is updated before a private file appears.
-- **Secrets** are moved to the private files and reported by name only. They are found by name: in headers, query and form fields, path parameters, the password or token in a URL, and inside JSON, XML, query-string and GraphQL bodies (`"apiKey": "…"`, `<Password>…</Password>`, `client_secret=…`). A token with no name next to it, such as free text in a body, cannot be recognised and stays: look through the bodies of a collection you did not write before you commit it.
-
-The core has no network access and does not spawn processes; a test checks that its source and the built extension import neither. Details and how to report a problem: [SECURITY.md](SECURITY.md).
-
-## Tried against the real tools
-
-The output has been run for real, against a local server that records what arrives, in REST Client 0.25.1, httpYac 6.16.7 and the JetBrains HTTP Client command line (`ijhttp` 263.7031). That is how the facts above were found (for example that JetBrains does not encode `Basic user:password`, or that REST Client drops a `#` line from a body). The runners are in [`samples/`](samples/) and need the tools downloaded by you:
-
-```sh
-node samples/make-sample.cjs               # made-up Thunder Client data in samples/thunder-data
-mkdir samples/workspace
-node dist/cli.js samples/thunder-data --workspace samples/workspace --write
-node samples/rest-client-check/run.cjs <the humao.rest-client .vsix you downloaded>
-```
-
-`samples/httpyac-check/` works the same way with the httpYac `.vsix`; `samples/jetbrains-check/` runs the Docker image `jetbrains/intellij-http-client` on an internal network. Each runner uses a throw-away VS Code profile or container, and `SAMPLE_API` chooses which imported folder it tries (for example one written with `--target httpyac`). Results are in the spec, sections 10.3b to 10.3d.
+The data it reads comes from other people (a cloned repository, answers of servers, files of other tools), so it is treated as hostile: files are parsed as data and never run, paths cannot leave the collection, a redirect never takes your credentials to another origin or goes from the internet to your machine or network unless you allow it, secrets are covered by what they are and by what they are called wherever something is written down, scripts need your consent for the exact text, and the pages have no network and a strict Content-Security-Policy. [SECURITY.md](SECURITY.md) lists what it defends against, what it does not (a script you allowed can read every variable it is given), the audits it went through and how to report a problem.
 
 ## Known limits
 
-- **Built from public information and a reading of the extension's code, and tested with data made up to match it.** The maintainers have not had a real Thunder Client v4 data folder to try. Fields the tool does not know are skipped silently; if your data imports wrongly, please open an issue with the output of [`tools/thunder-structure.cjs`](tools/README.md) (it prints structure, not values).
-- **No runtime.** `# @assert` and `# @capture` are written but nothing in this repository runs them.
-- **Speed.** Measured on a desktop PC, a dry run takes about a quarter of a second for 1,000 requests, one second for 10,000 and four seconds for 50,000, and writing 50,000 requests takes six seconds (about 360 MiB of memory). The conversion runs in one piece on the thread of the VS Code extension host, so the editor pauses for that long on a very large collection, and a reading in progress can be cancelled only between files. Writing is one file at a time (50,000 body files take about a minute).
-- Variable names with `-` or `.` are kept as Thunder Client has them; httpYac reads them as JavaScript, and the importer neutralises the dotted ones.
-- The VS Code extension is a preview (version 0.1.0 on the Marketplace); the command line is not on npm.
+- HTTP/1.1 only for now (no HTTP/2), no WebSocket, server-sent events or gRPC, no digest, AWS or NTLM authentication, no client certificates, no SOCKS or PAC proxy.
+- Reading and checking the `.http` copy of every request is paid again for the whole collection when one file changes: up to a thousand requests nobody notices; at ten thousand every edit holds the extension host for seconds ([docs/client/performance.md](docs/client/performance.md)).
+- Remote SSH, WSL and containers, and the secret storage of a remote machine, have not been verified by hand.
+- Not available in Restricted Mode, in the browser or in virtual workspaces.
+- A preview: file formats can still change between versions (the files carry `schema: 1` and are migrated).
 
 ## Development
 
@@ -206,29 +191,33 @@ node samples/rest-client-check/run.cjs <the humao.rest-client .vsix you download
 npm ci --ignore-scripts
 npm run check          # typecheck, extension typecheck, lint, all tests, tool self-test
 npm test               # compile the tests and run node --test
-npm run mutate         # breaks 50 rules on purpose, one at a time, and demands that the tests fail (slow)
-UPDATE_GOLDEN=1 npm test   # rewrite test/fixtures/golden after a change you mean; read the diff
-npm run ext:host-test      # runs the extension in an installed VS Code with a throw-away profile
+npm run mutate         # breaks the rules that protect something on purpose and demands that the tests fail (slow)
+npm run ext:host-test  # runs the extension in an installed VS Code with a throw-away profile
+node scripts/package-extension.cjs   # builds the .vsix and verifies what is in it
 ```
 
 ```
-src/             the core library: reader/, normalize/, convert/, emit/, write/, cli.ts, host.ts
-extension/       the VS Code layer: one command, Quick Picks, the report as a read-only document
-test/            unit tests, support (a reference .http parser and reference inheritance), fixtures and goldens
-tools/           thunder-structure.cjs (describe your data), mutate.cjs (mutation check)
-samples/         made-up data and the runners that try the output in the real tools
-site/, scripts/  the landing page and the scripts that build, check and deploy it
-docs/SPEC.vi.md  the specification (Vietnamese)
+src/core/        model, inheritance, variables, tests, cookies, redaction (pure)
+src/format/      the YAML subset and the .http reader (pure)
+src/storage/     reading and writing the files of a workspace
+src/engine/      the HTTP engine, redirects, OAuth 2.0 (node:http and node:https)
+src/script/      the sandbox for scripts (QuickJS in a worker thread)
+src/runner/ src/history/ src/importers/ src/mirror/ src/codegen/ src/view/
+src/reader/ src/normalize/ src/convert/ src/emit/ src/write/   the Thunder Client converter
+extension/       the VS Code layer, and the pages (Preact) under extension/src/webview/
+test/            unit tests, mock servers, fixtures and goldens
+tools/           mutate.cjs (mutation check), thunder-structure.cjs (describe your data)
+site/, scripts/  the landing page and the scripts that build, check, deploy it and package the extension
 ```
 
-The stages are pure functions: reader → normaliser → converter → emitter, and only `src/write/` writes to disk. Tests keep that so (`test/unit/purity.test.ts`).
+Every directory of `src/` may import only what its zone allows (`test/support/zones.ts`, checked by `test/unit/purity.test.ts`): the core is pure, only the engine uses the network modules, only the script zone uses the sandbox, and only `extension/` uses `vscode`.
 
 ## Documentation
 
-- [docs/SPEC.vi.md](docs/SPEC.vi.md): the specification, in Vietnamese: data format as observed, every rule, the output format, the safety model, the test plan and the open questions.
-- [tools/README.md](tools/README.md): describe the structure of your Thunder Client data without sharing it.
-- [site/README.md](site/README.md): the landing page, and how to build and deploy it.
-- [CHANGELOG.md](CHANGELOG.md)
+- [docs/client/](docs/client/): how each part works: [scripts](docs/client/scripts.md), [OAuth 2.0](docs/client/oauth.md), [the runner](docs/client/runner.md), [the `.http` copy](docs/client/mirror.md), [importing](docs/client/import.md), [history](docs/client/history.md), [code and cookies](docs/client/code-and-cookies.md), [performance](docs/client/performance.md).
+- [docs/converter.md](docs/converter.md): the Thunder Client to `.http` converter, with its command line.
+- [docs/SPEC.vi.md](docs/SPEC.vi.md): the specification of the converter, in Vietnamese.
+- [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), [site/README.md](site/README.md) (the landing page).
 
 ## License
 
