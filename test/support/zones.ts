@@ -20,7 +20,8 @@ export interface Zone {
 export const ZONES: Zone[] = [
   { name: 'stages', paths: ['src/model/', 'src/normalize/', 'src/convert/', 'src/emit/'], modules: [], uses: ['util'], deterministic: true },
   { name: 'util', paths: ['src/util/', 'src/reader/limits.ts'], modules: [], uses: [] },
-  { name: 'format', paths: ['src/format/'], modules: [], uses: ['util'], deterministic: true },
+  { name: 'core', paths: ['src/core/'], modules: [], uses: ['util'], deterministic: true },
+  { name: 'format', paths: ['src/format/'], modules: [], uses: ['util', 'core'], deterministic: true },
   { name: 'io', paths: ['src/reader/', 'src/write/', 'src/discover.ts'], modules: ['node:fs', 'node:fs/promises', 'node:path'], uses: ['stages', 'util'] },
   {
     name: 'app',
