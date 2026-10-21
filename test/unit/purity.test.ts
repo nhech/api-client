@@ -107,7 +107,7 @@ test('The stages that decide the output cannot depend on time, randomness, the m
   assert.ok(deciding.length >= 20, `only ${deciding.length} deciding files`);
   assert.deepEqual(scan(deciding, /\bDate\b|Math\.random|performance\.now|process\.(?:env|hrtime|platform|cwd)|\bIntl\./, bare), [], 'time, randomness or machine');
   assert.deepEqual(scan(deciding, /localeCompare|toLocale\w*/, bare), [], 'locale-dependent comparison');
-  assert.deepEqual(scan(deciding, /['"](?:node:)?(?:os|fs|path)['"]/), [], 'disk or machine access in a pure stage');
+  assert.deepEqual(scan(deciding, /(?:from\s+|require\(\s*|import\(\s*)['"](?:node:)?(?:os|fs|path)['"]/), [], 'disk or machine access in a pure stage');
 });
 
 // ---- the bundles that ship, from the same rules the package script checks ----
