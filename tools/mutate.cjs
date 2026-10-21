@@ -104,7 +104,21 @@ const MUTATIONS = [
   { id: "M82", rule: "Schema: an enabled row is written without the switch", file: "src/format/schema/common.ts", find: ".bool('enabled', row.enabled, true)", replace: ".bool('enabled', row.enabled, false)" },
   { id: "M83", rule: "Schema: a request has a parallel .http file unless it says otherwise", file: "src/format/schema/files.ts", find: "mirror: fields.bool('mirror', true)", replace: "mirror: fields.bool('mirror', false)" },
   { id: "M84", rule: "Schema: a request needs a name", file: "src/format/schema/files.ts", find: "if (name.trim() === '') fields.reader.error('name',", replace: "if (name.trim() === '' && false) fields.reader.error('name'," },
-  { id: "M85", rule: "Core: an identifier sorts by time", file: "src/core/clock.ts", find: "CROCKFORD[time % 32]", replace: "CROCKFORD[time % 31]" }
+  { id: "M85", rule: "Core: an identifier sorts by time", file: "src/core/clock.ts", find: "CROCKFORD[time % 32]", replace: "CROCKFORD[time % 31]" },
+  { id: "M86", rule: "Vars: the strongest scope is searched first", file: "src/core/vars.ts", find: "for (const scope of scopes) {", replace: "for (const scope of [...scopes].reverse()) {" },
+  { id: "M87", rule: "Vars: a name that leads back to itself is a cycle", file: "src/core/vars.ts", find: "if (stack.includes(token.name)) note(cycles, token.name);", replace: "if (false) note(cycles, token.name);" },
+  { id: "M88", rule: "Vars: variables nested too deeply are left alone", file: "src/core/vars.ts", find: "else if (depth >= maxDepth) truncated = true;", replace: "else if (false) truncated = true;" },
+  { id: "M89", rule: "Vars: the size of the result is limited", file: "src/core/vars.ts", find: "if (size > maxBytes || replacements <= 0)", replace: "if (replacements <= 0)" },
+  { id: "M90", rule: "Vars: the secret variables that were used are reported", file: "src/core/vars.ts", find: "if (found.secret) note(secrets, token.name);", replace: "" },
+  { id: "M91", rule: "Vars: a guid is version 4", file: "src/core/vars.ts", find: "index === 12 ? '4'", replace: "index === 12 ? '5'" },
+  { id: "M92", rule: "Vars: a timestamp is in whole seconds", file: "src/core/vars.ts", find: "String(Math.floor((clock.now() + offset) / 1000))", replace: "String((clock.now() + offset) / 1000)" },
+  { id: "M93", rule: "Vars: a random integer can be the upper bound", file: "src/core/vars.ts", find: "Math.floor(clock.random() * (max - min + 1))", replace: "Math.floor(clock.random() * (max - min))" },
+  { id: "M94", rule: "Vars: an unclosed {{ is plain text, found in one pass", file: "src/core/vars.ts", find: "if (open < 0 || open + 2 > lastClose) break;", replace: "if (open < 0) break;" },
+  { id: "M95", rule: "Vars: text between braces that is not a name is not a variable", file: "src/core/vars.ts", find: "NAME.test(name) ? 'variable' : 'invalid'", replace: "'variable'" },
+  { id: "M96", rule: "Vars: a disabled variable has no value", file: "src/core/vars.ts", find: "if (variable.enabled && variable.name !== '') scope.set(", replace: "if (variable.name !== '') scope.set(" },
+  { id: "M97", rule: "Vars: the nearest folder's variables come before its parents'", file: "src/core/vars.ts", find: "for (let index = input.levels.length - 1; index >= 0; index--) scopes.push(", replace: "for (let index = 0; index < input.levels.length; index++) scopes.push(" },
+  { id: "M98", rule: "Vars: the civil date arithmetic is right", file: "src/core/vars.ts", find: "monthIndex < 10 ? monthIndex + 3 : monthIndex - 9", replace: "monthIndex < 10 ? monthIndex + 4 : monthIndex - 9" },
+  { id: "M99", rule: "Vars: a day is 86400000 ms in a time offset", file: "src/core/vars.ts", find: "d: 86_400_000", replace: "d: 86_000_000" }
 ];
 
 function run(mutation) {
