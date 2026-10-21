@@ -17,23 +17,41 @@ export const REDACTED = '[redacted]';
 /** Values shorter than this are not searched for in text: a secret of two characters would hide half of everything. */
 export const MIN_SECRET_LENGTH = 4;
 
+/** A value longer than this is searched for as it is and in no other form: nobody types a secret of that size, and a hostile file could make the forms of a very long one cost a lot. */
+const MAX_DERIVED_CHARS = 8192;
+const FORMS_CACHE_SIZE = 256;
+const formsCache = new Map<string, string[]>();
+
 /**
- * The ways a value is written once it is in an address or a form: percent-encoded (`a/b=c` is `a%2Fb%3Dc`), with a plus for a space, with the characters that
- * a form also encodes (`!'()~`), and in lower case hex, which some servers and tools write. A secret that was put into a query or a path by a send is in
- * the text in one of these forms, not as the person typed it.
+ * The ways a value is written once it is in an address, a form or a JSON text: percent-encoded (`a/b=c` is `a%2Fb%3Dc`), with a plus for a space, with the
+ * characters that a form also encodes (`!'()~`), the way an address is written with its slashes kept (`encodeURI`), encoded twice, with the escapes of JSON,
+ * and in lower case hex, which some servers and tools write. A secret that was put into a query or a path by a send is in the text in one of these forms, not
+ * as the person typed it. The forms of a value are made once and kept (a bounded number of them).
  */
 export function secretForms(value: string): string[] {
+  const known = formsCache.get(value);
+  if (known !== undefined) return known;
   const forms = new Set<string>([value]);
-  let encoded = '';
-  try { encoded = encodeURIComponent(value); } catch { /* a lone surrogate has no encoding */ }
-  if (encoded !== '' && encoded !== value) {
-    const plus = encoded.replace(/%20/g, '+');
-    const form = plus.replace(/[!'()~]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
-    for (const form of [encoded, plus]) forms.add(form);
-    forms.add(form);
-    for (const item of [...forms]) forms.add(item.replace(/%[0-9A-F]{2}/g, escape => escape.toLowerCase()));
+  if (value.length <= MAX_DERIVED_CHARS) {
+    const strict = (text: string): string => text.replace(/[!'()~]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+    try {
+      const encoded = encodeURIComponent(value);
+      const plus = encoded.replace(/%20/g, '+');
+      for (const form of [encoded, plus, strict(encoded), strict(plus), encodeURIComponent(encoded)]) forms.add(form);
+    } catch { /* a lone surrogate has no encoding */ }
+    try {
+      const address = encodeURI(value);
+      forms.add(address);
+      forms.add(address.replace(/'/g, '%27'));
+    } catch { /* the same */ }
+    forms.add(JSON.stringify(value).slice(1, -1));
+    for (const form of [...forms]) forms.add(form.replace(/%[0-9A-F]{2}/g, escape => escape.toLowerCase()));
   }
-  return [...forms];
+  forms.delete('');
+  const list = [...forms];
+  if (formsCache.size >= FORMS_CACHE_SIZE) formsCache.clear();
+  formsCache.set(value, list);
+  return list;
 }
 
 /** The text with every value of `secrets` replaced (as typed and as put into an address or a form), longest first so that a value that contains another is covered whole. Linear in the size of the text for each form. */
