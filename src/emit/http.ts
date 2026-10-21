@@ -72,6 +72,7 @@ export function renderRequest(request: ImpRequest, atName: string, saveBody: (te
   const out: string[] = [`### ${title(request)}`, `# @name ${atName}`];
 
   if (request.docs !== undefined) for (const line of lines(request.docs)) out.push(comment(line));
+  for (const directive of request.directives ?? []) out.push(directive);
   for (const capture of request.captures) out.push(captureLine(capture));
   for (const assertion of request.assertions) out.push(assertLine(assertion));
   for (const header of request.headers) if (!header.enabled) out.push(`# [disabled] ${headerName(header.name)}: ${oneLine(header.value).text}`);

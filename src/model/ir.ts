@@ -45,6 +45,8 @@ export interface ImpRequest {
   auth?: ImpAuth;
   assertions: ImpAssertion[];
   captures: ImpCapture[];
+  /** Whole comment lines (`# @assert status == 200`) that go after the documentation, already clean and on one line each; for what the structured fields above cannot say. */
+  directives?: string[];
   /** Comment lines for what was not carried over, such as "[auth oauth2 not imported]". One line each, already clean. */
   notes: string[];
   skippedScripts: { phase: 'pre' | 'post'; lines: string[]; from?: string }[];
