@@ -109,7 +109,13 @@ function Editor(props: { request: Request; port: HostPort }) {
         {tab === 'body' ? <BodyTab body={r.body} send={send} /> : null}
         {tab === 'scripts' ? <ScriptsForm scripts={r.scripts} what="request" /> : null}
         {tab === 'tests' ? <TestsForm tests={r.tests} captures={r.captures} /> : null}
-        {tab === 'settings' ? <SettingsForm settings={r.settings} path={['settings']} what="request" /> : null}
+        {tab === 'settings' ? (
+          <>
+            <label class="check"><input type="checkbox" checked={r.mirror} onChange={event => edit({ op: 'set', path: ['mirror'], value: (event.target as HTMLInputElement).checked })} /><span>Write a .http file next to this request</span></label>
+            <p class="hint">For REST Client, JetBrains and httpYac, and for reading in a pull request. The file is made from this request: edit the request, not the file.</p>
+            <SettingsForm settings={r.settings} path={['settings']} what="request" />
+          </>
+        ) : null}
         {tab === 'docs' ? <div class="editor-box"><CodeEditor value={r.docs} language="text" label="Notes on this request" placeholder="Notes for yourself and your team" onChange={value => edit({ op: 'set', path: ['docs'], value })} onBlur={flushNow} /></div> : null}
       </Tabs>
       <ResponsePane port={props.port} />

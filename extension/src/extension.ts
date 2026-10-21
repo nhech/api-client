@@ -10,6 +10,7 @@ import { ContainerEditorProvider, ENVIRONMENT_VIEW_TYPE, CONTAINER_VIEW_TYPE, En
 import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
+import { MirrorService } from './mirror';
 import { SendEnvironment } from './sender';
 import type { ScriptService } from './scripts';
 import { CollectionsTree, EnvironmentsTree } from './trees';
@@ -28,6 +29,8 @@ const platform = (): 'win32' | 'darwin' | 'linux' => (process.platform === 'win3
 export interface ImporterTestApi {
   /** The consent to run scripts: the tests answer the question for the person. */
   scripts: ScriptService;
+  /** The .http files next to the requests. */
+  mirror: MirrorService;
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
@@ -73,6 +76,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   };
 
   const sending = new SendEnvironment(context, workspace);
+  const mirror = new MirrorService(workspace, context);
   const requests = new RequestEditorProvider(context, sending);
   const environmentEditors = new EnvironmentEditorProvider(context, workspace);
   const containerEditors = new ContainerEditorProvider(context, workspace);
@@ -95,7 +99,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { scripts: sending.scripts, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, mirror, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 

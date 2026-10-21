@@ -38,7 +38,9 @@
   "extensionKind": [
     "workspace"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:**/api-client/workspace.yml"
+  ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
@@ -164,6 +166,46 @@
         "command": "apiClient.forgetScripts",
         "title": "Forget Which Scripts Were Allowed",
         "category": "API Client"
+      },
+      {
+        "command": "apiClient.mirror.syncNow",
+        "title": "Write the .http Files Now",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.mirror.list",
+        "title": "Show the .http Files That Were Edited by Hand",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.openMirror",
+        "title": "Open the .http File",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.mirror.openRequest",
+        "title": "Open the Request of This .http File",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.mirror.showDifferences",
+        "title": "Show How This .http File Differs From Its Request",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.mirror.importEdits",
+        "title": "Take the Edits of This .http File Into Its Request",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.mirror.discardEdits",
+        "title": "Discard the Edits of This .http File",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.mirror.detach",
+        "title": "Keep This .http File as My Own",
+        "category": "API Client"
       }
     ],
     "views": {
@@ -227,6 +269,30 @@
     },
     "menus": {
       "commandPalette": [
+        {
+          "command": "apiClient.openMirror",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.mirror.openRequest",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.mirror.showDifferences",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.mirror.importEdits",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.mirror.discardEdits",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.mirror.detach",
+          "when": "false"
+        },
         {
           "command": "apiClient.openRequest",
           "when": "false"
@@ -327,6 +393,11 @@
           "group": "2_open@1"
         },
         {
+          "command": "apiClient.openMirror",
+          "when": "view == apiClient.collections && viewItem == request",
+          "group": "2_open@2"
+        },
+        {
           "command": "apiClient.revealInExplorer",
           "when": "view == apiClient.collections && viewItem =~ /^(collection|folder|request|broken)$/",
           "group": "9_manage@1"
@@ -401,6 +472,22 @@
     "configuration": {
       "title": "API Client",
       "properties": {
+        "apiClient.mirror.mode": {
+          "type": "string",
+          "enum": [
+            "on",
+            "off",
+            "gitignored"
+          ],
+          "enumDescriptions": [
+            "Write a .http file next to each request, and keep it in step with the request.",
+            "Write no .http files.",
+            "Write the .http files but keep them out of Git (they are listed in a block of the .gitignore of the client folder)."
+          ],
+          "default": "on",
+          "scope": "resource",
+          "markdownDescription": "The `.http` file that is written next to each request, for people who use the files with REST Client, JetBrains or httpYac, or read them in a pull request. The request is the source: a `.http` file that you edit is never written over."
+        },
         "apiClient.scripts.enabled": {
           "type": "boolean",
           "default": true,

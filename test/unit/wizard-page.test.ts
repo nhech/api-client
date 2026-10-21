@@ -75,7 +75,7 @@ test('The manifest, the code and the package agree: every command, view and menu
     assert.ok(views.includes(welcome.view), 'a welcome text for a view that does not exist: ' + welcome.view);
     for (const match of welcome.contents.matchAll(/\(command:([^)]+)\)/g)) assert.ok(declared.includes(match[1] as string) || /^workbench\./.test(match[1] as string), 'a welcome button for a command that does not exist: ' + match[1]);
   }
-  assert.deepEqual(manifest.activationEvents, [], 'no activation event of its own');
+  assert.deepEqual(manifest.activationEvents, ['workspaceContains:**/api-client/workspace.yml'], 'woken only in a workspace that has the files of the client, to keep the .http files next to its requests in step; nothing else wakes it');
   assert.ok(existsSync(join(root, 'extension', ...manifest.icon.split('/'))), 'the icon is there');
   for (const container of manifest.contributes.viewsContainers.activitybar) assert.ok(existsSync(join(root, 'extension', ...container.icon.split('/'))), 'the icon of the side bar is there');
   assert.ok(existsSync(join(root, 'extension', 'media', 'wizard.css')) && existsSync(join(root, 'extension', 'media', 'app.css')));

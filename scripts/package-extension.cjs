@@ -59,7 +59,7 @@ function verify(file) {
   if (packed.private !== undefined) fail('the manifest is marked private');
   if (packed.preview !== true) fail('the manifest is not marked as a preview');
   if (packed.dependencies !== undefined || packed.devDependencies !== undefined) fail('the manifest lists dependencies');
-  if (JSON.stringify(packed.activationEvents) !== '[]') fail('the extension has an activation event of its own');
+  if (JSON.stringify(packed.activationEvents) !== JSON.stringify(['workspaceContains:**/api-client/workspace.yml'])) fail('the extension wakes up on something other than a workspace that has the files of the client');
   if (packed.icon !== 'media/icon.png') fail('the icon is not media/icon.png');
   if (!/^\d+\.\d+\.\d+$/.test(packed.version ?? '')) fail(`version "${packed.version}" is not major.minor.patch`);
   if (!(packed.keywords || []).length || packed.keywords.length > 30) fail('keywords must be 1 to 30');

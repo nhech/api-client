@@ -833,4 +833,105 @@ exports.run = async function run() {
     scriptServer.closeAllConnections();
     scriptServer.close();
   }
+
+  // 16. The .http file next to a request: written after the files are loaded, followed when the request changes, never written over when somebody
+  //     edited it by hand; the lines above its first line offer to take the edits into the request, to show the difference, to discard them, or to
+  //     keep the file; a file with no header is left alone; the mode off writes nothing.
+  const mirrorDir = path.join(workspace, 'api-client', 'collections', 'shop');
+  const mirrorFile = name => path.join(mirrorDir, name);
+  const mirrorText = name => fs.readFileSync(mirrorFile(name), 'utf8');
+  const mirrorUri = name => vscode.Uri.file(mirrorFile(name));
+  // The command fails with "Illegal argument" for a file that no document has been opened on.
+  const mirrorTitles = async name => {
+    await vscode.workspace.openTextDocument(mirrorUri(name));
+    return (await vscode.commands.executeCommand('vscode.executeCodeLensProvider', mirrorUri(name), 10)).map(lens => lens.command?.title ?? '');
+  };
+  put('api-client/collections/shop/mirrored.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B31', 'name: Mirrored', 'method: GET', 'url: https://example.test/m', 'headers:', '  - name: X-One', '    value: "1"', ''].join('\n'));
+  await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Mirrored'), 'the mirrored request is in the tree');
+
+  // 16a. It is written, with the first line that says where it comes from, and what a .http tool reads is the request.
+  await until(() => fs.existsSync(mirrorFile('mirrored.http')), 'the .http file is written');
+  const written = mirrorText('mirrored.http');
+  assert.match(written.split('\n')[0], /^# api-client generated v1 src=mirrored\.req\.yml h=[0-9a-f]{14} -- edit the \.req\.yml, not this file$/);
+  assert.match(written, /\n### Mirrored\n# @name mirrored\n/);
+  assert.match(written, /\nGET https:\/\/example\.test\/m\n/);
+  assert.match(written, /\nX-One: 1\n/);
+  assert.match(written, /\nX-Shop: s\n/, 'with what the collection gives every request');
+  assert.match(written, /\n# @assert duration < 60000\n/, 'and its tests');
+  assert.ok(!written.includes('\r'), 'written with line feeds');
+  assert.match((await mirrorTitles('mirrored.http')).join(' | '), /Generated from mirrored\.req\.yml: edit the request, not this file/);
+
+  // 16b. A change of the request is followed by the file.
+  put('api-client/collections/shop/mirrored.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B31', 'name: Mirrored', 'method: GET', 'url: https://example.test/m2', 'headers:', '  - name: X-One', '    value: "1"', ''].join('\n'));
+  await until(() => mirrorText('mirrored.http').includes('https://example.test/m2'), 'the .http file follows the request');
+
+  // 16c. A file that somebody edited is never written over, not even when the request changes; the lines offer what to do.
+  const edited = mirrorText('mirrored.http').replace('GET https://example.test/m2', 'POST https://example.test/m2?by=hand\nX-Hand: yes').replace('X-One: 1\n', '');
+  fs.writeFileSync(mirrorFile('mirrored.http'), edited);
+  await until(() => test.mirror.drifted.some(entry => entry.path.endsWith('mirrored.http') && entry.drift === 'edited'), 'the edit is noticed');
+  assert.match((await mirrorTitles('mirrored.http')).join(' | '), /Edited by hand: this file is not written over \| Take the edits \| Show the difference \| Discard the edits \| Keep as my own file/);
+  put('api-client/collections/shop/mirrored.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B31', 'name: Mirrored', 'method: GET', 'url: https://example.test/m3', 'headers:', '  - name: X-One', '    value: "1"', ''].join('\n'));
+  await until(() => test.mirror.drifted.some(entry => entry.drift === 'both'), 'both changed is noticed');
+  assert.equal(mirrorText('mirrored.http'), edited, 'the edited file was not written over');
+  assert.match((await mirrorTitles('mirrored.http')).join(' | '), /The request and this file both changed/);
+  // Go back to the request the edit was made from, so that the edits can be taken.
+  put('api-client/collections/shop/mirrored.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B31', 'name: Mirrored', 'method: GET', 'url: https://example.test/m2', 'headers:', '  - name: X-One', '    value: "1"', ''].join('\n'));
+  await until(() => test.mirror.drifted.some(entry => entry.drift === 'edited'), 'edited again once the request is as it was');
+
+  // 16d. Taking the edits changes the request (the method, the query, the headers) and writes the file again from it.
+  const answered = [];
+  test.mirror.confirm = async question => { answered.push(question); return true; };
+  await vscode.commands.executeCommand('apiClient.mirror.importEdits', mirrorUri('mirrored.http'));
+  await until(() => /method: POST/.test(fs.readFileSync(mirrorFile('mirrored.req.yml'), 'utf8')), 'the request has the method of the edit');
+  const taken = fs.readFileSync(mirrorFile('mirrored.req.yml'), 'utf8');
+  assert.deepEqual(answered, ['take']);
+  assert.match(taken, /X-Hand/);
+  assert.match(taken, /name: by\n\s+value: hand/);
+  assert.ok(!/name: X-One/.test(taken), 'the header the edit removed is gone from the request');
+  await until(() => test.mirror.drifted.length === 0 && mirrorText('mirrored.http').includes('X-Hand: yes'), 'the file is written again from the request');
+  assert.match(mirrorText('mirrored.http'), /\nPOST https:\/\/example\.test\/m2\?by=hand\n/);
+
+  // 16e. Discarding the edits writes the file again from the request.
+  const afterTake = mirrorText('mirrored.http');
+  fs.writeFileSync(mirrorFile('mirrored.http'), afterTake.replace('POST', 'DELETE'));
+  await until(() => test.mirror.drifted.length === 1, 'the second edit is noticed');
+  answered.length = 0;
+  await vscode.commands.executeCommand('apiClient.mirror.discardEdits', mirrorUri('mirrored.http'));
+  await until(() => mirrorText('mirrored.http') === afterTake && test.mirror.drifted.length === 0, 'the file is as the request gives it');
+  assert.deepEqual(answered, ['discard']);
+
+  // 16f. Keeping the file as the person's own takes the first line out and stops the request from writing it.
+  fs.writeFileSync(mirrorFile('mirrored.http'), afterTake.replace('POST', 'PATCH'));
+  await until(() => test.mirror.drifted.length === 1, 'the third edit is noticed');
+  answered.length = 0;
+  await vscode.commands.executeCommand('apiClient.mirror.detach', mirrorUri('mirrored.http'));
+  await until(() => !mirrorText('mirrored.http').startsWith('# api-client generated') && /mirror: false/.test(fs.readFileSync(mirrorFile('mirrored.req.yml'), 'utf8')), 'the file is the own file of the person and the request writes none');
+  assert.deepEqual(answered, ['detach']);
+  assert.match(mirrorText('mirrored.http'), /^### Mirrored\n/);
+  assert.match(mirrorText('mirrored.http'), /\nPATCH https:\/\/example\.test\/m2\?by=hand\n/, 'with the edit that was made');
+  const own = mirrorText('mirrored.http');
+  put('api-client/collections/shop/mirrored.req.yml', fs.readFileSync(mirrorFile('mirrored.req.yml'), 'utf8').replace('/m2', '/m4'));
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  await test.mirror.sync();
+  assert.equal(mirrorText('mirrored.http'), own, 'a file with no first line is never written');
+  assert.deepEqual(await mirrorTitles('mirrored.http'), [], 'and has no lines above it');
+
+  // 16g. A .http file that is not generated is left alone, and the mode off writes nothing at all.
+  put('api-client/collections/shop/foreign.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B32', 'name: Foreign', 'url: https://example.test/f', ''].join('\n'));
+  put('api-client/collections/shop/foreign.http', '### mine\nGET https://mine.test/\n');
+  await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Foreign'), 'the foreign request is in the tree');
+  await test.mirror.sync();
+  assert.equal(mirrorText('foreign.http'), '### mine\nGET https://mine.test/\n');
+  const settingsOfMirror = vscode.workspace.getConfiguration('apiClient');
+  await settingsOfMirror.update('mirror.mode', 'off', vscode.ConfigurationTarget.Workspace);
+  try {
+    put('api-client/collections/shop/quiet.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B33', 'name: Quiet', 'url: https://example.test/q', ''].join('\n'));
+    await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Quiet'), 'the quiet request is in the tree');
+    await test.mirror.sync();
+    assert.ok(!fs.existsSync(mirrorFile('quiet.http')), 'no file in the mode off');
+  } finally {
+    await settingsOfMirror.update('mirror.mode', undefined, vscode.ConfigurationTarget.Workspace);
+    test.mirror.confirm = undefined;
+  }
+  await until(() => fs.existsSync(mirrorFile('quiet.http')), 'with the mode on again the file is written');
 };
