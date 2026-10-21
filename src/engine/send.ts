@@ -1,7 +1,7 @@
 import type { Settings } from '../core/model';
 import { DEFAULT_DECODE_LIMITS, type DecodeLimits } from './decode';
 import { resolveProxy, type ProxyConfig } from './proxy';
-import { isLocalHost, isRedirectStatus, nextHop, type Hop, type RedirectPolicy } from './redirect';
+import { isLocalHost, isRedirectStatus, nextHop, type Hop } from './redirect';
 import { exchange, type ExchangeOptions } from './transport';
 import { EngineError, type HeaderList, type RedirectHop, type TlsOptions, type WireRequest, type WireResponse } from './types';
 
@@ -70,17 +70,23 @@ function withCookies(request: WireRequest, jar: CookieStore | undefined): WireRe
 
 const headerValue = (headers: HeaderList, name: string): string | undefined => headers.find(([key]) => key.toLowerCase() === name)?.[1];
 
+/** Whether the host of an address is this machine or a private network, by its text. */
+function textIsLocal(url: string): boolean {
+  try { return isLocalHost(new URL(url).hostname); } catch { return false; }
+}
+
 /**
- * After a redirect from a public address to ANOTHER name, the address that the name resolves to is checked too (see lookup.ts), unless the person allowed
- * redirects to this machine. The same name again is the address the person already reached.
+ * Whether a hop was connected to this machine or a private network: the address that was really connected to, not the name (a name that pointed at a public
+ * address and then at 127.0.0.1 is the attack), and the text of the host behind a proxy, whose own address is all that is seen there.
  */
-function mustCheckAddress(redirects: readonly RedirectHop[], target: string, policy: RedirectPolicy): boolean {
-  const from = redirects.at(-1)?.url;
-  if (from === undefined || policy.allowLocal) return false;
-  try {
-    const before = new URL(from).hostname.toLowerCase();
-    return before !== new URL(target).hostname.toLowerCase() && !isLocalHost(before);
-  } catch { return false; }
+export function connectedToLocal(url: string, remoteAddress: string | undefined, proxied: boolean): boolean {
+  if (proxied || remoteAddress === undefined) return textIsLocal(url);
+  return isLocalHost(remoteAddress);
+}
+
+/** After a redirect from a connection to the internet, the address that the name of the next hop resolves to must not be on this machine or network (see lookup.ts), unless the person allowed it. */
+export function mustRefuseLocalAddresses(hopsBefore: number, allowLocal: boolean, previousLocal: boolean): boolean {
+  return hopsBefore > 0 && !allowLocal && !previousLocal;
 }
 
 export async function send(request: WireRequest, options: SendOptions): Promise<WireResponse> {
@@ -91,6 +97,14 @@ export async function send(request: WireRequest, options: SendOptions): Promise<
   try {
     let current = withDefaults(request, options);
     const redirects: RedirectHop[] = [];
+    /**
+     * Whether the connection of the hop before this one was to this machine or a private network: the address that was really connected to, not the name (a name that
+     * pointed at a public address and then at 127.0.0.1 is the attack), and the text of the host behind a proxy, whose own address is all that is seen there.
+     * After a redirect from a public connection the address that a name resolves to is checked before the next connection is made (see lookup.ts), unless the person
+     * allowed redirects to this machine in the settings.
+     */
+    let previousLocal = false;
+    const notes: string[] = [];
     for (;;) {
       const attempt = withCookies(current, options.cookies);
       // An address that is not valid is reported by the exchange itself, so the proxy is looked up only for one that is.
@@ -102,23 +116,26 @@ export async function send(request: WireRequest, options: SendOptions): Promise<
         const location = headerValue(headers, 'location');
         return location === undefined ? undefined : nextHop(current, status, location, policy);
       };
-      const result = await exchange(attempt, {
+      const exchanged = await exchange(attempt, {
         signal, connectTimeoutMs: options.connectTimeoutMs ?? Math.min(options.timeoutMs, 30_000), idleTimeoutMs: options.idleTimeoutMs ?? options.timeoutMs,
         tls: options.tls, responseLimitBytes: options.responseLimitBytes, decode: options.decode ?? DEFAULT_DECODE_LIMITS,
         ...(options.spill === undefined ? {} : { spill: options.spill }), ...(options.createConnection === undefined ? {} : { createConnection: options.createConnection }),
         ...(proxy === undefined ? {} : { proxy }),
-        ...(mustCheckAddress(redirects, attempt.url, policy) ? { refuseLocalAddresses: true } : {}),
+        ...(mustRefuseLocalAddresses(redirects.length, policy.allowLocal, previousLocal) ? { refuseLocalAddresses: true } : {}),
         body: (status, headers) => { decision = decide(status, headers); return decision?.follow === true ? 'discard' : 'read'; }
       });
+      const { remoteAddress, ...result } = exchanged;
+      previousLocal = connectedToLocal(attempt.url, remoteAddress, proxy !== undefined);
       if (options.cookies !== undefined) {
         const setCookies = result.headers.filter(([name]) => name.toLowerCase() === 'set-cookie').map(([, value]) => value);
         if (setCookies.length > 0) options.cookies.store(new URL(attempt.url), setCookies);
       }
       const hop = decision as Hop | undefined;
-      if (hop === undefined) return { ...result, redirects, finalUrl: current.url, sent: attempt };
-      if (!hop.follow) return { ...result, redirects, finalUrl: current.url, sent: attempt, warnings: [...result.warnings, `Not followed: ${hop.reason}.`] };
+      if (hop === undefined) return { ...result, redirects, finalUrl: current.url, sent: attempt, warnings: [...result.warnings, ...notes] };
+      if (!hop.follow) return { ...result, redirects, finalUrl: current.url, sent: attempt, warnings: [...result.warnings, ...notes, `Not followed: ${hop.reason}.`] };
       if (redirects.length >= options.maxRedirects) throw new EngineError('too-many-redirects', `The server redirected more than ${options.maxRedirects} times.`, 'It may be a loop; raise the limit in the settings if it is not.');
       redirects.push({ url: current.url, status: result.status });
+      if (policy.allowLocal && !previousLocal && textIsLocal(hop.request.url)) notes.push(`A redirect from the internet to ${new URL(hop.request.url).host}, an address on this machine or network, was followed because the settings of the request allow it.`);
       current = hop.request;
     }
   } finally {

@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import dns from 'node:dns';
 import { refuseLocalAddresses } from '../../src/engine/lookup';
-import { send, type SendOptions } from '../../src/engine/send';
+import { connectedToLocal, mustRefuseLocalAddresses, send, type SendOptions } from '../../src/engine/send';
 import { EngineError, type WireRequest } from '../../src/engine/types';
 import { startServer } from '../support/servers/http-server';
+import { startProxy } from '../support/servers/proxy-server';
 
 /** A name is not an address: after a redirect from a public address, a name that resolves to this machine is not connected to. */
 
@@ -35,7 +36,6 @@ test('When the lookup asks for all addresses, one that is local among them refus
   assert.deepEqual(await ask({ error: null, address: fine }, { all: true }), { error: null, address: fine });
 });
 
-const BASE: SendOptions = { timeoutMs: 10_000, followRedirects: true, maxRedirects: 10, tls: { rejectUnauthorized: true }, responseLimitBytes: 1024 * 1024 };
 const get = (url: string): WireRequest => ({ method: 'GET', url, headers: [] });
 
 /** Makes the names of the test resolve to the address of the server of the test, as a server that owns its DNS could. */
@@ -51,31 +51,66 @@ async function withNames<T>(names: readonly string[], run: () => Promise<T>): Pr
   try { return await run(); } finally { (dns as { lookup: typeof dns.lookup }).lookup = original; }
 }
 
-test('A public name that redirects to a name that resolves to this machine is not followed: the second connection is never made', async () => {
+test('What was connected to is the address of the socket, and the text of the host only behind a proxy or when no address was seen', () => {
+  assert.equal(connectedToLocal('https://public.example/a', '93.184.216.34', false), false);
+  assert.equal(connectedToLocal('https://public.example/a', '127.0.0.1', false), true, 'a name that pointed at this machine');
+  assert.equal(connectedToLocal('https://internal.corp.example/a', '10.1.2.3', false), true, 'an internal name');
+  assert.equal(connectedToLocal('https://public.example/a', '::ffff:192.168.1.5', false), true, 'a mapped address');
+  assert.equal(connectedToLocal('http://10.1.2.3/a', '93.184.216.34', true), true, 'behind a proxy the host is judged by its text: the address seen is the proxy\'s');
+  assert.equal(connectedToLocal('https://public.example/a', '127.0.0.1', true), false, 'and a name is not an address');
+  assert.equal(connectedToLocal('http://localhost:3000/a', undefined, false), true, 'with no address seen, the text');
+  assert.equal(connectedToLocal('not an address', undefined, false), false);
+});
+
+test('The address that a name resolves to is refused after a redirect from the internet, in every other case it is not', () => {
+  assert.equal(mustRefuseLocalAddresses(1, false, false), true, 'the second hop after a connection to a public address');
+  assert.equal(mustRefuseLocalAddresses(3, false, false), true);
+  assert.equal(mustRefuseLocalAddresses(0, false, false), false, 'the first address is the one the person wrote');
+  assert.equal(mustRefuseLocalAddresses(1, true, false), false, 'the person allowed it');
+  assert.equal(mustRefuseLocalAddresses(1, false, true), false, 'the hop before was on this machine or network: a company sends its people from one internal name to another');
+});
+
+test('A connection after a redirect goes through the guard of the lookup: a name that resolves to this machine does not get a connection', async () => {
+  const { exchange } = await import('../../src/engine/transport');
+  const { DEFAULT_DECODE_LIMITS } = await import('../../src/engine/decode');
   const server = await startServer();
   try {
     const port = new URL(server.url).port;
-    await withNames(['public-site.test', 'rebind.test'], async () => {
-      const target = encodeURIComponent(`http://rebind.test:${port}/echo`);
-      await assert.rejects(send(get(`http://public-site.test:${port}/to?to=${target}`), BASE), (error: unknown) => error instanceof EngineError && error.code === 'network' && /The name rebind\.test leads to 127\.0\.0\.1/.test(error.message));
-      assert.deepEqual(server.requests.map(request => request.url), [`/to?to=${target}`], 'only the first request reached the server');
-      // The person can allow it: then the redirect is followed as before.
-      const allowed = await send(get(`http://public-site.test:${port}/to?to=${target}`), { ...BASE, allowLocalRedirect: true });
-      assert.equal(allowed.status, 200);
+    const options = { signal: new AbortController().signal, connectTimeoutMs: 5000, idleTimeoutMs: 5000, tls: { rejectUnauthorized: true }, responseLimitBytes: 1024 * 1024, decode: DEFAULT_DECODE_LIMITS, body: () => 'read' as const };
+    await withNames(['rebind.test'], async () => {
+      await assert.rejects(exchange(get(`http://rebind.test:${port}/echo`), { ...options, refuseLocalAddresses: true }), (error: unknown) => error instanceof EngineError && error.code === 'network' && /The name rebind\.test leads to 127\.0\.0\.1/.test(error.message));
+      assert.equal(server.requests.length, 0, 'nothing reached the server');
+      const allowed = await exchange(get(`http://rebind.test:${port}/echo`), options);
+      assert.equal(allowed.status, 200, 'without the guard the same request is made');
+      assert.equal(allowed.remoteAddress, '127.0.0.1', 'and the address that was connected to is reported');
     });
   } finally { await server.close(); }
 });
 
-test('A request that starts on this machine is not held to the rule, and neither is a redirect to another path of the same name', async () => {
+const BASE: SendOptions = { timeoutMs: 10_000, followRedirects: true, maxRedirects: 10, tls: { rejectUnauthorized: true }, responseLimitBytes: 1024 * 1024 };
+
+test('A redirect from the internet to this machine that the settings allow is followed with a note, and a redirect between two local addresses with none', async () => {
   const server = await startServer();
+  const proxy = await startProxy();
   try {
     const port = new URL(server.url).port;
-    await withNames(['public-site.test'], async () => {
-      const local = await send(get(`${server.url}/redirect/1`), BASE);
-      assert.equal(local.status, 200, 'from 127.0.0.1 to 127.0.0.1');
-      // The first hop is the address the person wrote, and the same name again is where they already are.
-      const same = await send(get(`http://public-site.test:${port}/redirect/1`), BASE);
-      assert.equal(same.status, 200);
+    const target = `http://127.0.0.1:${port}/echo`;
+    await withNames(['public.example'], async () => {
+      // The first hop goes through a proxy, which is all that is seen of it: the name is public, so the hop after it is a redirect from the internet.
+      const through = { ...BASE, allowLocalRedirect: true, proxy: { all: proxy.url, proxyLoopback: true } };
+      const followed = await send(get(`http://public.example:${port}/to?to=${encodeURIComponent(target)}`), through);
+      assert.equal(followed.status, 200);
+      assert.equal(followed.redirects.length, 1);
+      assert.deepEqual(followed.warnings.filter(note => /^A redirect from the internet/.test(note)), [`A redirect from the internet to 127.0.0.1:${port}, an address on this machine or network, was followed because the settings of the request allow it.`]);
+      // The same without the permission is not followed.
+      const refused = await send(get(`http://public.example:${port}/to?to=${encodeURIComponent(target)}`), { ...through, allowLocalRedirect: false });
+      assert.equal(refused.redirects.length, 0);
+      assert.ok(refused.warnings.some(note => /^Not followed/.test(note)), refused.warnings.join(' | '));
     });
-  } finally { await server.close(); }
+    // From this machine to this machine there is nothing to say.
+    const local = await send(get(`${server.url}/to?to=${encodeURIComponent(target)}`), { ...BASE, allowLocalRedirect: true });
+    assert.equal(local.status, 200);
+    assert.equal(local.redirects.length, 1);
+    assert.deepEqual(local.warnings.filter(note => /^A redirect from the internet/.test(note)), []);
+  } finally { await proxy.close(); await server.close(); }
 });

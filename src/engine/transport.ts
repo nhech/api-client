@@ -38,7 +38,8 @@ export interface ExchangeOptions {
   refuseLocalAddresses?: boolean;
 }
 
-export type ExchangeResult = Omit<WireResponse, 'redirects' | 'finalUrl' | 'sent'>;
+/** `remoteAddress` is the address that the connection was really made to (the proxy's, behind a proxy). */
+export type ExchangeResult = Omit<WireResponse, 'redirects' | 'finalUrl' | 'sent'> & { remoteAddress?: string };
 
 const now = (): number => performance.now();
 
@@ -266,6 +267,7 @@ export async function exchange(request: WireRequest, options: ExchangeOptions): 
 
     req.on('response', res => {
       marks.response = now();
+      const remoteAddress = res.socket?.remoteAddress;
       if (connectTimer !== undefined) clearTimeout(connectTimer);
       const headers: HeaderList = [];
       for (let index = 0; index + 1 < res.rawHeaders.length; index += 2) headers.push([res.rawHeaders[index] as string, res.rawHeaders[index + 1] as string]);
@@ -287,7 +289,7 @@ export async function exchange(request: WireRequest, options: ExchangeOptions): 
       const done = (body: ResponseBody, wireBytes: number, size: number, truncated: boolean): void => {
         if (settled) return;
         settled = true;
-        resolve({ ...base, body, wireBytes, size, truncated, timings: timings(now()), ...(tlsInfo === undefined ? {} : { tls: tlsInfo }), warnings });
+        resolve({ ...base, body, wireBytes, size, truncated, timings: timings(now()), ...(tlsInfo === undefined ? {} : { tls: tlsInfo }), warnings, ...(remoteAddress === undefined ? {} : { remoteAddress }) });
       };
 
       const noBody = method === 'HEAD' || status === 204 || status === 304 || (status >= 100 && status < 200);
