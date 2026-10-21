@@ -69,7 +69,28 @@ const MUTATIONS = [
   { id: 'M48', rule: 'a repeated request name is numbered from where the last one stopped, not from 2 again', file: 'src/emit/names.ts', find: 'let n = next.get(key) ?? 2;\n    let collided = false;', replace: 'let n = 2;\n    let collided = false;' },
   { id: 'M49', rule: 'a test the request already has is not inherited again (one set of keys)', file: 'src/convert/inherit.ts', find: 'key !== undefined && present.has(key);', replace: 'false;' },
   { id: 'M50', rule: 'the table of written folders in the report is cut', file: 'src/emit/report.ts', find: 'if (input.collections.length > ROWS_PER_LIST) out.push(', replace: 'if (false) out.push(' },
-  { id: 'M20', rule: 'staging: nothing is left behind when a write fails', file: 'src/write/writer.ts', find: 'for (const step of undo.reverse()) {', replace: 'for (const step of [] as (() => Promise<void>)[]) {' }
+  { id: 'M20', rule: 'staging: nothing is left behind when a write fails', file: 'src/write/writer.ts', find: 'for (const step of undo.reverse()) {', replace: 'for (const step of [] as (() => Promise<void>)[]) {' },
+  { id: "M51", rule: "YAML: a key that appears twice is refused", file: "src/format/yaml/parse.ts", find: "if (map.has(entry.key)) this.fail(line, 0, `the key \"${entry.key}\" appears twice`);", replace: "" },
+  { id: "M52", rule: "YAML: anchors are refused", file: "src/format/yaml/parse.ts", find: "if (first === '&') return 'anchors are not supported';", replace: "" },
+  { id: "M53", rule: "YAML: aliases are refused", file: "src/format/yaml/parse.ts", find: "if (first === '*') return 'aliases are not supported';", replace: "" },
+  { id: "M54", rule: "YAML: tags are refused", file: "src/format/yaml/parse.ts", find: "if (first === '!') return 'tags are not supported';", replace: "" },
+  { id: "M55", rule: "YAML: flow collections are refused", file: "src/format/yaml/parse.ts", find: "if (first === '[' || first === '{') return 'flow", replace: "if (first === 'Z') return 'flow" },
+  { id: "M56", rule: "YAML: a tab cannot indent a line", file: "src/format/yaml/parse.ts", find: "if (line.text.charCodeAt(0) === 9) this.fail(line, 0, 'a tab cannot indent a line; use spaces');", replace: "" },
+  { id: "M57", rule: "YAML: the size limit counts bytes, not units", file: "src/format/yaml/parse.ts", find: "new TextEncoder().encode(text).length > limits.maxBytes", replace: "false" },
+  { id: "M58", rule: "YAML: the nesting limit holds", file: "src/format/yaml/parse.ts", find: "if (depth > this.limits.maxDepth) this.fail", replace: "if (depth > this.limits.maxDepth * 100) this.fail" },
+  { id: "M59", rule: "YAML: the limit on the number of nodes holds", file: "src/format/yaml/parse.ts", find: "if (++this.nodes > this.limits.maxNodes) this.fail", replace: "if (++this.nodes > this.limits.maxNodes * 100) this.fail" },
+  { id: "M60", rule: "YAML: a block scalar needs content indented more than its key", file: "src/format/yaml/parse.ts", find: "if (head === undefined || head.indent <= indent) {", replace: "if (head === undefined || head.indent < indent) {" },
+  { id: "M61", rule: "YAML: a list may sit at the indentation of its key", file: "src/format/yaml/parse.ts", find: "if (next !== undefined && next.indent === indent && isSequenceEntry(next.text)) return this.sequence(indent, depth + 1);", replace: "" },
+  { id: "M62", rule: "YAML: control characters are refused", file: "src/format/yaml/parse.ts", find: "const control = CONTROL.exec(raw);", replace: "const control = /\\u0001/.exec(raw);" },
+  { id: "M63", rule: "YAML: |+ keeps every trailing line break", file: "src/format/yaml/parse.ts", find: "return chomp === '+' ? `${text}\\n${'\\n'.repeat(trailing)}` : `${text}\\n`;", replace: "return chomp === '+' ? `${text}\\n${'\\n'.repeat(trailing + 1)}` : `${text}\\n`;" },
+  { id: "M64", rule: "YAML: |- strips the last line break", file: "src/format/yaml/parse.ts", find: "if (chomp === '-') return text;", replace: "if (chomp === '-') return `${text}\\n`;" },
+  { id: "M65", rule: "YAML: a value with \": \" inside is quoted when written", file: "src/format/yaml/emit.ts", find: "text.includes(': ') || text.includes(' #') || text.endsWith(':')", replace: "text.includes(' #') || text.endsWith(':')" },
+  { id: "M66", rule: "YAML: a value with spaces around it is quoted when written", file: "src/format/yaml/emit.ts", find: "text !== text.trim() ||", replace: "" },
+  { id: "M67", rule: "YAML: a lone surrogate is escaped when written (it cannot be UTF-8)", file: "src/format/yaml/emit.ts", find: "|| isLoneSurrogate(char);", replace: "|| false;" },
+  { id: "M68", rule: "YAML: the block header tells how many line breaks end the string", file: "src/format/yaml/emit.ts", find: "const header = trailing === 0 ? '|-' : trailing === 1 ? '|' : '|+';", replace: "const header = trailing === 0 ? '|' : trailing === 1 ? '|-' : '|+';" },
+  { id: "M69", rule: "YAML: true, false and whole numbers are written plain", file: "src/format/yaml/emit.ts", find: "return READABLE.test(text) ||", replace: "return false ||" },
+  { id: "M70", rule: "YAML: a string that looks like a date is quoted when written", file: "src/format/yaml/emit.ts", find: "  /^\\d{4}-\\d\\d?-\\d\\d?(?:[Tt ].*)?$/,\n", replace: "" },
+  { id: "M71", rule: "YAML: a value that starts with a brace is quoted when written", file: "src/format/yaml/emit.ts", find: "const PLAIN_START = /^[\\p{L}\\p{N}_$/.]/u;", replace: "const PLAIN_START = /^[\\p{L}\\p{N}_$/.{\\[]/u;" }
 ];
 
 function run(mutation) {
