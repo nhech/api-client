@@ -1,6 +1,6 @@
 {
   "_comment": "What the extension package may hold. Read by scripts/package-extension.cjs (the package) and test/unit/purity.test.ts (the built bundles). Raise a limit or add a module in the commit that needs it, and say why in the message.",
-  "maxPackageBytes": 460800,
+  "maxPackageBytes": 716800,
   "files": [
     "[Content_Types].xml",
     "extension.vsixmanifest",
@@ -14,7 +14,9 @@
     "extension/readme.md",
     "extension/media/activity.svg",
     "extension/dist/app.js",
-    "extension/media/app.css"
+    "extension/media/app.css",
+    "extension/dist/script-worker.js",
+    "extension/dist/quickjs.wasm"
   ],
   "bundles": {
     "extension/dist/extension.js": {
@@ -42,6 +44,16 @@
         "innerHTML": 2
       },
       "htmlSinksNote": "Both are in Preact, in the branch for the dangerouslySetInnerHTML property, which no source of the project uses (checked by test/unit/wizard-page.test.ts)."
+    },
+    "extension/dist/script-worker.js": {
+      "kind": "worker",
+      "requires": [
+        "node:worker_threads"
+      ]
     }
-  }
+  },
+  "pins": {
+    "extension/dist/quickjs.wasm": "105c3bed22d457e43e3d1c3c1c6959fda62a8fe06f0fc8a985303c3a2be72232"
+  },
+  "pinsNote": "QuickJS 2025-09-13 as built by @jitl/quickjs-wasmfile-release-sync 0.32.0 (MIT). A new version of the engine is a reviewed change of this hash, not an accident."
 }

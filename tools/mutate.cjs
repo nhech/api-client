@@ -297,7 +297,24 @@ const MUTATIONS = [
   { id: "M279", rule: "Response: the value of a secret saved by a capture is not shown", file: "src/view/response.ts", find: "const value = secret || result.action === 'delete' ? '' :", replace: "const value = result.action === 'delete' ? '' :" },
   { id: "M280", rule: "Response: a long saved value is cut", file: "src/view/response.ts", find: "result.value.length > 200 ? `${result.value.slice(0, 197)}...` : result.value", replace: "result.value" },
   { id: "M281", rule: "Response: a body that was not read whole is not tested", file: "src/view/response.ts", find: "if (bytes.length < response.size) return { ...base, body: undefined,", replace: "if (false) return { ...base, body: undefined," },
-  { id: "M282", rule: "Response: the time of a test is whole milliseconds", file: "src/view/response.ts", find: "durationMs: Math.round(response.timings.totalMs)", replace: "durationMs: response.timings.totalMs" }
+  { id: "M282", rule: "Response: the time of a test is whole milliseconds", file: "src/view/response.ts", find: "durationMs: Math.round(response.timings.totalMs)", replace: "durationMs: response.timings.totalMs" },
+  { id: "M283", rule: "Sandbox: an operation is found only among the ones offered", file: "src/script/sandbox.ts", find: "Object.hasOwn(ops, message.op) ? ops[message.op] : undefined", replace: "ops[message.op]" },
+  { id: "M284", rule: "Sandbox: time spent waiting for the extension is not computing time", file: "src/script/sandbox.ts", find: "waitedTotal += Date.now() - waitingSince;", replace: "waitedTotal += 0;" },
+  { id: "M285", rule: "Sandbox: a run has a wall limit", file: "src/script/sandbox.ts", find: "if (total > limits.wallMs) fail(", replace: "if (false) fail(" },
+  { id: "M286", rule: "Sandbox: the engine stopping a script for time is reported as such", file: "src/script/sandbox.ts", find: "message.error.message === 'interrupted'", replace: "message.error.message === 'never'" },
+  { id: "M287", rule: "Sandbox: a script that is too large is refused", file: "src/script/sandbox.ts", find: "if (job.source.length > 8 * MIB || job.input.length > 8 * MIB)", replace: "if (false)" },
+  { id: "M288", rule: "Sandbox: a run that is cancelled before it starts does not start", file: "src/script/sandbox.ts", find: "if (options.signal?.aborted === true) return { ok: false, kind: 'cancelled', message: 'cancelled' };", replace: "" },
+  { id: "M289", rule: "Worker: the time spent waiting for the extension is given back to the script", file: "src/script/worker.ts", find: "value => { waited += Date.now() - began; if (!closed", replace: "value => { if (!closed" },
+  { id: "M290", rule: "Worker: a script may ask for a limited number of operations", file: "src/script/worker.ts", find: "if (++calls > limits.hostCalls) throw", replace: "if (false) throw" },
+  { id: "M291", rule: "Worker: the argument of an operation is limited", file: "src/script/worker.ts", find: "if (arg.length > MAX_OPERATION_CHARS) throw", replace: "if (false) throw" },
+  { id: "M292", rule: "Worker: a script stopped for time in an async function still fails", file: "src/script/worker.ts", find: "if (interrupted) throw new GuestError('InternalError', 'interrupted');", replace: "" },
+  { id: "M293", rule: "Worker: nothing of the engine is touched after the run", file: "src/script/worker.ts", find: "    closed = true;\n", replace: "" },
+  { id: "M294", rule: "Worker: what the API has no use for is taken away", file: "src/script/worker.ts", find: "['SharedArrayBuffer', 'Atomics', 'WeakRef', 'FinalizationRegistry', 'escape', 'unescape']", replace: "['Atomics', 'WeakRef', 'FinalizationRegistry', 'escape', 'unescape']" },
+  { id: "M295", rule: "Worker: the result has a size limit", file: "src/script/worker.ts", find: "if (result.length > limits.resultBytes) throw", replace: "if (false) throw" },
+  { id: "M296", rule: "Worker: the memory of the engine has a hard maximum", file: "src/script/worker.ts", find: "maximum: HARD_MEMORY_PAGES }", replace: "maximum: HARD_MEMORY_PAGES * 64 }" },
+  { id: "M297", rule: "Worker: the heap of the engine has a soft limit", file: "src/script/worker.ts", find: "runtime.setMemoryLimit(limits.memoryBytes);", replace: "" },
+  { id: "M298", rule: "Worker: the stack of the engine is limited", file: "src/script/worker.ts", find: "runtime.setMaxStackSize(limits.stackBytes);", replace: "" },
+  { id: "M299", rule: "Protocol: the memory of the engine is capped at 64 MB", file: "src/script/protocol.ts", find: "export const HARD_MEMORY_PAGES = 1024;", replace: "export const HARD_MEMORY_PAGES = 1024 * 64;" }
 ];
 
 function run(mutation) {
@@ -306,7 +323,8 @@ function run(mutation) {
   if (!original.includes(mutation.find)) return { status: 'STALE', detail: 'the text to change is not in the file any more' };
   fs.writeFileSync(target, original.replace(mutation.find, () => mutation.replace));
   try {
-    const result = spawnSync('npm', ['test'], { cwd: root, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    // A mutant can make a test wait for something that never comes (a limit that is no longer there); the runner ends a test after two minutes and the run as a whole after a quarter of an hour, and a run that was ended counts as caught.
+    const result = spawnSync('npm', ['test'], { cwd: root, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000 });
     const output = `${result.stdout}\n${result.stderr}`;
     if (/error TS\d+/.test(output)) return { status: 'INVALID', detail: 'does not compile' };
     if (result.status === 0) return { status: 'SURVIVED', detail: 'all tests still pass' };

@@ -90,6 +90,14 @@ function verify(file) {
     }
   }
 
+  // Files that are not ours are pinned by their hash: the package holds exactly the file that was reviewed.
+  for (const [name, expected] of Object.entries(rules.pins ?? {})) {
+    const held = files.get(name);
+    if (held === undefined) { fail(`${name} is missing`); continue; }
+    const actual = crypto.createHash('sha256').update(held).digest('hex');
+    if (actual !== expected) fail(`${name} is not the file that was reviewed (its sha256 is ${actual}); a new version is a decision, so change the pin in scripts/package-rules.json with it`);
+  }
+
   // The README and the changelog: images only from https, none an SVG, no link relative to the repository.
   for (const name of ['extension/readme.md', 'extension/changelog.md']) {
     for (const match of text(name).matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {

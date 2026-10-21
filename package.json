@@ -36,7 +36,7 @@
     "lint": "eslint src test tools scripts site extension/src extension/test extension/esbuild.mjs eslint.config.mjs",
     "build": "tsc -p tsconfig.json",
     "test:compile": "tsc -p tsconfig.test.json",
-    "test": "npm run test:compile && node --test .test-build/test/unit/*.test.js",
+    "test": "npm run test:compile && node --test --test-timeout=120000 --test-force-exit .test-build/test/unit/*.test.js",
     "selftest:tools": "node tools/thunder-structure.cjs --selftest",
     "mutate": "node tools/mutate.cjs",
     "ext:typecheck": "npm --prefix extension run typecheck",
@@ -61,6 +61,7 @@
     "@codemirror/search": "6.7.2",
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.15",
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
     "@lezer/highlight": "1.2.5",
     "@preact/signals": "2.11.3",
     "@types/node": "22.15.30",
@@ -70,6 +71,7 @@
     "esbuild": "0.28.2",
     "eslint": "10.12.0",
     "preact": "11.0.1",
+    "quickjs-emscripten-core": "0.32.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.0"
   }
