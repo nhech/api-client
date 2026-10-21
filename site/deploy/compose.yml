@@ -1,0 +1,26 @@
+# Origin of the landing page. The Cloudflare Tunnel public hostname points at http://localhost:4281.
+# Deploy with: npm run site:deploy  (builds the site, the image and verifies the running container)
+name: api-client-site
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: site/deploy/Dockerfile
+    image: api-client-site:latest
+    container_name: api-client-site
+    restart: unless-stopped
+    # Loopback only: the tunnel runs on this machine, so nothing is exposed to the network.
+    ports:
+      - "127.0.0.1:${API_CLIENT_SITE_PORT:-4281}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

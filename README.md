@@ -214,6 +214,7 @@ extension/       the VS Code layer: one command, Quick Picks, the report as a re
 test/            unit tests, support (a reference .http parser and reference inheritance), fixtures and goldens
 tools/           thunder-structure.cjs (describe your data), mutate.cjs (mutation check)
 samples/         made-up data and the runners that try the output in the real tools
+site/, scripts/  the landing page and the scripts that build, check and deploy it
 docs/SPEC.vi.md  the specification (Vietnamese)
 ```
 
@@ -223,6 +224,7 @@ The stages are pure functions: reader → normaliser → converter → emitter, 
 
 - [docs/SPEC.vi.md](docs/SPEC.vi.md): the specification, in Vietnamese: data format as observed, every rule, the output format, the safety model, the test plan and the open questions.
 - [tools/README.md](tools/README.md): describe the structure of your Thunder Client data without sharing it.
+- [site/README.md](site/README.md): the landing page, and how to build and deploy it.
 - [CHANGELOG.md](CHANGELOG.md)
 
 ## License

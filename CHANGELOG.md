@@ -19,3 +19,4 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - VS Code extension: the command **API Client: Import from Thunder Client...**, which also fills in the REST Client settings (workspace and user scope, comments kept, nothing replaced, secrets kept out of Settings Sync).
 - `tools/thunder-structure.cjs` to describe the structure of your Thunder Client data without exposing its content.
 - Unit tests, byte-exact goldens, a mutation check, and runners that try the output in real REST Client, httpYac and the JetBrains HTTP Client.
+- A landing page in `site/` (static, no dependencies) with its build, validation and deploy scripts in `scripts/`.
