@@ -173,3 +173,11 @@ test('A cookie cannot claim the whole second level of a country, even one that i
   assert.equal(header(jar, 'https://other.example.co.nz/'), 'e=1');
   assert.equal(header(jar, 'https://victim.co.nz/'), undefined);
 });
+
+test('A real site whose name happens to look like a second level of a country keeps its domain cookies', () => {
+  const { jar } = jarAt();
+  jar.store(url('https://app.id.me/'), ['a=1; Domain=id.me']);
+  jar.store(url('https://www.info.ch/'), ['b=1; Domain=info.ch']);
+  jar.store(url('https://api.me.io/'), ['c=1; Domain=me.io']);
+  assert.deepEqual(jar.list().map(cookie => cookie.name).sort(), ['a', 'b', 'c']);
+});

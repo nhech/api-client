@@ -10,5 +10,6 @@ const FORBIDDEN = new Set(['.', '..', '.git', '.hg', '.svn', '.bzr', 'node_modul
 export function clientRoot(configured: string): string {
   const cleaned = configured.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
   if (!/^[\w.-]+(?:\/[\w.-]+)*$/.test(cleaned)) return DEFAULT_ROOT;
-  return cleaned.split('/').some(segment => FORBIDDEN.has(segment.toLowerCase()) || /^\.+$/.test(segment)) ? DEFAULT_ROOT : cleaned;
+  // Windows drops the dots and spaces at the end of a name, so `.git.` is `.git`.
+  return cleaned.split('/').some(segment => FORBIDDEN.has(segment.replace(/[. ]+$/, '').toLowerCase()) || /^\.+$/.test(segment)) ? DEFAULT_ROOT : cleaned;
 }

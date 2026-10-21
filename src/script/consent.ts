@@ -79,20 +79,32 @@ export function readApproved(value: unknown): ApprovedScript[] {
   return entries;
 }
 
+/** Every way a line can end in a text that is read as lines: CR LF, CR, LF, NEL and the separators of Unicode. */
+const LINE_ENDS = new RegExp('\\r\\n|[\\r\\n' + String.fromCodePoint(0x85, 0x2028, 0x2029) + ']');
+
 /** One line for each script that is waiting, for the question to the person. */
 export function describePending(pending: readonly PendingScript[]): string[] {
   return pending.map(script => {
-    const lines = script.code.split('\n').length;
+    const lines = script.code.split(LINE_ENDS).length;
     return `${script.status === 'new' ? 'New' : 'Changed'}: the script ${script.phase === 'pre' ? 'before the request' : 'after the answer'} of ${printable(script.from).slice(0, 80)} (${lines} ${lines === 1 ? 'line' : 'lines'})`;
   });
 }
 
+/** The most that one line of a script shows in the question: the rest of a long line is said to be there, so that the lines below it are not pushed out of sight. */
+const ROW_CHARS = 160;
+
 /**
  * The beginning of a script as the question shows it: the lines as they are (a script is read by its lines, so a line break is kept, and a tab is two spaces),
- * each made printable so that nothing hidden or reversing the text is in it, cut to a number of lines and of characters, with `...` when there is more.
+ * each made printable so that nothing hidden or reversing the text is in it and cut when it is long, a run of empty lines shown as one, then cut to a number of
+ * lines and of characters, with `...` when there is more.
  */
 export function previewOf(code: string, maxLines: number, maxChars: number): string {
-  const rows = code.replace(/\r\n?/g, '\n').split('\n').map(row => printable(row.replace(/\t/g, '  ')));
+  const rows: string[] = [];
+  for (const row of code.split(LINE_ENDS)) {
+    const clean = printable(row.replace(/\t/g, '  '));
+    if (clean.trim() === '' && rows.length > 0 && rows[rows.length - 1] === '') continue;
+    rows.push(clean.trim() === '' ? '' : clean.length > ROW_CHARS ? `${clean.slice(0, ROW_CHARS)} [... ${clean.length - ROW_CHARS} more characters on this line]` : clean);
+  }
   const shown = rows.slice(0, maxLines).join('\n');
   const cut = shown.length > maxChars ? `${shown.slice(0, maxChars)}...` : shown;
   return `${cut}${rows.length > maxLines || shown.length > maxChars ? '\n...' : ''}`;

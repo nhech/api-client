@@ -63,6 +63,13 @@ export class RuntimeVariables {
     return count;
   }
 
+  /** How many variables the collection of a context holds, in every scope: the limit is for a collection, so that one cannot use up the room of another. */
+  private sizeOf(context: RuntimeContext): number {
+    let count = (this.global.get(context.collection)?.size ?? 0) + (this.local.get(context.collection)?.size ?? 0);
+    for (const [key, bucket] of this.active) if ((JSON.parse(key) as [string, string])[1] === context.collection) count += bucket.size;
+    return count;
+  }
+
   private target(scope: RuntimeScope, context: RuntimeContext): Map<string, string> {
     return scope === 'global' ? this.bucket(this.global, context.collection) : scope === 'local' ? this.bucket(this.local, context.collection) : this.bucket(this.active, this.activeKey(context));
   }
@@ -70,7 +77,7 @@ export class RuntimeVariables {
   private put(scope: RuntimeScope, name: string, value: string | undefined, context: RuntimeContext): void {
     const target = this.target(scope, context);
     if (value === undefined) { target.delete(name); return; }
-    if (!target.has(name) && this.size >= MAX_RUNTIME_VARIABLES) return;
+    if (!target.has(name) && this.sizeOf(context) >= MAX_RUNTIME_VARIABLES) return;
     target.set(name, value.length > MAX_RUNTIME_VALUE_CHARS ? value.slice(0, MAX_RUNTIME_VALUE_CHARS) : value);
   }
 

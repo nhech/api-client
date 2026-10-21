@@ -30,7 +30,7 @@ const PUBLIC_SUFFIXES: ReadonlySet<string> = new Set([
 ]);
 
 /** The second levels that countries use under their two-letter domain (co.nz, com.au, ac.jp, ...): a name such as these is not a site but a place where many sites are. */
-const COUNTRY_SECOND_LEVEL = /^(?:co|com|net|org|gov|edu|ac|ne|or|go|mil|nom|sch|ltd|plc|me|id|info|biz)\.[a-z]{2}$/;
+const COUNTRY_SECOND_LEVEL = /^(?:co|com|net|org|gov|edu|ac|ne|or|go|mil|nom|sch|ltd|plc)\.[a-z]{2}$/;
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 

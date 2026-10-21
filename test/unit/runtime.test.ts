@@ -86,3 +86,14 @@ test('What one collection sets is never seen by another: a capture in a reposito
   assert.equal(variables.scope(mine).get('host')?.value, 'api.shop.example');
   assert.equal(variables.scope(evil).get('host')?.value, 'evil.example', 'and neither changes the other');
 });
+
+test('The limit of a thousand variables is for a collection: one collection cannot use up the room of another', () => {
+  const variables = new RuntimeVariables();
+  const first: RuntimeContext = { environmentId: 'E-dev', collection: 'api-client/collections/first' };
+  const second: RuntimeContext = { environmentId: 'E-dev', collection: 'api-client/collections/second' };
+  for (let index = 0; index < MAX_RUNTIME_VARIABLES + 50; index++) variables.apply(result(`v${index}`, '1', { scope: index % 3 === 0 ? 'global' : index % 3 === 1 ? 'local' : 'active' }), first);
+  assert.equal(names(variables, first).length, MAX_RUNTIME_VARIABLES, 'the first collection is held to the limit in all its scopes together');
+  variables.apply(result('token', 'abc12345'), second);
+  assert.equal(variables.scope(second).get('token')?.value, 'abc12345', 'the second collection still has its room');
+  assert.equal(variables.size, MAX_RUNTIME_VARIABLES + 1);
+});

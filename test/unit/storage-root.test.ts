@@ -11,7 +11,7 @@ test('A plain relative folder of the workspace is kept, with its separators and 
 });
 
 test('The folder of a version control system, one of packages, a way out and anything that is not a plain name give the default', () => {
-  for (const bad of ['', '   ', '.', '..', '../x', 'a/../b', 'a/./b', '...', '.git', '.GIT', 'x/.git/y', '.hg', '.svn', 'node_modules', 'Node_Modules/api', 'C:/x', 'a b', 'a:b', 'x/./.git']) {
+  for (const bad of ['', '   ', '.', '..', '../x', 'a/../b', 'a/./b', '...', '.git', '.GIT', 'x/.git/y', '.hg', '.svn', 'node_modules', 'Node_Modules/api', 'C:/x', 'a b', 'a:b', 'x/./.git', '.git.', '.git..', 'a/.GIT.', 'node_modules.']) {
     assert.equal(clientRoot(bad), DEFAULT_ROOT, bad);
   }
 });
