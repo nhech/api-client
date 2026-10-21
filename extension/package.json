@@ -298,7 +298,19 @@
           "markdownDescription": "The folder of the workspace where the collections, the environments and the settings of the client are kept, as plain files."
         }
       }
-    }
+    },
+    "customEditors": [
+      {
+        "viewType": "apiClient.request",
+        "displayName": "API Client Request",
+        "selector": [
+          {
+            "filenamePattern": "*.req.yml"
+          }
+        ],
+        "priority": "default"
+      }
+    ]
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

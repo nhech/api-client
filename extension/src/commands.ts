@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { TreeNode } from '../../src/view/tree';
 import type { ClientWorkspace } from './clientWorkspace';
+import { REQUEST_VIEW_TYPE } from './requestEditor';
 import { OPEN_REQUEST_COMMAND, type CollectionsTree } from './trees';
 
 /**
@@ -71,7 +72,7 @@ export function registerCommands(context: vscode.ExtensionContext, { workspace, 
 
   register(OPEN_REQUEST_COMMAND, async (path: string) => {
     const uri = workspace.absolute(path);
-    if (uri !== undefined) await vscode.commands.executeCommand('vscode.open', uri, { preview: true });
+    if (uri !== undefined) await vscode.commands.executeCommand('vscode.openWith', uri, REQUEST_VIEW_TYPE, { preview: true });
   });
   register('apiClient.openAsText', async (node: TreeNode | string) => {
     const uri = workspace.absolute(typeof node === 'string' ? node : node.path);

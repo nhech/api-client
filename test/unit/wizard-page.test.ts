@@ -84,6 +84,9 @@ test('The manifest, the code and the package agree: every command, view and menu
   const bundler = read('extension/esbuild.mjs');
   assert.ok(bundler.includes("outfile: 'dist/wizard.js'") && bundler.includes("platform: 'browser'"), 'the script of the panel is built for the browser');
   assert.ok(bundler.includes("outfile: 'dist/app.js'") && bundler.includes("jsxImportSource: 'preact'"), 'the script of the request editor is built for the browser');
+  assert.ok(read('extension/src/requestEditor.ts').includes("vscode.Uri.joinPath(dist, 'app.js')"), 'the request editor loads the built script');
+  assert.deepEqual(manifest.contributes.customEditors.map(editor => editor.viewType), ['apiClient.request'], 'the request editor is declared');
+  assert.ok(read('extension/src/extension.ts').includes('registerCustomEditorProvider(REQUEST_VIEW_TYPE'), 'and registered');
   assert.ok(read('extension/src/wizardPanel.ts').includes("'dist', 'wizard.js'") === false && read('extension/src/wizardPanel.ts').includes("vscode.Uri.joinPath(dist, 'wizard.js')"), 'the panel loads the built script');
 });
 

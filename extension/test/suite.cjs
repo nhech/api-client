@@ -202,6 +202,58 @@ exports.run = async function run() {
   assert.match(test.client().collections.find(node => node.kind === 'broken').tooltip, /line 1, column 7/);
   fs.rmSync(path.join(workspace, 'api-client', 'collections', 'shop', 'second.req.yml'));
   await until(() => test.client().collections[0].children.length === 1, 'a file removed on disk goes away');
+  // 9. The request editor: the command opens the page over the file, the page loads under its policy, an edit of the page becomes a small change of the
+  //    document, a change of the document reaches the page, a stale or invalid edit changes nothing, and a file that cannot be read is shown read-only.
+  const requestPath = path.join(workspace, 'api-client', 'collections', 'shop', 'list.req.yml');
+  const requestUri = vscode.Uri.file(requestPath);
   await vscode.commands.executeCommand('apiClient.openRequest', 'api-client/collections/shop/list.req.yml');
-  await until(() => vscode.window.activeTextEditor?.document.uri.fsPath.endsWith('list.req.yml') === true || vscode.window.tabGroups.activeTabGroup.activeTab?.label === 'list.req.yml', 'opening a request opens its file');
+  const editor = () => test.requestEditor(requestUri.toString());
+  await until(() => editor() !== undefined && editor().isReady, 'the page loaded under its Content-Security-Policy and says it is ready');
+  assert.deepEqual(editor().violations, [], 'nothing was refused by the policy');
+  await until(() => editor().lastMessage()?.type === 'init', 'the page was told what the file holds');
+  const init = editor().lastMessage();
+  assert.deepEqual([init.request.name, init.request.method, init.request.url, init.readOnly], ['List things', 'GET', 'http://x.test/things', undefined]);
+  const document = await vscode.workspace.openTextDocument(requestUri);
+  const original = document.getText();
+
+  await editor().receive({ type: 'edit', rev: init.rev, ops: [{ op: 'set', path: ['url'], value: 'http://x.test/changed' }, { op: 'insert', path: ['headers'], index: 0, value: { name: 'X-Test', value: '1', enabled: true, description: '' } }] });
+  assert.match(document.getText(), /url: http:\/\/x\.test\/changed\n/);
+  assert.match(document.getText(), /headers:\n {2}- name: X-Test\n {4}value: 1\n/);
+  assert.equal(document.isDirty, true, 'the document is dirty, so VS Code saves, backs up and undoes it');
+  const after = editor().lastMessage();
+  assert.deepEqual([after.type, after.cause, after.rev, after.request.url], ['doc', 'self', init.rev + 1, 'http://x.test/changed']);
+
+  await editor().receive({ type: 'edit', rev: init.rev, ops: [{ op: 'set', path: ['name'], value: 'Stale' }] });
+  assert.ok(!document.getText().includes('Stale'), 'an edit made on an old version changes nothing');
+  assert.equal(editor().lastMessage().type, 'doc', 'and the page is given the current file');
+  await editor().receive({ type: 'edit', rev: editor().lastMessage().rev, ops: [{ op: 'set', path: ['method'], value: 'GE T' }] });
+  assert.equal(editor().lastMessage().type, 'rejected');
+  assert.match(editor().lastMessage().reason, /method: not a valid HTTP method/);
+  assert.ok(!document.getText().includes('GE T'));
+  await editor().receive({ type: 'edit', rev: 1, ops: [{ op: 'set', path: ['id'], value: 'x' }] });
+  await editor().receive('rubbish');
+  await editor().receive({ type: 'edit', ops: [] });
+
+  const typed = new vscode.WorkspaceEdit();
+  typed.replace(requestUri, new vscode.Range(document.positionAt(document.getText().indexOf('changed')), document.positionAt(document.getText().indexOf('changed') + 'changed'.length)), 'typed');
+  await vscode.workspace.applyEdit(typed);
+  await until(() => editor().lastMessage()?.cause === 'disk' && editor().lastMessage().request.url === 'http://x.test/typed', 'a change made in the text editor reaches the page');
+  assert.ok(document.getText().startsWith('schema: 1\n'));
+  await document.save();
+  assert.match(fs.readFileSync(requestPath, 'utf8'), /url: http:\/\/x\.test\/typed\n/);
+  assert.notEqual(fs.readFileSync(requestPath, 'utf8'), original);
+
+  put('api-client/collections/shop/unreadable.req.yml', 'schema: 1\nname: [oops\n');
+  await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(path.join(workspace, 'api-client', 'collections', 'shop', 'unreadable.req.yml')), 'apiClient.request');
+  const unreadableKey = vscode.Uri.file(path.join(workspace, 'api-client', 'collections', 'shop', 'unreadable.req.yml')).toString();
+  await until(() => test.requestEditor(unreadableKey)?.lastMessage()?.type === 'init', 'a file that cannot be read still opens');
+  const unreadable = test.requestEditor(unreadableKey);
+  assert.match(unreadable.lastMessage().readOnly, /cannot be read as a request: line 2, column 7/);
+  await unreadable.receive({ type: 'edit', rev: unreadable.lastMessage().rev, ops: [{ op: 'set', path: ['url'], value: 'x' }] });
+  assert.equal(unreadable.lastMessage().type, 'rejected', 'nothing can be edited in it');
+  const newerKey = vscode.Uri.file(path.join(workspace, 'api-client', 'collections', 'shop', 'newer.req.yml'));
+  put('api-client/collections/shop/newer.req.yml', 'schema: 9\nname: Future\nthing: 1\n');
+  await vscode.commands.executeCommand('vscode.openWith', newerKey, 'apiClient.request');
+  await until(() => test.requestEditor(newerKey.toString())?.lastMessage()?.type === 'init', 'a file of a newer version opens');
+  assert.match(test.requestEditor(newerKey.toString()).lastMessage().readOnly, /newer version/);
 };

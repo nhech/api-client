@@ -7,6 +7,7 @@ import type { FlowResult } from '../../src/host';
 import type { TreeNode } from '../../src/view/tree';
 import { ClientWorkspace } from './clientWorkspace';
 import { registerCommands } from './commands';
+import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
 import { CollectionsTree, EnvironmentsTree } from './trees';
 import { REPORT_SCHEME, ReportDocuments, VscodeHost } from './vscodeHost';
 import { WizardPanel } from './wizardPanel';
@@ -24,6 +25,8 @@ export interface ImporterTestApi {
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void };
+  /** The open editor of a request file, by the address of the file. */
+  requestEditor(uri: string): RequestEditorTestView | undefined;
 }
 
 /**
@@ -58,7 +61,9 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     status.show();
   };
 
+  const requests = new RequestEditorProvider(context);
   context.subscriptions.push(
+    vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false }),
     reports, workspace, collections, environments, collections.view, environmentsView, historyView, status, workspace.onDidChange(showStatus),
     vscode.workspace.registerTextDocumentContentProvider(REPORT_SCHEME, reports),
     vscode.commands.registerCommand(IMPORT_COMMAND, async (): Promise<void> => { WizardPanel.show(context, host, await candidates()); }),
@@ -70,7 +75,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text) }) }
+    ? { panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text) }), requestEditor: uri => requests.open.get(uri) }
     : undefined;
 }
 
