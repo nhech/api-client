@@ -161,6 +161,14 @@ exports.run = async function run() {
     await open('pets/oauth.req.yml');
     await sleep(800);
     await shot('request-oauth', 1400, 860, 1200, clickTab('Auth', false));
+    // The collection runner: every request of the collection, with what each test said.
+    await vscode.commands.executeCommand('apiClient.runCollection', { kind: 'collection', path: 'api-client/collections/pet-store', label: 'Pet Store' });
+    for (let waited = 0; !(test.runner('api-client/collections/pet-store')?.isReady) && waited < 15000; waited += 100) await sleep(100);
+    const runner = test.runner('api-client/collections/pet-store');
+    await runner.receive({ type: 'start', config: { iterations: 1, delayMs: 0, stopOnFailure: false } });
+    for (let waited = 0; !runner.messages().some(message => message.type === 'done') && waited < 60000; waited += 100) await sleep(100);
+    await sleep(500);
+    await shot('runner', 1200, 800, 1200, "d => { const row = d.querySelector('table.data tr.clickable button'); if (row) { row.click(); return 'clicked'; } return 'none'; }");
   } finally {
     server.closeAllConnections();
     server.close();

@@ -163,6 +163,11 @@
         "category": "API Client"
       },
       {
+        "command": "apiClient.runCollection",
+        "title": "Run Collection or Folder",
+        "category": "API Client"
+      },
+      {
         "command": "apiClient.forgetTokens",
         "title": "Forget Access Tokens and Allowed Token Servers",
         "category": "API Client"
@@ -391,6 +396,11 @@
           "command": "apiClient.newFolder",
           "when": "view == apiClient.collections && viewItem =~ /^(collection|folder)$/",
           "group": "1_create@2"
+        },
+        {
+          "command": "apiClient.runCollection",
+          "when": "view == apiClient.collections && viewItem =~ /^(collection|folder)$/",
+          "group": "1_create@3"
         },
         {
           "command": "apiClient.openAsText",

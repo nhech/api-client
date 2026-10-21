@@ -12,9 +12,9 @@ h3 { margin: 16px 0 6px; font-size: 1em; font-weight: 600; }
 .bar { display: flex; align-items: stretch; gap: 6px; }
 .bar .cm-wrap { flex: 1; min-width: 0; }
 .method { min-width: 92px; font-weight: 600; }
-select, input[type="text"], input[type="password"], input:not([type]) { color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; padding: 4px 6px; font: inherit; }
+select, input[type="text"], input[type="password"], input[type="number"], input:not([type]) { color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; padding: 4px 6px; font: inherit; }
 input::placeholder { color: var(--vscode-input-placeholderForeground); }
-select, input[type="text"], input[type="password"], input:not([type]) { min-height: 26px; }
+select, input[type="text"], input[type="password"], input[type="number"], input:not([type]) { min-height: 26px; }
 select:focus, input:focus, button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 button { font: inherit; cursor: pointer; }
 .send { color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; padding: 4px 16px; font-weight: 600; }
@@ -153,3 +153,13 @@ pre.log-list { margin: 0; padding: 6px 8px; max-height: 60vh; overflow: auto; }
 .token { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .token .tools { display: flex; align-items: center; gap: 12px; }
 button.link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
+
+/* The collection runner. */
+.page h2 { margin: 0; font-size: 1.2em; font-weight: 600; }
+.field-row { display: flex; flex-wrap: wrap; gap: 16px; }
+.field-row .field { min-width: 160px; }
+.field-row input[type="number"] { width: 140px; }
+table.data tr.clickable { cursor: pointer; }
+table.data tr.clickable:hover { background: var(--vscode-list-hoverBackground); }
+table.data tr.detail > td { padding: 4px 8px 12px 24px; background: var(--vscode-textCodeBlock-background); }
+.summary { margin: 8px 0; }

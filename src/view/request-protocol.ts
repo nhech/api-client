@@ -51,7 +51,7 @@ export interface RequestState {
 }
 
 /** The pages of the app: the request editor, the editor of an environment, and the editor of a collection or a folder. */
-export type AppScreen = 'request' | 'environment' | 'container';
+export type AppScreen = 'request' | 'environment' | 'container' | 'runner';
 
 /** What the pages of an environment and of a collection or folder are given: the file as the format reads it (the secret values of an environment put back in), and whether it can be edited. */
 export type DocumentState = { rev: number; findings: Finding[]; readOnly: string | undefined } & (

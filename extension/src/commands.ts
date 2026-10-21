@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { TreeNode } from '../../src/view/tree';
 import type { ClientWorkspace } from './clientWorkspace';
+import type { RunnerManager } from './runner';
 import { findChild } from '../../src/storage/organise';
 import type { Organiser } from './organise';
 import { CONTAINER_VIEW_TYPE, ENVIRONMENT_VIEW_TYPE } from './documentEditors';
@@ -44,6 +45,7 @@ function containers(nodes: readonly TreeNode[], prefix = ''): { label: string; n
 }
 
 export interface CommandContext {
+  runner: RunnerManager;
   workspace: ClientWorkspace;
   collections: CollectionsTree;
   environments: EnvironmentsTree;
@@ -54,7 +56,7 @@ function fail(error: unknown): void {
   void vscode.window.showErrorMessage(`API Client: ${error instanceof Error ? error.message : String(error)}`);
 }
 
-export function registerCommands(context: vscode.ExtensionContext, { workspace, collections, environments, organiser }: CommandContext): void {
+export function registerCommands(context: vscode.ExtensionContext, { runner, workspace, collections, environments, organiser }: CommandContext): void {
   /** The folder or collection a new item goes into: the one the command was used on, or one the person picks. */
   const target = async (node: TreeNode | undefined, what: string): Promise<TreeNode | undefined> => {
     if (node !== undefined && (node.kind === 'collection' || node.kind === 'folder')) return node;
@@ -77,6 +79,10 @@ export function registerCommands(context: vscode.ExtensionContext, { workspace, 
   };
 
   register('apiClient.refresh', async () => { await workspace.reload(); });
+  register('apiClient.runCollection', async (node?: TreeNode) => {
+    const picked = await target(node, 'collection or folder to run');
+    if (picked !== undefined) runner.show(picked.path, picked.label);
+  });
   register('apiClient.filter', async () => {
     const text = await vscode.window.showInputBox({ prompt: 'Show only the requests whose name, method or address contains', value: collections.filter });
     if (text !== undefined) collections.setFilter(text);

@@ -1121,4 +1121,119 @@ exports.run = async function run() {
     oauthServer.closeAllConnections();
     oauthServer.close();
   }
+
+  // 18. The collection runner: the requests of a collection run in order, the results come one by one, a failure is a failure, a data file makes a pass
+  //     for each row, a script can send the run elsewhere, the run can be stopped, and the report says what ran.
+  const seenRuns = [];
+  let slowResolve;
+  const runServer = http2.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      seenRuns.push(req.method + ' ' + decodeURI(req.url));
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url === '/slow') { slowResolve = () => { res.end('{"slow":true}'); }; return; }
+      if (req.url === '/missing') { res.statusCode = 404; res.end('{"error":"not found","secret":"body-must-not-be-in-the-report"}'); return; }
+      res.end('{"ok":true}');
+    });
+  });
+  await new Promise(resolve => runServer.listen(0, '127.0.0.1', resolve));
+  const runBase = 'http://127.0.0.1:' + runServer.address().port;
+  const runDir = 'api-client/collections/runs';
+  const requestFile = (id, name, url, extra = []) => ['schema: 1', 'id: ' + id, 'name: ' + name, 'url: ' + url, ...extra, ''].join('\n');
+  test.scripts.answer = async () => 'allow';
+  try {
+    put(runDir + '/collection.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B51', 'name: Runs', 'baseUrl: ' + runBase, ''].join('\n'));
+    put(runDir + '/a-ok.req.yml', requestFile('01J9Z4V0N2XK7Q3M8T5R6Y1B52', 'A ok', '/ok', ['tests:', '  - expr: status == 200']));
+    put(runDir + '/b-echo.req.yml', requestFile('01J9Z4V0N2XK7Q3M8T5R6Y1B53', 'B echo', '/echo/{{id}}', ['tests:', '  - expr: status == 200']));
+    put(runDir + '/c-missing.req.yml', requestFile('01J9Z4V0N2XK7Q3M8T5R6Y1B54', 'C missing', '/missing', ['tests:', '  - expr: status == 200', '  - expr: status == 404']));
+    put(runDir + '/d-last.req.yml', requestFile('01J9Z4V0N2XK7Q3M8T5R6Y1B55', 'D last', '/last', ['tests:', '  - expr: status == 200']));
+    await until(() => test.client().collections.some(node => node.label === 'Runs' && node.children.length === 4), 'the collection to run is in the tree');
+    await vscode.commands.executeCommand('apiClient.runCollection', { kind: 'collection', path: runDir, label: 'Runs' });
+    await until(() => test.runner(runDir)?.isReady === true, 'the runner is open');
+    const runner = test.runner(runDir);
+    const loadedRequest = name => {
+      const walk = list => { for (const child of list) { if (child.kind === 'request' && child.request.name === name) return child.request; if (child.children) { const found = walk(child.children); if (found) return found; } } return undefined; };
+      return walk(test.client().workspace.loaded.collections);
+    };
+    const messagesOf = type => runner.messages().filter(message => message.type === type);
+    const finished = async run => {
+      const before = messagesOf('done').length;
+      await run();
+      await until(() => messagesOf('done').length > before, 'the run is done');
+      return messagesOf('done').at(-1).summary;
+    };
+
+    // 18a. The page is told what is to be run.
+    assert.deepEqual(messagesOf('init').at(-1), { type: 'init', name: 'Runs', kind: 'collection', environment: 'Dev', requests: 4, data: undefined });
+
+    // 18b. A run: in the order of the side bar, a failing test is a failed request, and each result comes as it happens.
+    seenRuns.length = 0;
+    const first = await finished(() => runner.receive({ type: 'start', config: { iterations: 1, delayMs: 0, stopOnFailure: false } }));
+    assert.deepEqual(seenRuns, ['GET /ok', 'GET /echo/{{id}}', 'GET /missing', 'GET /last']);
+    assert.deepEqual(messagesOf('result').map(message => [message.result.name, message.result.status, message.result.httpStatus]), [['A ok', 'passed', 200], ['B echo', 'passed', 200], ['C missing', 'failed', 404], ['D last', 'passed', 200]]);
+    assert.deepEqual([first.requests, first.passed, first.failed, first.testsPassed, first.testsFailed, first.stopped], [4, 3, 1, 4, 1, 'finished']);
+    assert.ok(messagesOf('started').length >= 1 && runner.isRunning === false);
+
+    // 18c. A data file: a pass for each row, the columns are variables of the pass.
+    runner.pickData = async () => ({ name: 'rows.csv', text: 'id,name\n1,Ann\n2,Bob\n' });
+    await runner.receive({ type: 'chooseData' });
+    await until(() => messagesOf('data').some(message => message.data?.rows === 2), 'the data file is read');
+    assert.deepEqual(messagesOf('data').at(-1).data, { name: 'rows.csv', rows: 2, columns: ['id', 'name'], warnings: [] });
+    seenRuns.length = 0;
+    const second = await finished(() => runner.receive({ type: 'start', config: { iterations: 5, delayMs: 0, stopOnFailure: false } }));
+    assert.deepEqual(seenRuns.filter(line => line.includes('echo')), ['GET /echo/1', 'GET /echo/2']);
+    assert.deepEqual([second.iterations, second.requests], [2, 8], 'the rows decide the passes, whatever the number says');
+    runner.pickData = async () => ({ name: 'bad.csv', text: 'a,b,a\n1,2,3\n' });
+    await runner.receive({ type: 'chooseData' });
+    await until(() => messagesOf('data').at(-1).error !== undefined, 'a data file that is no good is refused');
+    assert.match(messagesOf('data').at(-1).error, /Two columns have the same name/);
+    assert.equal(messagesOf('data').at(-1).data.rows, 2, 'and the one that was chosen before is kept');
+
+    // 18d. Stopping at the first failure.
+    seenRuns.length = 0;
+    const third = await finished(() => runner.receive({ type: 'start', config: { iterations: 1, delayMs: 0, stopOnFailure: true } }));
+    assert.deepEqual([third.stopped, seenRuns.some(line => line.includes('/last'))], ['failure', false]);
+    await runner.receive({ type: 'clearData' });
+    await until(() => messagesOf('data').at(-1).data === undefined, 'the data file is removed');
+
+    // 18e. A script sends the run to another request by its name.
+    put(runDir + '/a-ok.req.yml', requestFile('01J9Z4V0N2XK7Q3M8T5R6Y1B52', 'A ok', '/ok', ['scripts:', '  post: |', "    postman.setNextRequest('D last');"]));
+    await until(() => loadedRequest('A ok')?.scripts.post.includes('setNextRequest'), 'the request has its script');
+    seenRuns.length = 0;
+    const fourth = await finished(() => runner.receive({ type: 'start', config: { iterations: 1, delayMs: 0, stopOnFailure: false } }));
+    assert.deepEqual(seenRuns, ['GET /ok', 'GET /last'], 'B and C were passed over');
+    assert.deepEqual([fourth.requests, fourth.failed], [2, 0]);
+
+    // 18f. The report: the totals and every request, and nothing that a server answered.
+    const reports = [];
+    runner.reportTo = (format, text) => reports.push({ format, text });
+    await runner.receive({ type: 'save', format: 'json' });
+    await runner.receive({ type: 'save', format: 'junit' });
+    assert.deepEqual(reports.map(report => report.format), ['json', 'junit']);
+    const json = JSON.parse(reports[0].text);
+    assert.deepEqual([json.name, json.environment, json.totals.requests, json.results.map(result => result.name)], ['Runs', 'Dev', 2, ['A ok', 'D last']]);
+    assert.match(json.tool, /^api-client /);
+    assert.match(reports[1].text, /^<\?xml version="1.0" encoding="UTF-8"\?>\n<testsuites name="Runs" /);
+    assert.equal((reports[1].text.match(/<testsuite /g) ?? []).length, 2);
+    for (const report of reports) assert.ok(!report.text.includes('body-must-not-be-in-the-report') && !report.text.includes(runBase), 'nothing of what was answered, and no address');
+
+    // 18g. A run can be stopped while a request is waiting.
+    put(runDir + '/a-ok.req.yml', requestFile('01J9Z4V0N2XK7Q3M8T5R6Y1B52', 'A ok', '/slow'));
+    await until(() => loadedRequest('A ok')?.url === '/slow', 'the request waits');
+    seenRuns.length = 0;
+    const doneBefore = messagesOf('done').length;
+    await runner.receive({ type: 'start', config: { iterations: 1, delayMs: 0, stopOnFailure: false } });
+    await until(() => seenRuns.includes('GET /slow'), 'the slow request is waiting');
+    assert.equal(runner.isRunning, true);
+    await runner.receive({ type: 'stop' });
+    await until(() => messagesOf('done').length > doneBefore, 'the run ended');
+    assert.equal(messagesOf('done').at(-1).summary.stopped, 'cancelled');
+    assert.equal(runner.isRunning, false);
+    assert.ok(!seenRuns.some(line => line.includes('/last')), 'nothing after the one that was stopped');
+  } finally {
+    test.scripts.answer = undefined;
+    if (slowResolve !== undefined) slowResolve();
+    runServer.closeAllConnections();
+    runServer.close();
+  }
 };

@@ -37,6 +37,8 @@ export const ZONES: Zone[] = [
   },
   // The `.http` file written next to a request: generated from the model with the emitter of the importer, and the rules for when it and the request disagree.
   { name: 'mirror', paths: ['src/mirror/'], modules: [], uses: ['stages', 'util', 'core', 'format'], deterministic: true },
+  // The collection runner: the order of the requests, the passes, the pauses and what a run is written down as; it sends nothing itself.
+  { name: 'runner', paths: ['src/runner/'], modules: [], uses: ['util', 'core'], deterministic: true },
   { name: 'view', paths: ['src/view/'], modules: [], uses: ['util', 'core', 'format'], deterministic: true },
   { name: 'storage', paths: ['src/storage/'], modules: [], uses: ['stages', 'util', 'core', 'format', 'mirror'] },
   { name: 'storage-node', paths: ['src/storage/node-fs.ts'], modules: ['node:crypto', 'node:fs', 'node:path'], uses: ['io', 'util', 'storage'] },
@@ -47,7 +49,7 @@ export const ZONES: Zone[] = [
     modules: ['node:path'],
     uses: ['stages', 'util', 'io']
   },
-  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net', 'script', 'script-pure', 'script-consent', 'mirror'] },
+  { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view', 'net', 'script', 'script-pure', 'script-consent', 'mirror', 'runner'] },
   // The sandbox of the scripts: the messages and the code of the API are pure; the manager starts and watches the worker; the worker is the one place that holds the engine.
   { name: 'script-pure', paths: ['src/script/protocol.ts', 'src/script/prelude.ts', 'src/script/outcome.ts'], modules: [], uses: ['util', 'core'] },
   { name: 'script', paths: ['src/script/'], modules: ['node:fs', 'node:worker_threads'], uses: ['script-pure', 'util', 'core'] },

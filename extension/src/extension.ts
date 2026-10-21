@@ -11,6 +11,7 @@ import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
 import { MirrorService } from './mirror';
+import { RunnerManager, type RunnerTestView } from './runner';
 import { SendEnvironment } from './sender';
 import type { OAuthService } from './oauth';
 import type { ScriptService } from './scripts';
@@ -34,6 +35,8 @@ export interface ImporterTestApi {
   mirror: MirrorService;
   /** The access tokens of OAuth 2.0: the tests answer the questions and stand for the browser. */
   oauth: OAuthService;
+  /** The open collection runners, by the path of the collection or folder they run. */
+  runner(path: string): RunnerTestView | undefined;
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
@@ -80,12 +83,13 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
 
   const sending = new SendEnvironment(context, workspace);
   const mirror = new MirrorService(workspace, context);
+  const runner = new RunnerManager(context, sending, workspace);
   const requests = new RequestEditorProvider(context, sending);
   const environmentEditors = new EnvironmentEditorProvider(context, workspace);
   const containerEditors = new ContainerEditorProvider(context, workspace);
   const editorOptions = { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false };
   context.subscriptions.push(
-    sending,
+    sending, runner,
     vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, editorOptions),
     vscode.window.registerCustomEditorProvider(ENVIRONMENT_VIEW_TYPE, environmentEditors, editorOptions),
     vscode.window.registerCustomEditorProvider(CONTAINER_VIEW_TYPE, containerEditors, editorOptions),
@@ -99,11 +103,11 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     // The Explorer view has no items: it exists to show its welcome text, with the button that opens the panel.
     vscode.window.registerTreeDataProvider<never>(START_VIEW, { getTreeItem: item => item, getChildren: () => [] })
   );
-  registerCommands(context, { workspace, collections, environments, organiser });
+  registerCommands(context, { runner, workspace, collections, environments, organiser });
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 

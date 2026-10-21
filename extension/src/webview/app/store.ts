@@ -23,7 +23,7 @@ export interface HostPort {
 
 const readScreen = (): AppScreen => {
   const given = document.body.dataset['screen'];
-  return given === 'environment' || given === 'container' ? given : 'request';
+  return given === 'environment' || given === 'container' || given === 'runner' ? given : 'request';
 };
 export const screen: AppScreen = readScreen();
 
