@@ -1,0 +1,10 @@
+schema: 1
+settings:
+  rejectUnauthorized: true
+  responseLimitBytes: 5242880
+vars:
+  - name: team
+    value: pets
+collections:
+  - petstore
+  - billing

@@ -1,0 +1,26 @@
+schema: 1
+id: 01J9Z4V0N2XK7Q3M8T5R6Y1ABD
+name: Upload photo
+method: PUT
+url: https://api.example.com/pets/1/photo
+auth:
+  kind: oauth2
+  grant: authorization_code
+  authUrl: https://auth.example.com/authorize
+  tokenUrl: https://auth.example.com/token
+  clientId: '{{clientId}}'
+  clientSecret: '{{clientSecret}}'
+  scope: pets.write offline_access
+  clientAuth: body
+  extra:
+    - name: prompt
+      value: consent
+body:
+  kind: multipart
+  parts:
+    - name: caption
+      value: Rex at the beach
+    - name: photo
+      kind: file
+      file: files/rex.png
+      contentType: image/png

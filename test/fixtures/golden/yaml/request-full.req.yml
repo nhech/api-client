@@ -1,0 +1,51 @@
+schema: 1
+id: 01J9Z4V0N2XK7Q3M8T5R6Y1ABC
+name: Create pet
+method: POST
+url: '{{baseUrl}}/pets/{petId}'
+docs: |
+  Adds a pet to the store.
+  See the docs.
+query:
+  - name: dryRun
+    value: true
+  - name: trace
+    value: 1
+    enabled: false
+    description: turn on tracing
+pathParams:
+  - name: petId
+    value: 42
+headers:
+  - name: Content-Type
+    value: application/json
+  - name: X-Debug
+    value: 'on'
+    enabled: false
+  - name: Accept
+    value: ''
+auth:
+  kind: bearer
+  token: '{{token}}'
+body:
+  kind: json
+  text: |-
+    {
+      "name": "Rex",
+      "tags": ["a", "b"]
+    }
+scripts:
+  pre: |
+    pm.variables.set("t", Date.now());
+  post: pm.test("created", () => pm.response.to.have.status(201));
+tests:
+  - expr: status == 201
+  - expr: json $.id exists
+    enabled: false
+captures:
+  - expr: petId = json $.id
+settings:
+  timeoutMs: 5000
+  followRedirects: false
+  httpVersion: 2
+mirror: false

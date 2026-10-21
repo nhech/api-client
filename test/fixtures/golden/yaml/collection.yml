@@ -1,0 +1,28 @@
+schema: 1
+id: 01J9Z4V0N2XK7Q3M8T5R6Y1AAA
+name: Petstore
+docs: The pet store API.
+baseUrl: '{{baseUrl}}'
+order:
+  - pets
+  - list-pets
+  - create-pet
+headers:
+  - name: Accept
+    value: application/json
+auth:
+  kind: apikey
+  name: X-Api-Key
+  value: '{{apiKey}}'
+vars:
+  - name: region
+    value: eu
+  - name: apiKey
+    value: ''
+    secret: true
+scripts:
+  post: console.log("done");
+tests:
+  - expr: duration < 2000
+settings:
+  timeoutMs: 10000

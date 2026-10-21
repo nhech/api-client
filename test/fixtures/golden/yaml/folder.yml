@@ -1,0 +1,8 @@
+schema: 1
+id: 01J9Z4V0N2XK7Q3M8T5R6Y1AAB
+name: Pets
+baseUrl: https://pets.example.com
+auth:
+  kind: basic
+  username: admin
+  password: '{{adminPassword}}'
