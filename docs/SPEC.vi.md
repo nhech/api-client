@@ -3,7 +3,7 @@
 Trạng thái: 0.1, 2026-10-21 (xem [CHANGELOG](../CHANGELOG.md)).
 Phạm vi: chỉ phần **nhập dữ liệu từ Thunder Client**. Chưa định nghĩa runtime gửi request.
 
-Tên gọi tạm: "API client" (chưa đặt tên extension). Không dùng chữ "Thunder Client" trong tên, icon hay mô tả ngắn của extension; chỉ nói "nhập được collection của Thunder Client" (dùng tên để chỉ định dạng nguồn).
+Tên extension: **HTTP Files Importer** (chốt 2026-10-21; mã định danh `longtd.http-files-importer`). Tên và icon không chứa chữ "Thunder Client"; mô tả và từ khóa chỉ dùng tên đó để chỉ định dạng nguồn ("nhập collection của Thunder Client"), kèm lời nói rõ là không liên kết với Thunder Client (README). Phần còn lại của tài liệu gọi sản phẩm tương lai là "API client".
 
 ## 0. Cách đọc tài liệu này
 
@@ -414,7 +414,7 @@ Mọi quyết định có thể đổi bằng cách viết emitter khác: reader
 Quy tắc tên (`slug`):
 
 - Chuẩn hóa Unicode NFC. Thay `<>:"/\|?*` và ký tự điều khiển bằng `-`. Rút `..` thành `-`. Gộp các `-` liên tiếp. Cắt dấu chấm và khoảng trắng ở hai đầu.
-- Ký tự đổi hướng chữ (U+202A–U+202E, U+2066–U+2069, dấu hướng U+200E/U+200F) và ký tự rộng bằng không (U+200B–U+200D, U+FEFF) cũng bị thay bằng `-`: chúng có thể đảo thứ tự hiển thị hoặc ẩn một phần tên.
+- Ký tự đổi hướng chữ (U+202A–U+202E, U+2066–U+2069, dấu hướng U+200E/U+200F) ký tự rộng bằng không (U+200B–U+200D, U+FEFF) và dấu ngắt dòng, ngắt đoạn của Unicode (U+2028, U+2029; không công cụ nào coi chúng là xuống dòng, nhưng trình soạn thảo có thể hiện chúng như xuống dòng, làm người duyệt tệp tưởng có thêm một dòng) cũng bị thay bằng `-`: chúng có thể đảo thứ tự hiển thị hoặc ẩn một phần tên. Cũng bị thay: các ký tự không vẽ gì nhưng có thể giấu chữ trong tên hoặc làm một tên trông giống tên khác (U+00AD, U+034F, U+061C, U+115F–U+1160, U+3164, U+FFA0, U+180E, U+2060–U+2064, U+206A–U+206F, U+FFF9–U+FFFB và khối ký tự "tag" U+E0000–U+E007F). Bộ chọn biến thể U+FE0F không nằm trong danh sách, để emoji trong tên vẫn nguyên.
 - Tên dành riêng của Windows (`CON`, `PRN`, `AUX`, `NUL`, `CONIN$`, `CONOUT$`, `COM1`–`COM9`, `LPT1`–`LPT9` kể cả chữ số mũ): Windows coi tệp là dành riêng theo phần **trước dấu chấm đầu tiên** (`aux.txt` cũng bị), nên thêm `_` **ngay sau phần đó** (`aux.txt` → `aux_.txt`, `CON` → `CON_`).
 - Dài tối đa 60 ký tự (cắt theo điểm mã, không cắt giữa ký tự). Rỗng, hoặc chỉ còn dấu `-` do làm sạch (`..`, `/`, `---`) → `unnamed`.
 - Trùng nhau **không phân biệt hoa thường** → thêm `-2`, `-3` theo thứ tự đã sắp (N5). Mọi thay đổi tên báo `TC-NAME-SANITIZED` hoặc `TC-NAME-COLLISION`.
@@ -620,6 +620,8 @@ Mặc định bật "chuyển bí mật sang tệp riêng tư" (người dùng t
 - Biến môi trường mà tên khớp `/(secret|token|password|passwd|pwd|key|credential|auth)/i`.
 - Mọi biến trong môi trường `local` (§6.5) và mọi biến `encrypted`.
 - Mở rộng so với bản nháp 2 `[ĐÃ CÀI]`: tham số query và trường form (`formencoded`, phần chữ của `formdata`) mà **tên** khớp quy tắc biến ở trên và giá trị là hằng; header **đã tắt** cũng được bảo vệ (nó vẫn xuất hiện trong tệp dưới dạng chú thích `# [disabled] …`).
+- `[ĐÃ CÀI]` **Thân thô**: trong thân JSON, XML, chuỗi truy vấn (`a=b&c=d`) và trong GraphQL, giá trị chuỗi hằng nằm dưới một **tên** khớp quy tắc biến cũng là bí mật: `"apiKey": "…"`, `<Password>…</Password>` (và thuộc tính `apiKey="…"`, bỏ qua tiền tố và khai báo `xmlns`), `client_secret=…`, đối số `password: "…"` của query GraphQL và khóa trong `variables`. Chỉ giá trị được thay bằng `{{secret_<collection>_body_<tên>}}`, phần còn lại của văn bản giữ nguyên; giá trị riêng tư được ghi đúng như đã viết (có cả dấu escape), riêng đối số trong query GraphQL được ghi theo cách JSON viết vì query thành một chuỗi JSON. Văn bản tự do không có tên bên trong thì không quét được: đó là chỗ duy nhất một bí mật còn có thể nằm lại, và `SECURITY.md` nói rõ điều đó. Mỗi bộ quét chỉ đi qua văn bản một lần (test đưa 1 MiB dữ liệu xấu vào từng bộ).
+- `[ĐÃ CÀI]` **URL ngoài query**: mật khẩu trước `@` (`https://user:MẬT-KHẨU@host`; userinfo không có `:` coi là token và được bảo vệ cả), tham số đường dẫn `:tên` có tên khớp quy tắc biến (giá trị được bảo vệ trước khi vào đường dẫn), và các cặp `tên=giá trị` trong fragment (cách OAuth redirect mang token: `#access_token=…`). Tên người dùng của cặp `user:password` không phải bí mật.
 - Bảo vệ theo giá trị: cùng một giá trị trong cùng một collection là **một** biến (`secret_<collection>_<nhãn>`, giá trị khác thì thêm `_2`, `_3`); `Bearer abc` tách thành từ chỉ cách thức (`Bearer `) và thông tin xác thực. Giá trị chỉ gồm `{{biến}}` không phải bí mật.
 - Không bao giờ ghi giá trị của xác thực không hỗ trợ (OAuth 2.0, AWS, digest, NTLM): ghi chú chỉ có **tên khóa** (`[auth oauth2 not imported; settings: clientSecret, grantType]`).
 
@@ -643,7 +645,15 @@ Lý do: khóa thuộc cơ chế cấp phép của họ, dùng nó là vượt qu
 
 ## 9. Luồng người dùng
 
-Một lệnh: **API Client: Import from Thunder Client…** (cũng có trong Command Palette; không có menu ngữ cảnh ở bản đầu). Không dùng hộp thoại modal (môi trường test của VS Code từ chối chúng).
+Hai lệnh, cùng một luồng: **HTTP Files Importer: Import from Thunder Client…** mở **panel** (một webview, bên dưới), và **Import from Thunder Client (step by step)…** hỏi từng bước bằng Quick Pick (cho người dùng bàn phím, và là cách test cũ). Ngoài ra có một mục trong Explorer ("HTTP Files Importer", thu gọn sẵn, chỉ hiện khi đã mở thư mục) với nút mở panel. Không dùng hộp thoại modal (môi trường test của VS Code từ chối chúng). Mục dưới đây mô tả các bước của luồng Quick Pick; panel làm đúng những bước đó trên một màn hình.
+
+`[ĐÃ CÀI]` **Panel** (`src/wizard/`, `extension/src/wizardPanel.ts`, `extension/src/webview/main.ts`): bốn khối cuộn được: (1) nguồn: các thư mục gợi ý kèm số liệu, "Chọn thư mục…", "Chọn tệp xuất…", đang đọc thì có nút Hủy; (2) kết quả đọc: số collection, request, môi trường, bí mật đã chuyển, request không nhập được, giá trị phải nhập lại, các phát hiện nhóm theo mức (cần chú ý / chi tiết) và nút mở báo cáo đầy đủ; (3) cách ghi: công cụ đích (thẻ), thư mục trong workspace (kiểm tra ngay khi gõ), chính sách khi thư mục đã có tệp, hai công tắc (chuyển bí mật, điền cài đặt REST Client); (4) sẽ ghi gì (số tệp, danh sách, `.gitignore`), cùng một thanh ở đáy cửa sổ luôn thấy được với nút **Import N files**. Đổi công cụ đích hay công tắc bí mật thì đọc lại dữ liệu; đổi thư mục hay chính sách chỉ lập kế hoạch lại. Xong thì hiện kết quả với nút Mở thư mục / Mở báo cáo / Nhập tiếp. Không có gì được ghi trước khi bấm Import.
+
+`[ĐÃ CÀI]` Trạng thái và mọi quy tắc nằm ở `WizardSession` (`src/wizard/session.ts`, test không cần VS Code); panel chỉ vẽ `WizardView` (chỉ tên, số, thông báo do importer viết, không bao giờ giá trị đọc từ dữ liệu) và chuyển lựa chọn của người dùng. Thông điệp từ trang được coi là không đáng tin: `parseToHost` chỉ nhận đúng các dạng đã biết, không có đường dẫn nào đến từ trang (thư mục và tệp do hộp thoại của VS Code chọn, gợi ý được gọi bằng số thứ tự). Trang có CSP `default-src 'none'`, một script duy nhất mang nonce, không script/kiểu nội tuyến; nội dung từ collection chỉ vào trang bằng `textContent` (một test cấm `innerHTML` và các API tương tự). Webview chỉ nạp `dist/` và `media/` của extension, không giữ trang khi ẩn, không bật lệnh URI.
+
+`[ĐÃ CÀI]` **Import chỉ ghi đúng kế hoạch đã hiển thị**: ngay trước khi ghi, `write()` lập kế hoạch lại và chỉ ghi nếu kế hoạch giống hệt cái người dùng đang thấy (thư mục đã đổi, cửa sổ khác mở workspace khác); nếu khác thì không ghi gì, cập nhật kế hoạch và báo "nhấn Import lại". Các kế hoạch chồng nhau được đánh số, kế hoạch về muộn không đè kế hoạch mới. Đọc lại thất bại thì các lựa chọn trở về những cái màn hình đang hiển thị đã được đọc bằng. Khi đang ghi thì không thể "Start over", đọc nguồn khác hay đổi lựa chọn. Đóng panel không làm hỏng lệnh: panel được quên trước, rồi mới dọn.
+
+`[ĐÃ CÀI]` **Cài đặt REST Client chỉ được điền khi bí mật đã được chuyển** (cả ở panel lẫn luồng từng bước): nếu tắt chuyển bí mật thì một bí mật dạng hằng sẽ bị ghi cả vào cài đặt workspace, và cài đặt đó hay được commit.
 
 1. **Chọn nguồn** (Quick Pick): các thư mục gợi ý (§2.4) kèm số liệu, mục "Chọn thư mục…", mục "Chọn tệp xuất…".
 2. **Quét** (tiến trình, hủy được): đọc, chuẩn hóa, sinh IR và báo cáo trong bộ nhớ.

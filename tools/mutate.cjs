@@ -52,6 +52,23 @@ const MUTATIONS = [
   { id: 'M31', rule: 'settings merge: a value the person already has is kept', file: 'src/settings-merge.ts', find: 'else if (own(present, name) !== value) kept.push(`${environment}.${name}`);', replace: 'else if (own(present, name) !== value) { put(present, name, value); kept.push(`${environment}.${name}`); }' },
   { id: 'M32', rule: 'settings merge: a secret is never read into the shareable settings', file: 'src/settings-merge.ts', find: 'return { shareable, secrets };', replace: 'return { shareable: { ...shareable, ...(secrets ?? {}) }, secrets };' },
   { id: 'M33', rule: 'settings merge: a __proto__ key from the data cannot reach the prototype', file: 'src/settings-merge.ts', find: 'const own = <T>(source: Record<string, T>, key: string): T | undefined => (Object.hasOwn(source, key) ? source[key] : undefined);', replace: 'const own = <T>(source: Record<string, T>, key: string): T | undefined => source[key];' },
+  { id: 'M34', rule: '8.3 a raw body (JSON, XML, query string) is searched for secrets by name', file: 'src/convert/request.ts', find: 'text: protectBodyText(vars(body.text), bodySecret)', replace: 'text: vars(body.text)' },
+  { id: 'M35', rule: '8.3 GraphQL arguments and variables are searched for secrets', file: 'src/convert/request.ts', find: 'query: protectGraphqlQuery(vars(body.query), bodySecret)', replace: 'query: vars(body.query)' },
+  { id: 'M36', rule: '8.3 the password before the "@" of a URL is a secret', file: 'src/convert/url.ts', find: 'base = protectUserinfo(base, safe);', replace: '' },
+  { id: 'M37', rule: '8.3 the pairs of a URL fragment are protected like a query', file: 'src/convert/url.ts', find: 'fragment = protectFragment(fragment, safe);', replace: '' },
+  { id: 'M38', rule: '8.3 a path parameter with a secret name is protected', file: 'src/convert/url.ts', find: "pathValues.set(param.name, safe(param.name, param.value, 'pathparam'))", replace: 'pathValues.set(param.name, param.value)' },
+  { id: 'M39', rule: 'the line and paragraph separators are hidden characters', file: 'src/util/chars.ts', find: '[0x2028, 0x2029],', replace: '[0x2028, 0x2027],' },
+  { id: 'M40', rule: 'panel: only the script that carries the nonce may run', file: 'src/wizard/html.ts', find: "`script-src 'nonce-${nonce}'`", replace: "`script-src 'unsafe-inline'`" },
+  { id: 'M41', rule: 'panel: a message is read from its own properties only', file: 'src/wizard/protocol.ts', find: 'Object.hasOwn(record, key) ? record[key] : undefined', replace: 'record[key]' },
+  { id: 'M42', rule: 'panel: a path is shortened to ~ only at a folder boundary', file: 'src/util/display-path.ts', find: "next === '' || next === '/' || next === '\\\\'", replace: 'true' },
+  { id: 'M43', rule: 'panel: pressing Import with no folder open says so', file: 'src/wizard/session.ts', find: "text: 'Open a folder first: the imported files are written inside it.'", replace: "text: 'x'" },
+  { id: 'M44', rule: 'panel: Import writes only the plan that was shown (it plans again and compares)', file: 'src/wizard/session.ts', find: 'if (JSON.stringify(fresh) !== JSON.stringify(shown)) {', replace: 'if (JSON.stringify(fresh) === JSON.stringify(fresh) && false) {' },
+  { id: 'M45', rule: 'panel: the REST Client settings are filled in only when the secrets were moved', file: 'src/wizard/session.ts', find: "options.applyRestClientSettings && options.moveSecrets) {", replace: 'options.applyRestClientSettings) {' },
+  { id: 'M46', rule: 'the invisible tag characters are hidden characters', file: 'src/util/chars.ts', find: '[0xe0000, 0xe007f]', replace: '[0xe0000, 0xdffff]' },
+  { id: 'M47', rule: 'the panel page cannot set a base address or submit a form', file: 'src/wizard/html.ts', find: `"base-uri 'none'",`, replace: '' },
+  { id: 'M48', rule: 'a repeated request name is numbered from where the last one stopped, not from 2 again', file: 'src/emit/names.ts', find: 'let n = next.get(key) ?? 2;\n    let collided = false;', replace: 'let n = 2;\n    let collided = false;' },
+  { id: 'M49', rule: 'a test the request already has is not inherited again (one set of keys)', file: 'src/convert/inherit.ts', find: 'key !== undefined && present.has(key);', replace: 'false;' },
+  { id: 'M50', rule: 'the table of written folders in the report is cut', file: 'src/emit/report.ts', find: 'if (input.collections.length > ROWS_PER_LIST) out.push(', replace: 'if (false) out.push(' },
   { id: 'M20', rule: 'staging: nothing is left behind when a write fails', file: 'src/write/writer.ts', find: 'for (const step of undo.reverse()) {', replace: 'for (const step of [] as (() => Promise<void>)[]) {' }
 ];
 

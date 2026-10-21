@@ -1,4 +1,4 @@
-# api-client
+# HTTP Files Importer
 
 [![CI](https://github.com/nhech/api-client/actions/workflows/ci.yml/badge.svg)](https://github.com/nhech/api-client/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -30,7 +30,7 @@ Vietnamese: [README.vi.md](README.vi.md).
 - **Secrets stay out of Git.** Literal tokens, passwords and keys are replaced by `{{variables}}`; their values go to a private file that is added to `.gitignore` and written with mode `0600`.
 - **A report** (`IMPORT_REPORT.md`) of what was imported, what was left out and why, and what you still have to do. It lists names and places only, never a value.
 - **Safe by construction.** The data of a collection somebody else made cannot add a request to the file, read a file of yours or run code when you press Send (see [Safety](#safety)).
-- **Three ways to run it:** a command line, a VS Code command (**API Client: Import from Thunder Client...**), and a library.
+- **Three ways to run it:** a command line, a VS Code command (**HTTP Files Importer: Import from Thunder Client...**), and a library.
 
 ## Quick start
 
@@ -86,11 +86,13 @@ Build and install the extension from a clone (it is not on the Marketplace):
 
 ```sh
 npm run ext:build
-cd extension && npm run package        # writes ../.artifacts/api-client-importer.vsix
-code --install-extension ../.artifacts/api-client-importer.vsix
+cd extension && npm run package        # writes ../.artifacts/http-files-importer.vsix
+code --install-extension ../.artifacts/http-files-importer.vsix
 ```
 
-Run **API Client: Import from Thunder Client...** from the Command Palette. It suggests the Thunder Client folder it finds, shows the report, lets you choose the target folder, the tool and the policy, and writes only after you confirm. Cancelling at any step writes nothing. With REST Client as the target it also fills in the REST Client settings for you (see below).
+Run **HTTP Files Importer: Import from Thunder Client...** from the Command Palette, or open the **HTTP Files Importer** section of the Explorer and press the button. It opens a panel: it suggests the Thunder Client folder it finds, shows what was read and what needs your attention, lets you choose the tool, the target folder and what to do if it already has files, and writes only when you press **Import**. A step-by-step version with Command Palette questions is **HTTP Files Importer: Import from Thunder Client (step by step)...** Cancelling at any step writes nothing.
+
+![The importer panel in VS Code: what was read, the options, and the Import button](docs/images/panel-review.png) With REST Client as the target it also fills in the REST Client settings for you (see below).
 
 ## Output layout
 
@@ -173,7 +175,7 @@ The data of a collection can come from anyone, so the importer treats it as host
 - **A body line that starts with `#`, `//`, `<` or `>`** is read by the tools as a comment, a file include or a response handler. REST Client drops the first two silently, and `< ./file` makes REST Client, httpYac and JetBrains send that file. Such a body is therefore saved in `_bodies/` and read from there as it is.
 - **Text between `{{ }}` that is not a plain variable name** is made harmless (`{ { … } }`). httpYac runs it as JavaScript and REST Client, httpYac and JetBrains can read environment variables from it.
 - **Writing** goes through a staging folder and is undone on failure or cancel; paths cannot leave the target folder; links are never followed; `.gitignore` is updated before a private file appears.
-- **Secrets** are moved to the private files and reported by name only.
+- **Secrets** are moved to the private files and reported by name only. They are found by name: in headers, query and form fields, path parameters, the password or token in a URL, and inside JSON, XML, query-string and GraphQL bodies (`"apiKey": "…"`, `<Password>…</Password>`, `client_secret=…`). A token with no name next to it, such as free text in a body, cannot be recognised and stays: look through the bodies of a collection you did not write before you commit it.
 
 The core has no network access and does not spawn processes; a test checks that its source and the built extension import neither. Details and how to report a problem: [SECURITY.md](SECURITY.md).
 
@@ -194,8 +196,9 @@ node samples/rest-client-check/run.cjs <the humao.rest-client .vsix you download
 
 - **Built from public information and a reading of the extension's code, and tested with data made up to match it.** The maintainers have not had a real Thunder Client v4 data folder to try. Fields the tool does not know are skipped silently; if your data imports wrongly, please open an issue with the output of [`tools/thunder-structure.cjs`](tools/README.md) (it prints structure, not values).
 - **No runtime.** `# @assert` and `# @capture` are written but nothing in this repository runs them.
+- **Speed.** Measured on a desktop PC, a dry run takes about a quarter of a second for 1,000 requests, one second for 10,000 and four seconds for 50,000, and writing 50,000 requests takes six seconds (about 360 MiB of memory). The conversion runs in one piece on the thread of the VS Code extension host, so the editor pauses for that long on a very large collection, and a reading in progress can be cancelled only between files. Writing is one file at a time (50,000 body files take about a minute).
 - Variable names with `-` or `.` are kept as Thunder Client has them; httpYac reads them as JavaScript, and the importer neutralises the dotted ones.
-- The VS Code extension is a draft: `publisher` is a placeholder and it is not on the Marketplace.
+- The VS Code extension is a preview and is not on the Marketplace yet.
 
 ## Development
 
@@ -203,7 +206,7 @@ node samples/rest-client-check/run.cjs <the humao.rest-client .vsix you download
 npm ci --ignore-scripts
 npm run check          # typecheck, extension typecheck, lint, all tests, tool self-test
 npm test               # compile the tests and run node --test
-npm run mutate         # breaks 33 rules on purpose and demands that the tests fail (slow)
+npm run mutate         # breaks 50 rules on purpose, one at a time, and demands that the tests fail (slow)
 UPDATE_GOLDEN=1 npm test   # rewrite test/fixtures/golden after a change you mean; read the diff
 npm run ext:host-test      # runs the extension in an installed VS Code with a throw-away profile
 ```
