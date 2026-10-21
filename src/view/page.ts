@@ -11,9 +11,11 @@ export interface AppHtmlOptions {
   nonce: string;
   scriptUri: string;
   styleUri: string;
-  /** The screen the script draws: `request`. Written to a data attribute of the body. */
-  screen: 'request';
+  /** The screen the script draws. Written to a data attribute of the body. */
+  screen: AppScreen;
 }
+
+import type { AppScreen } from './request-protocol';
 
 const escapeAttribute = (text: string): string => text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

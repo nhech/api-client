@@ -113,3 +113,12 @@ pre.plain { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* The name of the request above its address. */
 input.title { width: 100%; min-height: 0; padding: 2px 4px; font-size: 1.15em; font-weight: 600; color: inherit; background: transparent; border: 1px solid transparent; }
 input.title:hover, input.title:focus { border-color: var(--vscode-input-border, var(--vscode-panel-border, transparent)); background: var(--vscode-input-background); }
+
+/* The pages of an environment and of a collection or folder. */
+.page { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 24px; max-width: 980px; }
+.grid-row.var { grid-template-columns: 22px minmax(120px, 1fr) minmax(160px, 2fr) 56px 28px; }
+.grid-row.var.head { color: var(--vscode-descriptionForeground); font-size: 0.9em; }
+.grid-row.var input.secret { justify-self: center; }
+.hint.warn { color: var(--vscode-errorForeground); }
+button.send:disabled { opacity: 0.5; cursor: default; }
+.check input { margin: 0; }

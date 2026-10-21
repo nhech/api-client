@@ -6,6 +6,7 @@ import { runImportFlow } from '../../src/host';
 import type { FlowResult } from '../../src/host';
 import type { TreeNode } from '../../src/view/tree';
 import { ClientWorkspace } from './clientWorkspace';
+import { ContainerEditorProvider, ENVIRONMENT_VIEW_TYPE, CONTAINER_VIEW_TYPE, EnvironmentEditorProvider, type DocumentEditorTestView } from './documentEditors';
 import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
@@ -29,6 +30,9 @@ export interface ImporterTestApi {
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
   /** The open editor of a request file, by the address of the file. */
   requestEditor(uri: string): RequestEditorTestView | undefined;
+  /** The open editors of an environment file and of a collection or folder file. */
+  environmentEditor(uri: string): DocumentEditorTestView | undefined;
+  containerEditor(uri: string): DocumentEditorTestView | undefined;
 }
 
 /**
@@ -67,9 +71,14 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
 
   const sending = new SendEnvironment(context, workspace);
   const requests = new RequestEditorProvider(context, sending);
+  const environmentEditors = new EnvironmentEditorProvider(context, workspace);
+  const containerEditors = new ContainerEditorProvider(context, workspace);
+  const editorOptions = { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false };
   context.subscriptions.push(
     sending,
-    vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false }),
+    vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, editorOptions),
+    vscode.window.registerCustomEditorProvider(ENVIRONMENT_VIEW_TYPE, environmentEditors, editorOptions),
+    vscode.window.registerCustomEditorProvider(CONTAINER_VIEW_TYPE, containerEditors, editorOptions),
     reports, workspace, collections, environments, collections.view, environmentsView, historyView, status, workspace.onDidChange(showStatus),
     vscode.workspace.registerTextDocumentContentProvider(REPORT_SCHEME, reports),
     vscode.commands.registerCommand(IMPORT_COMMAND, async (): Promise<void> => { WizardPanel.show(context, host, await candidates()); }),
@@ -81,7 +90,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri) }
+    ? { panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 

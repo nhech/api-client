@@ -1,4 +1,5 @@
 import type { Request } from '../core/model';
+import type { Container, Environment } from '../core/model';
 import type { VariableInfo } from '../core/vars';
 import type { Finding } from '../format/schema';
 import type { ResponseView } from './response';
@@ -13,6 +14,8 @@ export type Path = (string | number)[];
 
 export type EditOp =
   | { op: 'set'; path: Path; value: JsonValue }
+  /** Removes a key of an object (an optional setting goes back to what it inherits). */
+  | { op: 'unset'; path: Path }
   | { op: 'insert'; path: Path; index: number; value: JsonValue }
   | { op: 'remove'; path: Path; index: number }
   | { op: 'move'; path: Path; from: number; to: number };
@@ -31,6 +34,8 @@ export type ToHost =
   | { type: 'violation'; text: string }
   /** Copy the body of the last response to the clipboard, formatted or as it came. */
   | { type: 'copyResponse'; pretty: boolean }
+  /** Make this environment the active one. */
+  | { type: 'activate' }
   /** Show the file in the text editor (when the page cannot edit it). */
   | { type: 'openAsText' };
 
@@ -42,8 +47,19 @@ export interface RequestState {
   readOnly: string | undefined;
 }
 
+/** The pages of the app: the request editor, the editor of an environment, and the editor of a collection or a folder. */
+export type AppScreen = 'request' | 'environment' | 'container';
+
+/** What the pages of an environment and of a collection or folder are given: the file as the format reads it (the secret values of an environment put back in), and whether it can be edited. */
+export type DocumentState = { rev: number; findings: Finding[]; readOnly: string | undefined } & (
+  | { screen: 'environment'; environment: Environment; active: boolean }
+  | { screen: 'container'; container: Container; kind: 'collection' | 'folder' }
+);
+
 export type ToView =
   | ({ type: 'init' } & RequestState)
+  /** The file of an environment or a collection or folder: the first time, and after every change (`meta`: the file did not change, something about it did, such as which environment is the active one). */
+  | ({ type: 'document'; cause: 'init' | 'self' | 'disk' | 'undo' | 'meta' } & DocumentState)
   /** The file changed: by an edit of the page (`self`), on disk, or by an undo in the text editor. */
   | ({ type: 'doc'; cause: 'self' | 'disk' | 'undo' } & RequestState)
   | { type: 'rejected'; rev: number; reason: string }
@@ -108,6 +124,7 @@ function parseOp(raw: unknown): EditOp | undefined {
     const value = parseValue(own(raw, 'value'));
     return isIndex(index) && value !== undefined ? { op, path, index, value } : undefined;
   }
+  if (op === 'unset') return { op, path };
   if (op === 'remove') {
     const index = own(raw, 'index');
     return isIndex(index) ? { op, path, index } : undefined;
@@ -124,7 +141,7 @@ function parseOp(raw: unknown): EditOp | undefined {
 export function parseToHost(raw: unknown): ToHost | undefined {
   if (!isRecord(raw)) return undefined;
   const type = own(raw, 'type');
-  if (type === 'send' || type === 'cancel' || type === 'openAsText' || type === 'saveResponse' || type === 'openResponse') return { type };
+  if (type === 'send' || type === 'cancel' || type === 'openAsText' || type === 'saveResponse' || type === 'openResponse' || type === 'activate') return { type };
   if (type === 'violation') { const text = own(raw, 'text'); return typeof text === 'string' ? { type, text: text.slice(0, 200) } : undefined; }
   if (type === 'copyResponse') return { type, pretty: own(raw, 'pretty') === true };
   if (type === 'ready') {

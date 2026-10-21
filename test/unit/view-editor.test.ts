@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newRequest, type Request } from '../../src/core/model';
+import { newContainer, newEnvironment, newRequest, type Environment, type Request } from '../../src/core/model';
 import { writeRequest } from '../../src/format/schema';
-import { applyEditOps, applyLineEdit, minimalEdit, toRangeEdit } from '../../src/view/edit';
+import { applyEditOps, applyLineEdit, applyOps, containerCodec, ENVIRONMENT_CODEC, minimalEdit, toRangeEdit } from '../../src/view/edit';
 import { appContentSecurityPolicy, buildAppHtml } from '../../src/view/page';
 import { MAX_OPS, parseToHost } from '../../src/view/request-protocol';
 
@@ -39,6 +39,7 @@ test('A message of the page is read only when it is exactly one of the known sha
   assert.deepEqual(parseToHost({ type: 'cancel', extra: 1 }), { type: 'cancel' });
   assert.deepEqual(parseToHost({ type: 'saveResponse', path: '/etc/passwd' }), { type: 'saveResponse' }, 'the page cannot say where to save');
   assert.deepEqual(parseToHost({ type: 'openResponse' }), { type: 'openResponse' });
+  assert.deepEqual(parseToHost({ type: 'activate', id: 'x' }), { type: 'activate' });
   assert.deepEqual(parseToHost({ type: 'violation', text: 'x'.repeat(500) }), { type: 'violation', text: 'x'.repeat(200) }, 'a report is cut');
   assert.equal(parseToHost({ type: 'violation', text: 5 }), undefined);
   assert.equal(parseToHost({ type: 'violation' }), undefined);
@@ -195,4 +196,47 @@ test('A request opens on the tab that has something in it', async () => {
   assert.equal(defaultRequestTab({ ...base(), headers: [row('A')], query: [row('q')] }), 'query', 'the query comes first');
   assert.equal(defaultRequestTab({ ...base(), headers: [row('A', false)], query: [row('', true), row('q', false)] }), 'query', 'rows that are switched off or have no name do not count');
   assert.equal(defaultRequestTab({ ...base(), query: [row('q')], body: { kind: 'json', text: '{}' } }), 'body', 'a body wins');
+});
+
+const environment = (): Environment => ({ ...newEnvironment('E1', 'Dev'), vars: [{ name: 'a', value: '1', secret: false, enabled: true }] });
+
+test('The edits of an environment reach its name and its variables and nothing else, and a secret is a variable like any other', () => {
+  const edited = applyOps(environment(), [
+    { op: 'set', path: ['name'], value: 'Staging' }, { op: 'set', path: ['vars', 0, 'value'], value: '2' },
+    { op: 'insert', path: ['vars'], index: 1, value: { name: 'token', value: 'abc12345', secret: true, enabled: true } }, { op: 'set', path: ['vars', 0, 'enabled'], value: false }
+  ], ENVIRONMENT_CODEC);
+  assert.ok(edited.ok);
+  assert.deepEqual(edited.ok ? [edited.value.name, edited.value.vars.map(item => [item.name, item.value, item.secret, item.enabled])] : undefined, ['Staging', [['a', '2', false, false], ['token', 'abc12345', true, true]]]);
+  const refuse = (ops: Parameters<typeof applyOps>[1]): string => { const result = applyOps(environment(), ops, ENVIRONMENT_CODEC); assert.equal(result.ok, false); return result.ok ? '' : result.reason; };
+  assert.match(refuse([{ op: 'set', path: ['id'], value: 'x' }]), /not something that can be edited/);
+  assert.match(refuse([{ op: 'set', path: ['extra'], value: 'x' }]), /not something that can be edited/);
+  assert.match(refuse([{ op: 'set', path: ['name'], value: '  ' }]), /needs a name/);
+  assert.match(refuse([{ op: 'set', path: ['vars', 0, 'secret'], value: 'maybe' }]), /secret must be true or false/);
+  assert.match(refuse([{ op: 'set', path: ['vars'], value: 'x' }]), /expected a list|does not fit/);
+  assert.match(refuse([{ op: 'remove', path: ['vars'], index: 4 }]), /no row 4/);
+});
+
+test('The edits of a collection or a folder reach what it gives its requests, and not the order of what it holds', () => {
+  const container = { ...newContainer('C1', 'Shop'), order: ['a', 'b'] };
+  const codec = containerCodec('collection');
+  const edited = applyOps(container, [
+    { op: 'set', path: ['baseUrl'], value: 'https://{{host}}' }, { op: 'set', path: ['auth'], value: { kind: 'bearer', token: '{{token}}', prefix: 'Bearer' } },
+    { op: 'insert', path: ['headers'], index: 0, value: { name: 'X-Team', value: 'pets', enabled: true, description: '' } }, { op: 'set', path: ['settings', 'timeoutMs'], value: 5000 }
+  ], codec);
+  assert.ok(edited.ok);
+  assert.deepEqual(edited.ok ? [edited.value.baseUrl, edited.value.auth.kind, edited.value.headers.length, edited.value.settings, edited.value.order] : undefined, ['https://{{host}}', 'bearer', 1, { timeoutMs: 5000 }, ['a', 'b']]);
+  for (const path of [['id'], ['order'], ['children']]) assert.equal(applyOps(container, [{ op: 'set', path, value: path[0] === 'order' ? [] : 'x' }], codec).ok, false, path.join('.'));
+  assert.equal(applyOps(container, [{ op: 'set', path: ['settings', 'timeoutMs'], value: 0 }], codec).ok, false, 'a number out of range is refused as it is in a file');
+});
+
+test('An optional setting goes back to what it inherits when its key is removed, and removing is only for keys of objects', () => {
+  const r = { ...base(), settings: { timeoutMs: 5000, followRedirects: false } };
+  assert.deepEqual(ok(r, [{ op: 'unset', path: ['settings', 'timeoutMs'] }]).settings, { followRedirects: false });
+  assert.deepEqual(ok(r, [{ op: 'unset', path: ['settings', 'cookies'] }]).settings, { timeoutMs: 5000, followRedirects: false }, 'a key that is not there stays not there');
+  assert.deepEqual(ok(r, [{ op: 'unset', path: ['settings', 'timeoutMs'] }, { op: 'unset', path: ['settings', 'followRedirects'] }]).settings, {});
+  assert.match(refused(r, [{ op: 'unset', path: ['headers', 0] }]), /not a place in an object/);
+  assert.match(refused(r, [{ op: 'unset', path: ['id'] }]), /not something that can be edited/);
+  assert.match(refused(r, [{ op: 'unset', path: ['name'] }]), /needs a name/, 'what the format needs cannot be removed');
+  assert.deepEqual(parseToHost({ type: 'edit', rev: 1, ops: [{ op: 'unset', path: ['settings', 'timeoutMs'], value: 'ignored' }] }), { type: 'edit', rev: 1, ops: [{ op: 'unset', path: ['settings', 'timeoutMs'] }] });
+  assert.equal(parseToHost({ type: 'edit', rev: 1, ops: [{ op: 'unset', path: ['__proto__'] }] }), undefined);
 });

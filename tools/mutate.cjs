@@ -178,7 +178,7 @@ const MUTATIONS = [
   { id: "M156", rule: "View: a folder that matches by name shows everything in it", file: "src/view/tree.ts", find: "const sub = containerNode(child, own ? '' : filter);", replace: "const sub = containerNode(child, filter);" },
   { id: "M157", rule: "View: with a filter only the matches are shown, not the files that cannot be read", file: "src/view/tree.ts", find: "if (wanted === '') {\n    for (const broken", replace: "if (true) {\n    for (const broken" },
   { id: "M158", rule: "View: only the active environment is marked", file: "src/view/tree.ts", find: "const active = activeId !== undefined && node.environment.id === activeId;", replace: "const active = activeId !== undefined;" },
-  { id: "M160", rule: "Edit: only the fields of a request can be edited", file: "src/view/edit.ts", find: "typeof first !== 'string' || !EDITABLE.has(first)", replace: "typeof first !== 'string'" },
+  { id: "M160", rule: "Edit: only the fields of a request can be edited", file: "src/view/edit.ts", find: "typeof first !== 'string' || !editable.has(first)", replace: "typeof first !== 'string'" },
   { id: "M161", rule: "Edit: a row that is not there cannot be set", file: "src/view/edit.ts", find: "if (typeof key !== 'number' || key >= parent.length) throw", replace: "if (typeof key !== 'number') throw" },
   { id: "M162", rule: "Edit: a list holds a limited number of rows", file: "src/view/edit.ts", find: "op.index > list.length || list.length >= MAX_ROWS", replace: "op.index > list.length" },
   { id: "M163", rule: "Edit: a row that is not there cannot be removed", file: "src/view/edit.ts", find: "if (op.index >= list.length) throw", replace: "if (op.index > list.length) throw" },
@@ -245,7 +245,13 @@ const MUTATIONS = [
   { id: "M225", rule: "Variables: the list is in the order of the names", file: "src/core/vars.ts", find: ".sort((a, b) => compareCodePoints(a.name, b.name))", replace: "" },
   { id: "M226", rule: "Variables: a dynamic word is known when it makes a value", file: "src/core/vars.ts", find: "dynamicValue(expression, CONSTANT_CLOCK) !== undefined", replace: "dynamicValue(expression, CONSTANT_CLOCK) === undefined" },
   { id: "M227", rule: "Variables: each says where it comes from", file: "src/core/vars.ts", find: "take(level.container.vars, `${level.kind} ${level.name}`);", replace: "take(level.container.vars, 'folder');" },
-  { id: "M228", rule: "Variables: a request outside a collection has an incomplete list", file: "src/engine/prepare.ts", find: "if (located === undefined) return { vars: [], complete: false };", replace: "if (located === undefined) return { vars: [], complete: true };" }
+  { id: "M228", rule: "Variables: a request outside a collection has an incomplete list", file: "src/engine/prepare.ts", find: "if (located === undefined) return { vars: [], complete: false };", replace: "if (located === undefined) return { vars: [], complete: true };" },
+  { id: "M230", rule: "Edit: removing a key removes it", file: "src/view/edit.ts", find: "delete parent[key];", replace: "" },
+  { id: "M231", rule: "Edit: the identifier of an environment cannot be edited", file: "src/view/edit.ts", find: "editable: new Set(['name', 'vars']),", replace: "editable: new Set(['id', 'name', 'vars'])," },
+  { id: "M232", rule: "Edit: the order of a collection cannot be edited by the page", file: "src/view/edit.ts", find: "editable: new Set(['name', 'docs', 'baseUrl', 'headers', 'auth', 'vars', 'scripts', 'tests', 'settings']),", replace: "editable: new Set(['name', 'docs', 'baseUrl', 'headers', 'auth', 'vars', 'scripts', 'tests', 'settings', 'order'])," },
+  { id: "M233", rule: "Store: only a folder without its file is given one", file: "src/storage/store.ts", find: "if (node.implicit) await this.saveContainerFile(node.path, node.kind, { ...node.container, id:", replace: "if (true) await this.saveContainerFile(node.path, node.kind, { ...node.container, id:" },
+  { id: "M234", rule: "Store: a folder given its file gets an identifier", file: "src/storage/store.ts", find: "id: node.container.id !== '' ? node.container.id : newId(this.clock) }, node.extra);\n  }\n\n  /** The values of the secret", replace: "id: node.container.id }, node.extra);\n  }\n\n  /** The values of the secret" },
+  { id: "M235", rule: "Store: the secret values are read from the private file", file: "src/storage/store.ts", find: "return readLocalValues(await this.fs.read(localPathOf(path)));", replace: "return readLocalValues(await this.fs.read(path));" }
 ];
 
 function run(mutation) {

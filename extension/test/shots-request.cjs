@@ -58,7 +58,7 @@ exports.run = async function run() {
     put('api-client/collections/pet-store/pets/create-pet.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABD\nname: Create pet\nmethod: POST\nurl: /pets\nbody:\n  kind: json\n  text: |-\n    {\n      "name": "Rex",\n      "tag": "dog"\n    }\n');
     put('api-client/collections/pet-store/pets/get-pet.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABE\nname: Get a pet\nmethod: GET\nurl: "{{baseUrl}}/pets/{petId}?key={{apiKey}}&request={{$guid}}"\npathParams:\n  - name: petId\n    value: 1\n');
     put('api-client/collections/pet-store/health.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABF\nname: Health check\nurl: http://127.0.0.1:1/health\n');
-    put('api-client/environments/local.env.yml', `schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAC\nname: Local\nvars:\n  - name: baseUrl\n    value: ${base}\n  - name: token\n    value: ""\n    secret: true\n`);
+    put('api-client/environments/local.env.yml', `schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAC\nname: Local\nvars:\n  - name: baseUrl\n    value: ${base}\n  - name: token\n    value: ""\n    secret: true\n  - name: region\n    value: eu-west\n  - name: debug\n    value: true\n    enabled: false\n`);
     put('api-client/environments/local.env.local.yml', 'schema: 1\nvalues:\n  token: demo-token-0000\n');
     for (let waited = 0; waited < 10000; waited += 100) {
       const loaded = test.client().workspace.loaded;
@@ -95,6 +95,14 @@ exports.run = async function run() {
     await health.receive({ type: 'send' });
     await answer(health, 'failed');
     await shot('request-failed', 1000, 560, 1200);
+
+    // The environment and the settings of the collection, each in its own editor.
+    await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(path.join(workspace, 'api-client', 'environments', 'local.env.yml')), 'apiClient.environment');
+    await sleep(1500);
+    await shot('environment', 1000, 520, 1200);
+    await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(path.join(workspace, 'api-client', 'collections', 'pet-store', 'collection.yml')), 'apiClient.container');
+    await sleep(1500);
+    await shot('collection', 1000, 520, 1200);
 
     // The names in the address: known (green), dynamic (blue) and not defined anywhere (red).
     await open('pets/get-pet.req.yml');

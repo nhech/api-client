@@ -5,6 +5,8 @@ import type { Organiser } from './organise';
 
 /** Opens a request in its editor; registered in extension.ts. */
 export const OPEN_REQUEST_COMMAND = 'apiClient.openRequest';
+/** Opens an environment in its editor. */
+export const OPEN_ENVIRONMENT_COMMAND = 'apiClient.openEnvironment';
 /** What a drag in the collections view carries: the paths of the requests and folders. */
 export const DRAG_MIME = 'application/vnd.code.tree.apiclient.collections';
 
@@ -23,6 +25,7 @@ function itemFor(node: TreeNode): vscode.TreeItem {
   item.contextValue = node.contextValue;
   item.iconPath = new vscode.ThemeIcon(ICONS[node.icon], node.color === undefined ? undefined : new vscode.ThemeColor(node.color));
   if (node.kind === 'request') item.command = { command: OPEN_REQUEST_COMMAND, title: 'Open', arguments: [node.path] };
+  else if (node.kind === 'environment') item.command = { command: OPEN_ENVIRONMENT_COMMAND, title: 'Open', arguments: [node.path] };
   else if (node.kind === 'broken') item.command = { command: 'apiClient.openAsText', title: 'Open as text', arguments: [node] };
   return item;
 }

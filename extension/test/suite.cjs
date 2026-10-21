@@ -479,4 +479,107 @@ exports.run = async function run() {
   await organiser.remove([renamedEnvironment]);
   assert.ok(!fs.existsSync(onDisk(renamedEnvironment)) && !fs.existsSync(onDisk('api-client/environments/staging.env.local.yml')), 'the secrets go with it');
   assert.equal(test.client().workspace.activeEnvironmentId, undefined, 'and it is no longer the active one');
+
+  // 12. The editors of an environment and of a collection or folder: the page is given the file with the secret values put back; an edit
+  //     of the page becomes a small change of the document, except the value of a secret, which goes to the file that Git ignores.
+  const environmentPath = 'api-client/environments/dev.env.yml';
+  const environmentUri = uriOf(environmentPath);
+  await vscode.commands.executeCommand('vscode.openWith', environmentUri, 'apiClient.environment');
+  const environmentView = () => test.environmentEditor(environmentUri.toString());
+  await until(() => environmentView()?.isReady === true && environmentView().lastMessage()?.type === 'document', 'the environment is open and the page is told what it holds');
+  assert.deepEqual(environmentView().violations, [], 'under the policy of the page');
+  const initial = environmentView().lastMessage();
+  assert.deepEqual([initial.cause, initial.screen, initial.environment.name, initial.active, initial.readOnly], ['init', 'environment', 'Dev', false, undefined]);
+  assert.deepEqual(initial.environment.vars.map(item => [item.name, item.secret, item.value]), [['base', false, base], ['token', true, 'super-secret-value-9']], 'the secret value is put back from the private file');
+
+  // 12a. The environment is made the active one from the page.
+  await environmentView().receive({ type: 'activate' });
+  assert.equal(test.client().workspace.activeEnvironmentId, '01J9Z4V0N2XK7Q3M8T5R6Y1AAC');
+  await until(() => environmentView().lastMessage()?.cause === 'meta' && environmentView().lastMessage().active === true, 'and the page is told');
+
+  // 12b. An edit of a variable changes the document by a line; the value of a secret changes the private file and not the document.
+  const environmentDocument = await vscode.workspace.openTextDocument(environmentUri);
+  const envRev = () => environmentView().lastMessage().rev;
+  await environmentView().receive({ type: 'edit', rev: envRev(), ops: [{ op: 'set', path: ['vars', 0, 'value'], value: 'http://changed.test' }] });
+  assert.match(environmentDocument.getText(), /\n {4}value: http:\/\/changed\.test\n/);
+  assert.equal(environmentView().lastMessage().cause, 'self');
+  await environmentView().receive({ type: 'edit', rev: envRev(), ops: [{ op: 'set', path: ['vars', 1, 'value'], value: 'a-new-secret-value' }] });
+  assert.ok(!environmentDocument.getText().includes('a-new-secret-value'), 'a secret is never written into the document');
+  assert.match(readFile('api-client/environments/dev.env.local.yml'), /token: a-new-secret-value/);
+  assert.equal(environmentView().lastMessage().environment.vars[1].value, 'a-new-secret-value', 'but the page has it');
+  assert.ok(readFile('api-client/.gitignore').includes('*.local.yml'), 'and Git is told to ignore the file');
+
+  // 12c. A new variable that is secret from the start, and one that is taken away.
+  await environmentView().receive({ type: 'edit', rev: envRev(), ops: [{ op: 'insert', path: ['vars'], index: 2, value: { name: 'apiKey', value: 'key-value-123', secret: true, enabled: true } }] });
+  assert.match(environmentDocument.getText(), /- name: apiKey\n {4}value: ''\n {4}secret: true/);
+  assert.match(readFile('api-client/environments/dev.env.local.yml'), /apiKey: key-value-123/);
+  await environmentView().receive({ type: 'edit', rev: envRev(), ops: [{ op: 'remove', path: ['vars'], index: 2 }] });
+  assert.ok(!readFile('api-client/environments/dev.env.local.yml').includes('apiKey'), 'a variable that is gone leaves no secret behind');
+  // A variable that stops being secret keeps its value in the document, and the private file loses it.
+  await environmentView().receive({ type: 'edit', rev: envRev(), ops: [{ op: 'set', path: ['vars', 1, 'secret'], value: false }] });
+  assert.match(environmentDocument.getText(), /- name: token\n {4}value: a-new-secret-value\n/);
+  assert.ok(!fs.existsSync(onDisk('api-client/environments/dev.env.local.yml')), 'with no secret left the file is removed');
+
+  // 12d. What is refused changes nothing.
+  const environmentText = environmentDocument.getText();
+  await environmentView().receive({ type: 'edit', rev: envRev() - 1, ops: [{ op: 'set', path: ['name'], value: 'Stale' }] });
+  assert.equal(environmentDocument.getText(), environmentText, 'an edit of an old version');
+  await environmentView().receive({ type: 'edit', rev: envRev(), ops: [{ op: 'set', path: ['name'], value: '' }] });
+  assert.equal(environmentView().lastMessage().type, 'rejected');
+  await environmentView().receive({ type: 'edit', rev: envRev(), ops: [{ op: 'set', path: ['id'], value: 'x' }] });
+  assert.equal(environmentView().lastMessage().type, 'rejected');
+  assert.equal(environmentDocument.getText(), environmentText);
+  // A change made in the text editor reaches the page.
+  const typedInEnvironment = new vscode.WorkspaceEdit();
+  typedInEnvironment.replace(environmentUri, new vscode.Range(environmentDocument.positionAt(environmentDocument.getText().indexOf('name: Dev')), environmentDocument.positionAt(environmentDocument.getText().indexOf('name: Dev') + 'name: Dev'.length)), 'name: Typed');
+  await vscode.workspace.applyEdit(typedInEnvironment);
+  await until(() => environmentView().lastMessage().cause === 'disk' && environmentView().lastMessage().environment.name === 'Typed', 'a change in the text editor reaches the page');
+  await environmentDocument.save();
+
+  // 12e. A file that cannot be read opens read-only.
+  put('api-client/environments/bad.env.yml', 'schema: 1\nname: [oops\n');
+  const badUri = uriOf('api-client/environments/bad.env.yml');
+  await vscode.commands.executeCommand('vscode.openWith', badUri, 'apiClient.environment');
+  await until(() => test.environmentEditor(badUri.toString())?.lastMessage()?.type === 'document', 'a file that cannot be read still opens');
+  const bad = test.environmentEditor(badUri.toString());
+  assert.match(bad.lastMessage().readOnly, /cannot be read as an environment: line 2, column 7/);
+  await bad.receive({ type: 'edit', rev: bad.lastMessage().rev, ops: [{ op: 'set', path: ['name'], value: 'x' }] });
+  assert.equal(bad.lastMessage().type, 'rejected');
+
+  // 12f. A collection: its settings are edited, its secret variables go to the file next to it.
+  const collectionUri = uriOf('api-client/collections/shop/collection.yml');
+  await vscode.commands.executeCommand('vscode.openWith', collectionUri, 'apiClient.container');
+  const collectionView = () => test.containerEditor(collectionUri.toString());
+  await until(() => collectionView()?.isReady === true && collectionView().lastMessage()?.type === 'document', 'the collection is open');
+  const collectionState = collectionView().lastMessage();
+  assert.deepEqual([collectionState.screen, collectionState.kind, collectionState.container.name, collectionState.container.auth.kind, collectionState.container.headers.map(row => row.name)], ['container', 'collection', 'Shop', 'bearer', ['X-Shop']]);
+  const collectionDocument = await vscode.workspace.openTextDocument(collectionUri);
+  const collectionRev = () => collectionView().lastMessage().rev;
+  await collectionView().receive({ type: 'edit', rev: collectionRev(), ops: [{ op: 'set', path: ['baseUrl'], value: 'https://{{host}}' }, { op: 'set', path: ['settings', 'timeoutMs'], value: 5000 }, { op: 'insert', path: ['vars'], index: 0, value: { name: 'key', value: 'collection-secret-1', secret: true, enabled: true } }] });
+  assert.match(collectionDocument.getText(), /\nbaseUrl: ['"]?https:\/\/\{\{host\}\}['"]?\n/);
+  assert.match(collectionDocument.getText(), /\nsettings:\n {2}timeoutMs: 5000\n/);
+  assert.ok(!collectionDocument.getText().includes('collection-secret-1'));
+  assert.match(readFile('api-client/collections/shop/collection.local.yml'), /key: collection-secret-1/);
+  await collectionView().receive({ type: 'edit', rev: collectionRev(), ops: [{ op: 'unset', path: ['settings', 'timeoutMs'] }] });
+  assert.ok(!collectionDocument.getText().includes('timeoutMs'), 'a setting goes back to what it inherits');
+  await collectionView().receive({ type: 'edit', rev: collectionRev(), ops: [{ op: 'set', path: ['order'], value: [] }] });
+  assert.equal(collectionView().lastMessage().type, 'rejected', 'the order of a collection is not for the page to change');
+  await collectionDocument.save();
+
+  // 12g. A folder that has no file of its own gets one when its settings are opened, and nothing else is changed.
+  put('api-client/collections/shop/implicit/inside.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B09\nname: Inside\nurl: http://x.test/\n');
+  await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'implicit'), 'the folder is listed');
+  const implicit = test.client().collections.find(node => node.label === 'Shop').children.find(child => child.label === 'implicit');
+  assert.ok(!fs.existsSync(onDisk('api-client/collections/shop/implicit/folder.yml')));
+  await vscode.commands.executeCommand('apiClient.openSettings', implicit);
+  const folderFile = readFile('api-client/collections/shop/implicit/folder.yml');
+  assert.ok(/^schema: 1\nid: [0-9A-Z]{26}\nname: implicit\n/.test(folderFile), 'the file is written with the name the folder had: ' + JSON.stringify(folderFile));
+  assert.ok(fs.existsSync(onDisk('api-client/collections/shop/implicit/inside.req.yml')) && !fs.existsSync(onDisk('api-client/collections/shop/implicit-2')), 'nothing was renamed');
+  const folderUri = uriOf('api-client/collections/shop/implicit/folder.yml');
+  await until(() => test.containerEditor(folderUri.toString())?.lastMessage()?.screen === 'container', 'and its settings open');
+  assert.equal(test.containerEditor(folderUri.toString()).lastMessage().kind, 'folder');
+
+  // 12h. Clicking an environment in the side bar opens it in its editor.
+  await vscode.commands.executeCommand('apiClient.openEnvironment', environmentPath);
+  await until(() => environmentView()?.isReady === true, 'the command opens the environment');
 };

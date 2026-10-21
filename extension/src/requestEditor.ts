@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { isAbsolute, relative } from 'node:path';
 import * as vscode from 'vscode';
 import { newRequest } from '../../src/core/model';
@@ -6,8 +5,8 @@ import { variablesOf } from '../../src/engine/prepare';
 import { readRequest, writeRequest } from '../../src/format/schema';
 import type { YMap } from '../../src/format/yaml';
 import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
-import { buildAppHtml } from '../../src/view/page';
 import { parseToHost, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
+import { configureAppPanel } from './appPanel';
 import { RequestRunner, type SendEnvironment } from './sender';
 
 /** The custom editor of a request file (`*.req.yml`): the page of the client over the text document. */
@@ -200,14 +199,7 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
   constructor(private readonly context: vscode.ExtensionContext, private readonly env: SendEnvironment) {}
 
   resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
-    const root = this.context.extensionUri;
-    const dist = vscode.Uri.joinPath(root, 'dist');
-    const media = vscode.Uri.joinPath(root, 'media');
-    panel.webview.options = { enableScripts: true, localResourceRoots: [dist, media] };
-    panel.webview.html = buildAppHtml({
-      cspSource: panel.webview.cspSource, nonce: randomBytes(16).toString('base64'), screen: 'request',
-      scriptUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(dist, 'app.js')).toString(), styleUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(media, 'app.css')).toString()
-    });
+    configureAppPanel(this.context, panel, 'request');
     const session = new RequestSession(document, panel, this.env);
     const key = document.uri.toString();
     this.open.set(key, session);

@@ -315,3 +315,42 @@ test('A collection of 10,000 requests loads in a moment and in a stable order', 
   assert.equal(tree.children.length, 20);
   assert.deepEqual((tree.children[3] as ContainerNode).children.slice(0, 3).map(child => child.slug), ['r0', 'r1', 'r10'], 'by name, as text');
 });
+
+test('The secret values of a file are read from the file next to it and written there, and none at all removes it', async () => {
+  const { fs, store } = setup();
+  const environment = await store.createEnvironment('Dev');
+  assert.deepEqual(await store.readSecrets(environment.path), { values: {} }, 'no file, no values');
+  await store.writeSecrets(environment.path, { token: 'abc12345', other: 'x' });
+  assert.ok(fs.paths().includes('api-client/environments/dev.env.local.yml'));
+  assert.ok((fs.files.get('api-client/.gitignore') ?? '').includes('*.local.yml'), 'Git is told to ignore it');
+  assert.deepEqual({ ...(await store.readSecrets(environment.path)).values }, { token: 'abc12345', other: 'x' });
+  await store.writeSecrets(environment.path, {});
+  assert.ok(!fs.paths().includes('api-client/environments/dev.env.local.yml'), 'no values, no file');
+  fs.files.set('api-client/environments/dev.env.local.yml', 'schema: 1\nvalues: [oops\n');
+  assert.match((await store.readSecrets(environment.path)).problem ?? '', /line 2/, 'a file that is not usable says why');
+  const shop = await store.createCollection('Shop');
+  await store.writeSecrets(`${shop.path}/collection.yml`, { key: 'k1234' });
+  assert.ok(fs.paths().includes('api-client/collections/shop/collection.local.yml'), 'a collection keeps its secrets next to its file');
+});
+
+test('A folder with no file of its own gets one when asked, with an identifier and the name it was shown by, and nothing is moved', async () => {
+  const { fs, store } = setup();
+  const shop = await store.createCollection('Shop');
+  await store.createRequest(`${shop.path}/implicit`, 'Inside');
+  const loaded = await store.load();
+  const folder = loaded.collections[0]?.children.find((child): child is ContainerNode => child.kind === 'folder');
+  assert.ok(folder !== undefined && folder.implicit, 'a folder without folder.yml is implicit');
+  assert.equal(fs.files.has(`${shop.path}/implicit/folder.yml`), false);
+  await store.materialize(folder);
+  const written = fs.files.get(`${shop.path}/implicit/folder.yml`) ?? '';
+  assert.match(written, /^schema: 1\nid: [0-9A-Z]{26}\nname: implicit\n/);
+  assert.ok(fs.files.has(`${shop.path}/implicit/inside.req.yml`), 'the request stayed where it was');
+  const again = await store.load();
+  const reloaded = again.collections[0]?.children.find((child): child is ContainerNode => child.kind === 'folder');
+  assert.deepEqual([reloaded?.implicit, reloaded?.container.name, reloaded?.slug], [false, 'implicit', 'implicit']);
+  const edited = `${written}# my own note
+`;
+  fs.files.set(`${shop.path}/implicit/folder.yml`, edited);
+  await store.materialize(reloaded as ContainerNode);
+  assert.equal(fs.files.get(`${shop.path}/implicit/folder.yml`), edited, 'a folder that has its file is left alone, as it is');
+});

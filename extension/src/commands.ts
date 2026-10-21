@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import type { TreeNode } from '../../src/view/tree';
 import type { ClientWorkspace } from './clientWorkspace';
+import { findChild } from '../../src/storage/organise';
 import type { Organiser } from './organise';
+import { CONTAINER_VIEW_TYPE, ENVIRONMENT_VIEW_TYPE } from './documentEditors';
 import { REQUEST_VIEW_TYPE } from './requestEditor';
-import { OPEN_REQUEST_COMMAND, type CollectionsTree, type EnvironmentsTree } from './trees';
+import { OPEN_ENVIRONMENT_COMMAND, OPEN_REQUEST_COMMAND, type CollectionsTree, type EnvironmentsTree } from './trees';
 
 /**
  * The commands of the side bar: create, open, filter, refresh and choose the environment. Each one reads from the loaded
@@ -76,6 +78,21 @@ export function registerCommands(context: vscode.ExtensionContext, { workspace, 
   register(OPEN_REQUEST_COMMAND, async (path: string) => {
     const uri = workspace.absolute(path);
     if (uri !== undefined) await vscode.commands.executeCommand('vscode.openWith', uri, REQUEST_VIEW_TYPE, { preview: true });
+  });
+  register(OPEN_ENVIRONMENT_COMMAND, async (path: string) => {
+    const uri = workspace.absolute(path);
+    if (uri !== undefined) await vscode.commands.executeCommand('vscode.openWith', uri, ENVIRONMENT_VIEW_TYPE, { preview: true });
+  });
+  register('apiClient.openSettings', async (node?: TreeNode) => {
+    const [entry] = chosen(node, undefined, ['collection', 'folder']);
+    const loaded = workspace.loaded;
+    const files = store();
+    if (entry === undefined || loaded === undefined || files === undefined) return;
+    const found = findChild(loaded, entry.path);
+    if (found === undefined || found.kind === 'request') return;
+    await files.materialize(found);
+    const uri = workspace.absolute(`${found.path}/${found.kind === 'collection' ? 'collection.yml' : 'folder.yml'}`);
+    if (uri !== undefined) await vscode.commands.executeCommand('vscode.openWith', uri, CONTAINER_VIEW_TYPE, { preview: true });
   });
   register('apiClient.openAsText', async (node: TreeNode | string) => {
     const uri = workspace.absolute(typeof node === 'string' ? node : node.path);

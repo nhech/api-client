@@ -1,14 +1,16 @@
 import { useState } from 'preact/hooks';
-import { AUTH_KINDS, BODY_KINDS, newAuth, newBody, type Auth, type AuthKind, type Body, type BodyKind, type Part, type Request } from '../../../../src/core/model';
+import { BODY_KINDS, newBody, type Body, type BodyKind, type Part, type Request } from '../../../../src/core/model';
+import { AuthEditor } from './AuthEditor';
 import { CodeEditor } from './CodeEditor';
-import { Check, Choice, Field, KeyValueGrid, Tabs, type TabSpec } from './components';
+import { Choice, Field, KeyValueGrid, Tabs, type TabSpec } from './components';
 import { defaultRequestTab } from '../../../../src/view/tabs';
+import { DocumentPage } from './Pages';
 import { ResponsePane } from './ResponsePane';
-import { confirmed, edit, flushNow, notice, request, sending, sendNow, type HostPort } from './store';
+import { SettingsForm } from './SettingsForm';
+import { confirmed, edit, flushNow, notice, request, screen, sending, sendNow, type HostPort } from './store';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
-const AUTH_LABELS: Record<AuthKind, string> = { inherit: 'Inherit from parent', none: 'No authentication', bearer: 'Bearer token', basic: 'Basic', apikey: 'API key', oauth2: 'OAuth 2.0' };
 const BODY_LABELS: Record<BodyKind, string> = { none: 'None', text: 'Text', json: 'JSON', xml: 'XML', form: 'Form (urlencoded)', multipart: 'Form (multipart)', graphql: 'GraphQL', binary: 'Binary file' };
 
 function Method(props: { value: string }) {
@@ -17,40 +19,6 @@ function Method(props: { value: string }) {
     <select class="method" aria-label="Method" value={props.value} onChange={event => edit({ op: 'set', path: ['method'], value: (event.target as HTMLSelectElement).value })}>
       {options.map(method => <option value={method}>{method}</option>)}
     </select>
-  );
-}
-
-function AuthTab(props: { auth: Auth }) {
-  const auth = props.auth;
-  return (
-    <div class="form">
-      <Choice label="Type" value={auth.kind} options={AUTH_KINDS.map(kind => ({ value: kind, label: AUTH_LABELS[kind] }))} onChange={kind => edit({ op: 'set', path: ['auth'], value: newAuth(kind) as never })} />
-      {auth.kind === 'inherit' ? <p class="hint">The authentication of the folder or the collection above this request is used.</p> : null}
-      {auth.kind === 'none' ? <p class="hint">This request is sent without authentication, whatever its folder says.</p> : null}
-      {auth.kind === 'bearer' ? <><Field label="Token" value={auth.token} path={['auth', 'token']} placeholder="{{token}}" wide /><Field label="Prefix" value={auth.prefix} path={['auth', 'prefix']} placeholder="Bearer" /></> : null}
-      {auth.kind === 'basic' ? <><Field label="Username" value={auth.username} path={['auth', 'username']} /><Field label="Password" value={auth.password} path={['auth', 'password']} type="password" /></> : null}
-      {auth.kind === 'apikey' ? (
-        <>
-          <Field label="Name" value={auth.name} path={['auth', 'name']} placeholder="X-Api-Key" />
-          <Field label="Value" value={auth.value} path={['auth', 'value']} placeholder="{{apiKey}}" wide />
-          <Choice label="Add to" value={auth.in} options={[{ value: 'header', label: 'Header' }, { value: 'query', label: 'Query parameter' }]} onChange={where => edit({ op: 'set', path: ['auth', 'in'], value: where })} />
-        </>
-      ) : null}
-      {auth.kind === 'oauth2' ? (
-        <>
-          <Choice label="Grant type" value={auth.grant} options={[{ value: 'authorization_code', label: 'Authorization code' }, { value: 'client_credentials', label: 'Client credentials' }, { value: 'password', label: 'Password' }]} onChange={grant => edit({ op: 'set', path: ['auth', 'grant'], value: grant })} />
-          {auth.grant === 'authorization_code' ? <Check label="Use PKCE" checked={auth.pkce} path={['auth', 'pkce']} /> : null}
-          {auth.grant === 'authorization_code' ? <Field label="Authorization URL" value={auth.authUrl} path={['auth', 'authUrl']} wide /> : null}
-          <Field label="Token URL" value={auth.tokenUrl} path={['auth', 'tokenUrl']} wide />
-          <Field label="Client ID" value={auth.clientId} path={['auth', 'clientId']} />
-          <Field label="Client secret" value={auth.clientSecret} path={['auth', 'clientSecret']} type="password" />
-          {auth.grant === 'password' ? <><Field label="Username" value={auth.username} path={['auth', 'username']} /><Field label="Password" value={auth.password} path={['auth', 'password']} type="password" /></> : null}
-          <Field label="Scope" value={auth.scope} path={['auth', 'scope']} />
-          <Field label="Audience" value={auth.audience} path={['auth', 'audience']} />
-          <p class="hint">Getting a token comes with the next version of this screen.</p>
-        </>
-      ) : null}
-    </div>
   );
 }
 
@@ -117,7 +85,8 @@ function Editor(props: { request: Request; port: HostPort }) {
   const running = sending.value !== undefined;
   const tabs: TabSpec[] = [
     { id: 'query', label: 'Query', badge: countRows(r.query) }, { id: 'headers', label: 'Headers', badge: countRows(r.headers) }, { id: 'auth', label: 'Auth', badge: r.auth.kind === 'inherit' || r.auth.kind === 'none' ? '' : '\u2022' },
-    { id: 'body', label: 'Body', badge: r.body.kind === 'none' ? '' : '\u2022' }, { id: 'docs', label: 'Docs', badge: r.docs === '' ? '' : '\u2022' }
+    { id: 'body', label: 'Body', badge: r.body.kind === 'none' ? '' : '\u2022' }, { id: 'settings', label: 'Settings', badge: Object.keys(r.settings).length === 0 ? '' : String(Object.keys(r.settings).length) },
+    { id: 'docs', label: 'Docs', badge: r.docs === '' ? '' : '\u2022' }
   ];
   return (
     <div class="request">
@@ -133,8 +102,9 @@ function Editor(props: { request: Request; port: HostPort }) {
       <Tabs tabs={tabs} active={tab} onSelect={setTab} label="Request">
         {tab === 'query' ? <><KeyValueGrid rows={r.query} path={['query']} label="Query parameters" namePlaceholder="Parameter" />{r.pathParams.length > 0 ? <><h3>Path parameters</h3><KeyValueGrid rows={r.pathParams} path={['pathParams']} label="Path parameters" /></> : null}</> : null}
         {tab === 'headers' ? <KeyValueGrid rows={r.headers} path={['headers']} label="Headers" namePlaceholder="Header" /> : null}
-        {tab === 'auth' ? <AuthTab auth={r.auth} /> : null}
+        {tab === 'auth' ? <AuthEditor auth={r.auth} what="request" /> : null}
         {tab === 'body' ? <BodyTab body={r.body} send={send} /> : null}
+        {tab === 'settings' ? <SettingsForm settings={r.settings} path={['settings']} what="request" /> : null}
         {tab === 'docs' ? <div class="editor-box"><CodeEditor value={r.docs} language="text" label="Notes on this request" placeholder="Notes for yourself and your team" onChange={value => edit({ op: 'set', path: ['docs'], value })} onBlur={flushNow} /></div> : null}
       </Tabs>
       <ResponsePane port={props.port} />
@@ -144,6 +114,7 @@ function Editor(props: { request: Request; port: HostPort }) {
 }
 
 export function App(props: { port: HostPort }) {
+  if (screen !== 'request') return <DocumentPage port={props.port} />;
   const state = confirmed.value;
   const current = request.value;
   if (state === undefined || current === undefined) return <p class="loading">Loading...</p>;

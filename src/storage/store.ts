@@ -8,7 +8,7 @@ import { LIMITS } from '../reader/limits';
 import { compareCodePoints } from '../util/chars';
 import { ensureIgnored } from '../write/gitignore';
 import { baseName, joinPath, parentPath, STORAGE_LIMITS, type StorageFs } from './fs';
-import { localPathOf, mergeSecrets, readLocalValues, splitSecrets, writeLocalValues } from './secrets';
+import { localPathOf, mergeSecrets, readLocalValues, splitSecrets, writeLocalValues, type LocalValues } from './secrets';
 
 /**
  * The client's files as a tree, and the operations that change them. Everything is written relative to a root folder (by
@@ -303,6 +303,21 @@ export class Store {
     if (Object.keys(secrets).length === 0) { await this.fs.remove(local); return; }
     await this.ensureWorkspace();
     await this.fs.write(local, writeLocalValues(secrets), LOCAL_FILE_MODE);
+  }
+
+  /** Writes the `folder.yml` of a folder that has none yet (it is shown by the name of its folder), without moving or renaming anything. */
+  async materialize(node: ContainerNode): Promise<void> {
+    if (node.implicit) await this.saveContainerFile(node.path, node.kind, { ...node.container, id: node.container.id !== '' ? node.container.id : newId(this.clock) }, node.extra);
+  }
+
+  /** The values of the secret variables of the file at `path` (an environment, a collection, a folder), from the file next to it that Git ignores. */
+  async readSecrets(path: string): Promise<LocalValues> {
+    try { return readLocalValues(await this.fs.read(localPathOf(path))); } catch { return { values: {}, problem: 'the file with the secret values could not be read' }; }
+  }
+
+  /** Writes the values of the secret variables of the file at `path`; none at all removes the file. The file is private, and Git is told to ignore it. */
+  async writeSecrets(path: string, secrets: Record<string, string>): Promise<void> {
+    await this.writeLocal(path, secrets);
   }
 
   /** A slug for `name` that no entry of the folder uses (ignoring letter case); `own` is a slug that may be reused because it is the one being replaced. */
