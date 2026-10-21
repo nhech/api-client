@@ -15,3 +15,13 @@ await build({
   platform: 'browser', target: 'es2022', format: 'iife',
   sourcemap: !release, legalComments: 'none'
 });
+
+// The request editor: Preact and CodeMirror with our code, one file for the browser. Its inputs are written to dist/app.meta.json so that a test can check
+// that only the packages that were chosen went into it.
+import { writeFileSync } from 'node:fs';
+const app = await build({
+  entryPoints: ['src/webview/app/main.tsx'], outfile: 'dist/app.js', bundle: true,
+  platform: 'browser', target: 'es2022', format: 'iife', jsx: 'automatic', jsxImportSource: 'preact',
+  minify: release, sourcemap: !release, legalComments: 'none', metafile: true
+});
+writeFileSync('dist/app.meta.json', JSON.stringify(app.metafile));

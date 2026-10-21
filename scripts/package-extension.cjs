@@ -77,7 +77,13 @@ function verify(file) {
     if (/[A-Z]:\\\\(?:Users|Workspaces)|\/home\/|localaccount|LOCALA~1/.test(code)) fail(`${name} holds a path of the machine that built it`);
     if (rule.kind === 'page') {
       if (/\brequire\s*\(|\bimport\s*\(|importScripts/.test(code)) fail(`${name} loads something`);
-      if (/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(code)) fail(`${name} puts HTML in the page`);
+      // The sources of the project never use these (test/unit/wizard-page.test.ts scans them); a library may carry a branch it never reaches, and the rule pins how many
+      // times each word occurs, so that a new version of the library with one more is a decision and not an accident.
+      const allowed = rule.htmlSinks ?? {};
+      for (const word of ['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write']) {
+        const found = code.split(word).length - 1;
+        if (found !== (allowed[word] ?? 0)) fail(`${name} has ${word} ${found} times; its rule allows ${allowed[word] ?? 0}`);
+      }
     } else {
       const required = [...new Set([...code.matchAll(/require\(\s*"([^"]+)"\s*\)/g)].map(match => match[1]))].sort();
       if (JSON.stringify(required) !== JSON.stringify([...rule.requires].sort())) fail(`${name} requires ${JSON.stringify(required)}; its rule lists ${JSON.stringify(rule.requires)}`);

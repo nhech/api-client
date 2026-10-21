@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildWizardHtml, contentSecurityPolicy } from '../../src/wizard/html';
+import { APP_PAGE_PACKAGES } from '../support/zones';
 
 const root = join(__dirname, '..', '..', '..');
 const read = (relative: string): string => readFileSync(join(root, ...relative.split('/')), 'utf8');
@@ -52,7 +53,7 @@ test('The manifest, the code and the package agree: every command, view and menu
     activationEvents: string[]; icon: string;
     contributes: {
       commands: { command: string }[]; views: Record<string, { id: string }[]>; viewsWelcome: { view: string; contents: string }[];
-      viewsContainers: { activitybar: { id: string; icon: string }[] }; menus: Record<string, { command: string }[]>;
+      viewsContainers: { activitybar: { id: string; icon: string }[] }; menus: Record<string, { command: string }[]>; customEditors: { viewType: string }[];
     };
   }
   const manifest = JSON.parse(read('extension/package.json')) as Manifest;
@@ -77,11 +78,12 @@ test('The manifest, the code and the package agree: every command, view and menu
   assert.deepEqual(manifest.activationEvents, [], 'no activation event of its own');
   assert.ok(existsSync(join(root, 'extension', ...manifest.icon.split('/'))), 'the icon is there');
   for (const container of manifest.contributes.viewsContainers.activitybar) assert.ok(existsSync(join(root, 'extension', ...container.icon.split('/'))), 'the icon of the side bar is there');
-  assert.ok(existsSync(join(root, 'extension', 'media', 'wizard.css')));
+  assert.ok(existsSync(join(root, 'extension', 'media', 'wizard.css')) && existsSync(join(root, 'extension', 'media', 'app.css')));
   const ignore = read('extension/.vscodeignore').split('\n').map(line => line.trim());
-  assert.ok(!ignore.some(line => /^(?:dist|media)(?:\/|$)/.test(line) || line === '**'), 'the built files and the media are packaged');
+  assert.ok(!ignore.some(line => /^(?:dist|media)(?:\/\*{0,2})?$/.test(line) || line === '**'), 'the built files and the media are packaged');
   const bundler = read('extension/esbuild.mjs');
   assert.ok(bundler.includes("outfile: 'dist/wizard.js'") && bundler.includes("platform: 'browser'"), 'the script of the panel is built for the browser');
+  assert.ok(bundler.includes("outfile: 'dist/app.js'") && bundler.includes("jsxImportSource: 'preact'"), 'the script of the request editor is built for the browser');
   assert.ok(read('extension/src/wizardPanel.ts').includes("'dist', 'wizard.js'") === false && read('extension/src/wizardPanel.ts').includes("vscode.Uri.joinPath(dist, 'wizard.js')"), 'the panel loads the built script');
 });
 
@@ -92,4 +94,33 @@ test('The panel loads only its own folders and keeps no page in memory when hidd
   assert.match(panel, /retainContextWhenHidden: false/);
   assert.ok(!panel.includes('enableCommandUris'), 'the page cannot run commands');
   assert.match(panel, /parseToHost\(raw\)/, 'every message is parsed before it is used');
+});
+
+test('No script of a page puts text in as HTML, runs code from text, loads anything or keeps anything', () => {
+  const files = readdirSync(join(root, 'extension', 'src', 'webview'), { recursive: true, encoding: 'utf8' }).filter(name => /\.tsx?$/.test(name)).map(name => 'extension/src/webview/' + name.replaceAll('\\', '/'));
+  assert.ok(files.length >= 6, 'the sources of both pages are scanned: ' + files.join(', '));
+  for (const file of files) {
+    const code = read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    assert.deepEqual(['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'dangerouslySetInnerHTML', 'document.write', 'createContextualFragment', 'DOMParser', 'srcdoc'].filter(word => code.includes(word)), [], file + ': HTML from text');
+    assert.deepEqual(['eval(', 'new Function', 'setTimeout("', "setTimeout('", 'importScripts', 'import(', 'javascript:'].filter(word => code.includes(word)), [], file + ': code from text');
+    assert.deepEqual(['fetch(', 'XMLHttpRequest', 'WebSocket', 'sendBeacon', 'EventSource', 'localStorage', 'sessionStorage', 'indexedDB', 'document.cookie', 'navigator.clipboard'].filter(word => code.includes(word)), [], file + ': network or storage');
+    assert.ok(!/setAttribute\(\s*['"`]on/i.test(code), file + ': no event attribute set from text');
+    assert.ok(!/\bhref\s*=|\bsrc\s*=/.test(code), file + ': no link or image address is set');
+  }
+});
+
+test('Only the packages that were chosen went into the script of the request editor', () => {
+  let meta: { inputs: Record<string, unknown> };
+  try { meta = JSON.parse(read('extension/dist/app.meta.json')) as typeof meta; } catch { return; }
+  const allowed = new Set(APP_PAGE_PACKAGES.map(name => name.split('/').slice(0, name.startsWith('@') ? 2 : 1).join('/')));
+  // What the chosen packages bring with them: the parser library of CodeMirror's languages, its small helpers and the core of the signals.
+  const brought = /^(?:@lezer\/(?:common|highlight|lr|javascript|json|xml)|@codemirror\/streamparser|style-mod|w3c-keyname|crelt|@marijn\/find-cluster-break|@preact\/signals-core)$/;
+  const strangers: string[] = [];
+  for (const input of Object.keys(meta.inputs)) {
+    const path = input.replaceAll('\\', '/');
+    const match = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(path);
+    if (match === null) { if (!/^(?:\.\.\/)*(?:extension\/)?src\//.test(path)) strangers.push(path); }
+    else if (!allowed.has(match[1] as string) && !brought.test(match[1] as string)) strangers.push(match[1] as string);
+  }
+  assert.deepEqual([...new Set(strangers)].sort(), [], 'something nobody chose is in the bundle');
 });

@@ -1,6 +1,6 @@
 {
   "_comment": "What the extension package may hold. Read by scripts/package-extension.cjs (the package) and test/unit/purity.test.ts (the built bundles). Raise a limit or add a module in the commit that needs it, and say why in the message.",
-  "maxPackageBytes": 307200,
+  "maxPackageBytes": 368640,
   "files": [
     "[Content_Types].xml",
     "extension.vsixmanifest",
@@ -12,7 +12,9 @@
     "extension/media/wizard.css",
     "extension/package.json",
     "extension/readme.md",
-    "extension/media/activity.svg"
+    "extension/media/activity.svg",
+    "extension/dist/app.js",
+    "extension/media/app.css"
   ],
   "bundles": {
     "extension/dist/extension.js": {
@@ -27,6 +29,13 @@
     },
     "extension/dist/wizard.js": {
       "kind": "page"
+    },
+    "extension/dist/app.js": {
+      "kind": "page",
+      "htmlSinks": {
+        "innerHTML": 2
+      },
+      "htmlSinksNote": "Both are in Preact, in the branch for the dangerouslySetInnerHTML property, which no source of the project uses (checked by test/unit/wizard-page.test.ts)."
     }
   }
 }

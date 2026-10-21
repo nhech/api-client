@@ -4,7 +4,8 @@
     "strict": true, "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true, "noFallthroughCasesInSwitch": true, "noImplicitReturns": true,
     "esModuleInterop": true, "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true, "noEmit": true, "rootDir": "..", "types": ["node", "vscode"]
+    "skipLibCheck": true, "noEmit": true, "rootDir": "..", "types": ["node", "vscode"],
+    "jsx": "react-jsx", "jsxImportSource": "preact"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "../src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "../src/**/*.ts"]
 }

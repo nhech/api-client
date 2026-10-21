@@ -17,6 +17,13 @@ export interface Zone {
   deterministic?: boolean;
 }
 
+/** The packages the request editor page is built from; the bundle audit of the page checks that nothing else went into dist/app.js. */
+export const APP_PAGE_PACKAGES = [
+  'preact', 'preact/hooks', '@preact/signals',
+  '@codemirror/autocomplete', '@codemirror/commands', '@codemirror/lang-javascript', '@codemirror/lang-json', '@codemirror/lang-xml', '@codemirror/language',
+  '@codemirror/lint', '@codemirror/search', '@codemirror/state', '@codemirror/view', '@lezer/highlight'
+] as const;
+
 export const ZONES: Zone[] = [
   { name: 'stages', paths: ['src/model/', 'src/normalize/', 'src/convert/', 'src/emit/'], modules: [], uses: ['util'], deterministic: true },
   { name: 'util', paths: ['src/util/', 'src/reader/limits.ts', 'src/write/gitignore.ts'], modules: [], uses: [] },
@@ -39,7 +46,10 @@ export const ZONES: Zone[] = [
     uses: ['stages', 'util', 'io']
   },
   { name: 'ui', paths: ['extension/src/'], modules: ['vscode', 'node:crypto', 'node:fs', 'node:os', 'node:path'], uses: ['stages', 'util', 'io', 'app', 'core', 'format', 'storage', 'storage-node', 'view'] },
-  { name: 'page', paths: ['extension/src/webview/'], modules: [], uses: ['util'] }
+  { name: 'page', paths: ['extension/src/webview/'], modules: [], uses: ['util'] },
+  // The request editor in the page: Preact and CodeMirror are the only packages that go into it (dist/app.meta.json is checked against the same list), and it
+  // applies the edits it sends with the same code the extension checks them with, so it may use the view zone.
+  { name: 'app-page', paths: ['extension/src/webview/app/'], modules: [...APP_PAGE_PACKAGES], uses: ['util', 'core', 'view'] }
 ];
 
 /** Never allowed in any zone, whatever its list says: they run code or processes the data could steer. */
