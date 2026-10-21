@@ -24,3 +24,4 @@ jobs:
       - run: npm run build
       - run: npm run ext:build
       - run: npm run site:build
+      - run: node scripts/package-extension.cjs --skip-check

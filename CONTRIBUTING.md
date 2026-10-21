@@ -16,20 +16,39 @@ npm run check
 - **The finding codes match the spec both ways.** Add a code in `src/model/findings.ts` and in the table of section 7 of [docs/SPEC.vi.md](docs/SPEC.vi.md) together, and have a fixture produce it (`test/unit/findings-catalog.test.ts`, `test/unit/fixtures-more.test.ts`).
 - **No hidden characters in the code.** Build such characters from numbers (`String.fromCodePoint(0x202e)`), never as escapes that a tool may turn into the real character (`test/unit/hygiene.test.ts`).
 - **A report or log never holds a value read from the data**, only names and places.
-- **No runtime dependencies.** The package has none; the extension bundle imports only `node:fs`, `node:os`, `node:path` and `vscode` (checked).
+- **No runtime dependencies.** The package has none; the extension bundle imports only `node:crypto` (the nonce of the panel's page), `node:fs`, `node:os`, `node:path` and `vscode` (checked), and the script of the panel imports nothing.
+- **The panel shows text, never markup.** Anything that comes from a collection is put in the panel's page with `textContent`; a test keeps `innerHTML` and its relatives out of `extension/src/webview/`. A message from the page is parsed as untrusted (`src/wizard/protocol.ts`), and no path comes from the page.
 
 ## Tests
 
 ```sh
 npm test                    # compile the tests and run them
 UPDATE_GOLDEN=1 npm test    # rewrite test/fixtures/golden/ after a change you mean
-npm run mutate              # break 33 rules one by one; every one must be caught (slow)
+npm run mutate              # break the rules one by one; every one must be caught (slow)
 npm run ext:host-test       # the extension in an installed VS Code, with a throw-away profile
+node extension/test/screenshots.cjs   # the pictures of the panel in docs/images (a real VS Code, made-up data)
 ```
 
 The goldens are the exact bytes the importer writes for each fixture. **Read the diff of a golden before you accept it**; they are not there to make a test green. When a new rule matters, add a mutation for it to `tools/mutate.cjs` and check that the tests catch it.
 
 Tests that touch the disk create disposable folders and must not operate on a contributor's own data. Fixtures are made up; secrets in them are `CANARY-…` strings that tests look for.
+
+## Publishing the extension
+
+A release is built from a clean checkout of the release commit, so work in progress is never packaged.
+
+```sh
+npm run ext:package         # runs npm run check, builds, checks what is in the package, writes .artifacts/http-files-importer-<version>.vsix
+API_CLIENT_TEST_VSIX=.artifacts/http-files-importer-<version>.vsix node extension/test/run.cjs   # tries the PACKAGE in a real VS Code
+```
+
+`npm run ext:package` refuses a tree with uncommitted changes (`--allow-dirty` makes a trial package) and fails when the package holds a file it should not, a network or process module, a source map, an SVG or relative image in the README, or a manifest that is marked private or has an activation event.
+
+The pictures in `docs/images/` are the images of the Marketplace page and the landing page (`site/img/`, copy them). Take them again with `node extension/test/screenshots.cjs` after a change of the panel, and push the commit before the package is uploaded: the README of the extension links them on the `main` branch.
+
+**Visual Studio Marketplace.** The publisher `longtd` uploads the package on its Manage page (the `...` menu of the extension, then **Update**; the first time, **New extension**). Marketplace scans the upload, which takes some time. Then set `MARKETPLACE_LISTED` to `true` in `scripts/build-site.cjs` (check that `MARKETPLACE_URL` opens the listing first) and run `npm run site:deploy`.
+
+**Open VSX** (VSCodium, Cursor and others) needs an account and a token of the owner: sign in at <https://open-vsx.org>, create an access token, keep it in an environment variable (never in a file or the command history), claim the namespace once with `npx --yes ovsx@1.2.0 create-namespace longtd -p "$OVSX_PAT"`, then publish each release with `npx --yes ovsx@1.2.0 publish .artifacts/http-files-importer-<version>.vsix -p "$OVSX_PAT"`.
 
 ## Trying the output in the real tools
 

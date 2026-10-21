@@ -42,6 +42,7 @@
     "ext:typecheck": "npm --prefix extension run typecheck",
     "ext:build": "npm --prefix extension run build",
     "ext:host-test": "npm run ext:build && node extension/test/run.cjs",
+    "ext:package": "node scripts/package-extension.cjs",
     "site:build": "node scripts/build-site.cjs",
     "site:serve": "node scripts/serve-site.cjs",
     "site:og": "node scripts/render-og.cjs",
