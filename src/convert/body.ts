@@ -37,9 +37,18 @@ function text(value: unknown, coerce: Coercions): string {
   return result.text;
 }
 
-/** A file name that is not relative to the folder of the file: absolute, a drive, "~", or going up. */
+/**
+ * A file name that is not relative to the folder of the file: absolute, a drive, "~", or going up. The path is looked at the way the things that use it
+ * look at it: the files that name it are written with the spaces and the line breaks around it taken off (a path that starts with a space is not a way
+ * to hide a `..`), a name is the same with or without the dots and spaces that Windows drops at its end, and `\` is a separator as well as `/`.
+ */
 export function leavesFolder(path: string): boolean {
-  return /^(?:[A-Za-z]:|[\\/]|~)/.test(path) || /(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path);
+  const clean = path.replace(/[\r\n\t]/g, ' ').trim();
+  if (/^(?:[A-Za-z]:|[\\/]|~)/.test(clean)) return true;
+  return clean.split(/[\\/]/).some(segment => {
+    const name = segment.trim();
+    return /^[. ]+$/.test(name) && (name.match(/\./g)?.length ?? 0) >= 2;
+  });
 }
 
 export function convertBody(value: unknown, coerce: Coercions): BodyResult {
