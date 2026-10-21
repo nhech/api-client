@@ -1,0 +1,12 @@
+<?php
+$curl = curl_init();
+curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://api.test/bin',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_HTTPHEADER => ['Content-Type: application/octet-stream'],
+]);
+$response = curl_exec($curl);
+curl_close($curl);
+echo $response;
+// The body is binary (12 bytes): use CURLOPT_POSTFIELDS with the bytes.

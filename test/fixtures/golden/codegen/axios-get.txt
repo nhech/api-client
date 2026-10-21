@@ -1,0 +1,9 @@
+const response = await axios({
+  method: "get",
+  url: "https://api.test/pets?limit=10",
+  headers: {
+    "Accept": "application/json",
+    "X-Token": "abc"
+  }
+});
+console.log(response.status, response.data);

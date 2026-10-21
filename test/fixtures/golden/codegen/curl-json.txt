@@ -1,0 +1,5 @@
+curl -X POST 'https://api.test/pets' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer [redacted]' \
+  --data-raw '{"name":"it'\''s \"Rex\"","n":"line
+break","u":"é"}'

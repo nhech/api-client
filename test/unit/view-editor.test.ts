@@ -43,6 +43,9 @@ test('A message of the page is read only when it is exactly one of the known sha
   assert.deepEqual(parseToHost({ type: 'violation', text: 'x'.repeat(500) }), { type: 'violation', text: 'x'.repeat(200) }, 'a report is cut');
   assert.equal(parseToHost({ type: 'violation', text: 5 }), undefined);
   assert.equal(parseToHost({ type: 'violation' }), undefined);
+  assert.deepEqual(parseToHost({ type: 'code', language: 'python', extra: 1 }), { type: 'code', language: 'python' });
+  for (const language of [undefined, 'cobol', 'CURL', 5, null, ['curl'], '__proto__', 'constructor']) assert.equal(parseToHost({ type: 'code', language }), undefined, String(language));
+  assert.deepEqual(parseToHost({ type: 'copyCode', text: 'anything' }), { type: 'copyCode' }, 'the page cannot say what to copy');
   assert.deepEqual(parseToHost({ type: 'oauth', action: 'get' }), { type: 'oauth', action: 'get' });
   assert.deepEqual(parseToHost({ type: 'oauth', action: 'clear', url: 'https://evil.test' }), { type: 'oauth', action: 'clear' }, 'the page cannot say where to ask');
   for (const action of [undefined, 'refresh', 'GET', 5, null, ['get']]) assert.equal(parseToHost({ type: 'oauth', action }), undefined, String(action));

@@ -1,0 +1,8 @@
+import requests
+
+response = requests.request(
+    "GET",
+    "https://api.test/pets?limit=10",
+    headers={"Accept": "application/json", "X-Token": "abc"},
+)
+print(response.status_code, response.text)

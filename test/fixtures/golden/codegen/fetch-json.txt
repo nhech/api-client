@@ -1,0 +1,9 @@
+const response = await fetch("https://api.test/pets", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer [redacted]"
+  },
+  body: "{\"name\":\"it's \\\"Rex\\\"\",\"n\":\"line\nbreak\",\"u\":\"é\"}"
+});
+console.log(response.status, await response.text());

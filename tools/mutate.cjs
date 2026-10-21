@@ -531,7 +531,27 @@ const MUTATIONS = [
   { id: "M518", rule: "Protocol: only true stops at the first failure", file: "src/view/runner-protocol.ts", find: "stopOnFailure: own(config, 'stopOnFailure') === true", replace: "stopOnFailure: own(config, 'stopOnFailure') !== undefined" },
   { id: "M519", rule: "Protocol: a report is JSON or JUnit", file: "src/view/runner-protocol.ts", find: "return format === 'json' || format === 'junit' ? { type, format } : undefined;", replace: "return { type, format } as never;" },
   { id: "M520", rule: "Protocol: the tests of a result are bounded", file: "src/view/runner-protocol.ts", find: "result.tests.slice(0, 200)", replace: "result.tests" },
-  { id: "M521", rule: "Protocol: the text of a result is printable", file: "src/view/runner-protocol.ts", find: "const cut = (text: string): string => printable(text.length > TEXT_LIMIT", replace: "const cut = (text: string): string => (text.length > TEXT_LIMIT" }
+  { id: "M521", rule: "Protocol: the text of a result is printable", file: "src/view/runner-protocol.ts", find: "const cut = (text: string): string => printable(text.length > TEXT_LIMIT", replace: "const cut = (text: string): string => (text.length > TEXT_LIMIT" },
+  { id: "M522", rule: "Code: a single quote in a shell string is closed and written again", file: "src/codegen/index.ts", find: "text.replace(/'/g, \"'\\\\''\")", replace: "text" },
+  { id: "M523", rule: "Code: a backslash in a PHP string is doubled", file: "src/codegen/index.ts", find: ".replace(/\\\\/g, '\\\\\\\\')", replace: "" },
+  { id: "M524", rule: "Code: a quote in a PHP string is escaped", file: "src/codegen/index.ts", find: ".replace(/'/g, \"\\\\'\")", replace: "" },
+  { id: "M525", rule: "Code: a quote in a PowerShell string is doubled", file: "src/codegen/index.ts", find: "text.replace(SINGLE_QUOTES, match => match + match)", replace: "text.replace(SINGLE_QUOTES, match => match)" },
+  { id: "M526", rule: "Code: the separators are escaped in a JavaScript string", file: "src/codegen/index.ts", find: "JSON.stringify(text).replace(SEPARATORS, char =>", replace: "JSON.stringify(text).replace(/(?!)/g, char =>" },
+  { id: "M527", rule: "Code: a client is left to set its own framing headers", file: "src/codegen/languages.ts", find: "const FRAMING = ['content-length', 'host', 'connection', 'transfer-encoding'];", replace: "const FRAMING: string[] = [];" },
+  { id: "M528", rule: "Code: curl leaves the boundary of a multipart body to curl", file: "src/codegen/languages.ts", find: "for (const [name, value] of headersFor(request, body?.kind === 'multipart' ? ['content-type'] : [])) parts.push", replace: "for (const [name, value] of headersFor(request, [])) parts.push" },
+  { id: "M529", rule: "Code: a form is encoded as a form", file: "src/codegen/languages.ts", find: ".replace(/%20/g, '+')", replace: "" },
+  { id: "M530", rule: "Code: the Java client is not given what it refuses", file: "src/codegen/languages.ts", find: "const JAVA_RESTRICTED = ['connection', 'content-length', 'expect', 'host', 'upgrade'];", replace: "const JAVA_RESTRICTED: string[] = [];" },
+  { id: "M531", rule: "Code: fetch takes pairs when two headers have the same name", file: "src/codegen/languages.ts", find: "if (unique(headers)) return `${indent}headers: {", replace: "if (true) return `${indent}headers: {" },
+  { id: "M532", rule: "Code: a text part of a multipart body is text in curl", file: "src/codegen/languages.ts", find: "else parts.push(`--form-string ${shellQuote(`${part.name}=${part.value ?? ''}`)}`);", replace: "else parts.push(`-F ${shellQuote(`${part.name}=${part.value ?? ''}`)}`);" },
+  { id: "M533", rule: "Code: a HEAD request is --head in curl", file: "src/codegen/languages.ts", find: "method === 'HEAD' ? '--head '", replace: "method === 'HEAD' ? '-X HEAD '" },
+  { id: "M534", rule: "Code: a GET request has no -X in curl", file: "src/codegen/languages.ts", find: "method === 'GET' ? '' :", replace: "method === 'GET' ? '-X GET ' :" },
+  { id: "M535", rule: "Code: Python keeps the last of two headers with a name", file: "src/codegen/languages.ts", find: "for (const [name, value] of headers) last.set(name.toLowerCase(), [name, value]);", replace: "for (const [name, value] of headers) if (!last.has(name.toLowerCase())) last.set(name.toLowerCase(), [name, value]);" },
+  { id: "M536", rule: "Code: PowerShell gets the content type by its own parameter", file: "src/codegen/languages.ts", find: "const headers = headersFor(request, ['content-type']);\n    const lines: string[] = [`$response = Invoke-WebRequest", replace: "const headers = headersFor(request, []);\n    const lines: string[] = [`$response = Invoke-WebRequest" },
+  { id: "M537", rule: "Code: secrets in the address are hidden", file: "src/view/code.ts", find: "url: hide(wire.url)", replace: "url: printable(wire.url)" },
+  { id: "M538", rule: "Code: secrets in a header are hidden", file: "src/view/code.ts", find: "[printable(name), hide(value)]", replace: "[printable(name), printable(value)]" },
+  { id: "M539", rule: "Code: a form body is shown as fields", file: "src/view/code.ts", find: "type.toLowerCase().startsWith('application/x-www-form-urlencoded') ? decodeForm(text) : undefined", replace: "type === '-' ? decodeForm(text) : undefined" },
+  { id: "M540", rule: "Code: the folders of the person are not in the code", file: "src/view/code.ts", find: "shown = { kind: 'file', path: `./${printable(baseName(body.path))}` };", replace: "shown = { kind: 'file', path: body.path };" },
+  { id: "M541", rule: "Code: the person is told that secrets were left out", file: "src/view/code.ts", find: "if (redactions.length > 0) notes.push(", replace: "if (false) notes.push(" }
 ];
 
 function run(mutation) {

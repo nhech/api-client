@@ -1,0 +1,11 @@
+<?php
+$curl = curl_init();
+curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://api.test/pets?limit=10',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CUSTOMREQUEST => 'GET',
+    CURLOPT_HTTPHEADER => ['Accept: application/json', 'X-Token: abc'],
+]);
+$response = curl_exec($curl);
+curl_close($curl);
+echo $response;

@@ -1236,4 +1236,45 @@ exports.run = async function run() {
     runServer.closeAllConnections();
     runServer.close();
   }
+
+  // 19. The Code tab: the request written as code that sends it, in a language, with the variables replaced and the secrets left out; the language can be
+  //     changed, the code can be copied, and nothing is sent.
+  put('api-client/collections/shop/coded.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B61', 'name: Coded', 'method: POST', 'url: "{{base}}/code?id=7"', 'auth:', '  kind: bearer', '  token: bearer-literal-1', '  prefix: Bearer', 'headers:', '  - name: X-Plain', '    value: visible', 'body:', '  kind: json', '  text: \'{"a":1}\'', ''].join('\n'));
+  await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Coded'), 'the coded request is in the tree');
+  const codedUri = uriOf('api-client/collections/shop/coded.req.yml');
+  await vscode.commands.executeCommand('vscode.openWith', codedUri, 'apiClient.request');
+  await until(() => test.requestEditor(codedUri.toString())?.isReady === true, 'the coded request is open');
+  const coded = test.requestEditor(codedUri.toString());
+  const codes = () => coded.messages().filter(message => message.type === 'code');
+  const sentBefore = seenTests.length;
+  await coded.receive({ type: 'code', language: 'curl' });
+  await until(() => codes().some(message => message.language === 'curl'), 'the code in cURL');
+  const curl = codes().filter(message => message.language === 'curl').at(-1);
+  assert.match(curl.text, /^curl -X POST 'http:\/\/127\.0\.0\.1:\d+\/code\?id=7' \\\n/);
+  assert.match(curl.text, /-H 'X-Plain: visible'/);
+  assert.match(curl.text, /-H 'Authorization: Bearer \[redacted\]'/);
+  assert.match(curl.text, /--data-raw '\{"a":1\}'/);
+  assert.ok(!JSON.stringify(curl).includes('bearer-literal-1'), 'the secret is not in the code');
+  assert.ok(curl.notes.some(note => /Secret values are written as \[redacted\]/.test(note)));
+  await coded.receive({ type: 'code', language: 'python' });
+  await until(() => codes().some(message => message.language === 'python'), 'the code in Python');
+  assert.match(codes().filter(message => message.language === 'python').at(-1).text, /^import requests\n\nresponse = requests\.request\(\n {4}"POST",/);
+  const countBefore = codes().length;
+  await coded.receive({ type: 'code', language: 'cobol' });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(codes().length, countBefore, 'a language that is not offered is not answered');
+  await coded.receive({ type: 'copyCode' });
+  assert.equal(await vscode.env.clipboard.readText(), codes().filter(message => message.language === 'python').at(-1).text, 'what was written last is copied');
+  assert.equal(seenTests.length, sentBefore, 'nothing was sent');
+  put('api-client/collections/shop/uncoded.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B62', 'name: Uncoded', 'url: ""', ''].join('\n'));
+  await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Uncoded'), 'the empty request is in the tree');
+  const emptyUri = uriOf('api-client/collections/shop/uncoded.req.yml');
+  await vscode.commands.executeCommand('vscode.openWith', emptyUri, 'apiClient.request');
+  await until(() => test.requestEditor(emptyUri.toString())?.isReady === true, 'the empty request is open');
+  const empty = test.requestEditor(emptyUri.toString());
+  await empty.receive({ type: 'code', language: 'curl' });
+  await until(() => empty.messages().some(message => message.type === 'code'), 'told why there is no code');
+  const none = empty.messages().filter(message => message.type === 'code').at(-1);
+  assert.equal(none.text, '');
+  assert.match(none.notes.join(' '), /The request has no address/);
 };

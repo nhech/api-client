@@ -4,7 +4,8 @@ import * as vscode from 'vscode';
 import { CookieJar } from '../../src/core/cookies';
 import type { Request } from '../../src/core/model';
 import { RuntimeVariables, type RuntimeContext } from '../../src/core/runtime';
-import { locate, prepareSend } from '../../src/engine/prepare';
+import { confinedFile } from '../../src/engine/files';
+import { locate, prepareSend, type Prepared } from '../../src/engine/prepare';
 import { proxyConfigFromEnv, type ProxyConfig } from '../../src/engine/proxy';
 import type { WireResponse } from '../../src/engine/types';
 import type { ToView } from '../../src/view/request-protocol';
@@ -46,12 +47,23 @@ export class SendEnvironment implements vscode.Disposable {
     return `${this.workspace.folder()?.uri.toString() ?? ''}#${collectionPath}`;
   }
 
-  /** What the OAuth service needs to know about a request: its collection, the authentication that applies to it (its own or inherited), the variables, and how to connect. */
-  oauthInput(path: string, request: Request): Omit<TokenRequestInput, 'signal'> | undefined {
+  /** The request as it would be sent now, built but not sent: the scripts are not run and no access token is asked for. */
+  describe(path: string, request: Request): Prepared | undefined {
     const loaded = this.workspace.loaded;
     if (loaded === undefined) return undefined;
     const collection = locate(loaded, path)?.collection.path ?? '';
-    const prepared = prepareSend({ loaded, path, request, environmentId: this.workspace.activeEnvironmentId, clock: realClock, runtime: this.runtime.scope(this.contextOf(collection)), resolveFile: () => undefined });
+    return prepareSend({
+      loaded, path, request, environmentId: this.workspace.activeEnvironmentId, clock: realClock, runtime: this.runtime.scope(this.contextOf(collection)),
+      resolveFile: (collectionPath, relative) => {
+        const folder = this.workspace.folder();
+        return folder === undefined ? undefined : confinedFile(join(folder.uri.fsPath, ...collectionPath.split('/')), relative);
+      }
+    });
+  }
+
+  /** What the OAuth service needs to know about a request: its collection, the authentication that applies to it (its own or inherited), the variables, and how to connect. */
+  oauthInput(path: string, request: Request): Omit<TokenRequestInput, 'signal'> | undefined {
+    const prepared = this.describe(path, request);
     return prepared === undefined ? undefined : { collection: this.collectionKey(prepared.collection.path), auth: prepared.effective.auth, scopes: prepared.scopes, proxy: this.proxy(), tls: prepared.options.tls };
   }
 

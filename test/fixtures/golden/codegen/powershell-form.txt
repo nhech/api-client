@@ -1,0 +1,2 @@
+$response = Invoke-WebRequest -Uri 'https://api.test/login' -Method POST -ContentType 'application/x-www-form-urlencoded' -Body 'user=ann+lee&pass=p%26ss%3D1'
+$response.Content

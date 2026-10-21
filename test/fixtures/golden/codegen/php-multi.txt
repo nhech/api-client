@@ -1,0 +1,12 @@
+<?php
+$curl = curl_init();
+curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://api.test/up',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CUSTOMREQUEST => 'PUT',
+    CURLOPT_HTTPHEADER => ['X-A: 1'],
+    CURLOPT_POSTFIELDS => ['note' => 'hi', 'doc' => new CURLFile('./a.pdf', 'application/pdf')],
+]);
+$response = curl_exec($curl);
+curl_close($curl);
+echo $response;

@@ -1,0 +1,37 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"os"
+)
+
+func main() {
+	var buffer bytes.Buffer
+	writer := multipart.NewWriter(&buffer)
+	writer.WriteField("note", "hi")
+	file, err := os.Open("./a.pdf")
+	if err != nil {
+		panic(err)
+	}
+	part, _ := writer.CreateFormFile("doc", "a.pdf")
+	io.Copy(part, file)
+	file.Close()
+	writer.Close()
+	request, err := http.NewRequest("PUT", "https://api.test/up", &buffer)
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Add("X-A", "1")
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(response.Body)
+	fmt.Println(response.StatusCode, string(data))
+}

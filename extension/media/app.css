@@ -149,6 +149,11 @@ pre.log-list { margin: 0; padding: 6px 8px; max-height: 60vh; overflow: auto; }
 .log.error { color: var(--vscode-errorForeground); }
 .log.debug, .log.info { color: var(--vscode-descriptionForeground); }
 
+/* The request written as code. */
+.code-tab { display: flex; flex-direction: column; gap: 8px; }
+.code-tab .tools { display: flex; align-items: center; gap: 12px; }
+.field.inline { flex-direction: row; align-items: center; gap: 8px; }
+
 /* The access token of an OAuth 2.0 request. */
 .token { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .token .tools { display: flex; align-items: center; gap: 12px; }

@@ -1,0 +1,9 @@
+import requests
+
+response = requests.request(
+    "PUT",
+    "https://api.test/up",
+    headers={"X-A": "1"},
+    files=[("note", (None, "hi")), ("doc", ("a.pdf", open("./a.pdf", "rb"), "application/pdf"))],
+)
+print(response.status_code, response.text)

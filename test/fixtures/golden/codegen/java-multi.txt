@@ -1,0 +1,18 @@
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        // The JDK client has no multipart body: build the body by hand or use a library.
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.test/up"))
+            .header("Content-Type", "multipart/form-data; boundary=x")
+            .header("X-A", "1")
+            .method("PUT", HttpRequest.BodyPublishers.noBody())
+            .build();
+        HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(response.statusCode() + " " + response.body());
+    }
+}

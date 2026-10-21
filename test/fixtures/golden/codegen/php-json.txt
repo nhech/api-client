@@ -1,0 +1,13 @@
+<?php
+$curl = curl_init();
+curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://api.test/pets',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer [redacted]'],
+    CURLOPT_POSTFIELDS => '{"name":"it\'s \\"Rex\\"","n":"line
+break","u":"é"}',
+]);
+$response = curl_exec($curl);
+curl_close($curl);
+echo $response;

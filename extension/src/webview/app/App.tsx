@@ -6,6 +6,7 @@ import { Choice, Field, KeyValueGrid, Tabs, type TabSpec } from './components';
 import { defaultRequestTab } from '../../../../src/view/tabs';
 import { DocumentPage } from './Pages';
 import { ResponsePane } from './ResponsePane';
+import { CodeTab } from './CodeTab';
 import { ScriptsForm } from './Scripts';
 import { SettingsForm } from './SettingsForm';
 import { TestsForm } from './TestsForm';
@@ -89,7 +90,7 @@ function Editor(props: { request: Request; port: HostPort }) {
     { id: 'query', label: 'Query', badge: countRows(r.query) }, { id: 'headers', label: 'Headers', badge: countRows(r.headers) }, { id: 'auth', label: 'Auth', badge: r.auth.kind === 'inherit' || r.auth.kind === 'none' ? '' : '\u2022' },
     { id: 'body', label: 'Body', badge: r.body.kind === 'none' ? '' : '\u2022' }, { id: 'scripts', label: 'Scripts', badge: r.scripts.pre.trim() === '' && r.scripts.post.trim() === '' ? '' : '\u2022' }, { id: 'tests', label: 'Tests', badge: countRows(r.tests.map(row => ({ enabled: row.enabled, name: row.expr })).concat(r.captures.map(row => ({ enabled: row.enabled, name: row.expr })))) },
     { id: 'settings', label: 'Settings', badge: Object.keys(r.settings).length === 0 ? '' : String(Object.keys(r.settings).length) },
-    { id: 'docs', label: 'Docs', badge: r.docs === '' ? '' : '\u2022' }
+    { id: 'docs', label: 'Docs', badge: r.docs === '' ? '' : '\u2022' }, { id: 'code', label: 'Code' }
   ];
   return (
     <div class="request">
@@ -116,6 +117,7 @@ function Editor(props: { request: Request; port: HostPort }) {
             <SettingsForm settings={r.settings} path={['settings']} what="request" />
           </>
         ) : null}
+        {tab === 'code' ? <CodeTab request={r} port={props.port} /> : null}
         {tab === 'docs' ? <div class="editor-box"><CodeEditor value={r.docs} language="text" label="Notes on this request" placeholder="Notes for yourself and your team" onChange={value => edit({ op: 'set', path: ['docs'], value })} onBlur={flushNow} /></div> : null}
       </Tabs>
       <ResponsePane port={props.port} />

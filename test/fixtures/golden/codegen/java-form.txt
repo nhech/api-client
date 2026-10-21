@@ -1,0 +1,16 @@
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.test/login"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .method("POST", HttpRequest.BodyPublishers.ofString("user=ann+lee&pass=p%26ss%3D1"))
+            .build();
+        HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(response.statusCode() + " " + response.body());
+    }
+}

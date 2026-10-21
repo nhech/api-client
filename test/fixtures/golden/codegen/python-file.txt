@@ -1,0 +1,9 @@
+import requests
+
+response = requests.request(
+    "POST",
+    "https://api.test/raw",
+    headers={"Content-Type": "application/octet-stream"},
+    data=open("./data.bin", "rb"),
+)
+print(response.status_code, response.text)

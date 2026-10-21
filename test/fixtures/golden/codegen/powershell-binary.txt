@@ -1,0 +1,3 @@
+$response = Invoke-WebRequest -Uri 'https://api.test/bin' -Method POST -ContentType 'application/octet-stream'
+# The body is binary (12 bytes): add -InFile 'path'
+$response.Content

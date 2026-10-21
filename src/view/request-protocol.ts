@@ -3,6 +3,7 @@ import type { Container, Environment } from '../core/model';
 import type { VariableInfo } from '../core/vars';
 import type { Finding } from '../format/schema';
 import type { ResponseView } from './response';
+import { CODE_LANGUAGE_IDS } from './code-languages';
 import type { ScriptReport } from './scripts';
 
 /**
@@ -39,6 +40,9 @@ export type ToHost =
   | { type: 'activate' }
   /** Get an access token for the request now (`get`), or forget the one that is kept (`clear`). */
   | { type: 'oauth'; action: 'get' | 'clear' }
+  /** Write the request as code in a language (`code`), and copy what was written last (`copyCode`). */
+  | { type: 'code'; language: string }
+  | { type: 'copyCode' }
   /** Show the file in the text editor (when the page cannot edit it). */
   | { type: 'openAsText' };
 
@@ -75,7 +79,9 @@ export type ToView =
   | { type: 'failed'; id: number; code: string; message: string; hint: string; warnings: string[]; scripts?: ScriptReport }
   | { type: 'cancelled'; id: number }
   /** Whether the request has an access token: sent whenever the request or the variables change, and after a try to get one. */
-  | { type: 'oauth'; status: OAuthStatusView };
+  | { type: 'oauth'; status: OAuthStatusView }
+  /** The request written as code; `text` is empty when it cannot be written, and `notes` say why or what to put back. */
+  | { type: 'code'; language: string; text: string; notes: string[] };
 
 export interface OAuthStatusView {
   /** The authentication that applies to the request (its own or the one it inherits) is OAuth 2.0. */
@@ -159,6 +165,8 @@ export function parseToHost(raw: unknown): ToHost | undefined {
   if (type === 'send' || type === 'cancel' || type === 'openAsText' || type === 'saveResponse' || type === 'openResponse' || type === 'activate') return { type };
   if (type === 'violation') { const text = own(raw, 'text'); return typeof text === 'string' ? { type, text: text.slice(0, 200) } : undefined; }
   if (type === 'copyResponse') return { type, pretty: own(raw, 'pretty') === true };
+  if (type === 'copyCode') return { type };
+  if (type === 'code') { const language = own(raw, 'language'); return typeof language === 'string' && CODE_LANGUAGE_IDS.includes(language) ? { type, language } : undefined; }
   if (type === 'oauth') { const action = own(raw, 'action'); return action === 'get' || action === 'clear' ? { type, action } : undefined; }
   if (type === 'ready') {
     const given = own(raw, 'violations');

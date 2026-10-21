@@ -1,0 +1,8 @@
+using System;
+using System.Net.Http;
+
+using var client = new HttpClient();
+using var request = new HttpRequestMessage(new HttpMethod("POST"), "https://api.test/bin");
+// The body is binary (12 bytes): request.Content = new ByteArrayContent(bytes);
+using var response = await client.SendAsync(request);
+Console.WriteLine((int)response.StatusCode + " " + await response.Content.ReadAsStringAsync());

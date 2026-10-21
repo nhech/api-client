@@ -48,6 +48,8 @@ export const sending = signal<{ id: number; since: number } | undefined>(undefin
 export const response = signal<ResponseView | undefined>(undefined);
 /** Whether the request has an access token (OAuth 2.0), as the extension last said. */
 export const oauthStatus = signal<OAuthStatusView | undefined>(undefined);
+/** The request written as code, as the extension last did. */
+export const codeResult = signal<{ language: string; text: string; notes: string[] } | undefined>(undefined);
 export const failure = signal<{ code: string; message: string; hint: string; warnings: string[]; scripts?: ScriptReport } | undefined>(undefined);
 
 const FLUSH_DELAY_MS = 250;
@@ -170,6 +172,10 @@ export function receive(message: ToView): void {
   }
   if (message.type === 'oauth') {
     oauthStatus.value = message.status;
+    return;
+  }
+  if (message.type === 'code') {
+    codeResult.value = { language: message.language, text: message.text, notes: message.notes };
     return;
   }
   if (message.type === 'sending') {

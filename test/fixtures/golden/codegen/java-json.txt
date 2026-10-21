@@ -1,0 +1,17 @@
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.test/pets"))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer [redacted]")
+            .method("POST", HttpRequest.BodyPublishers.ofString("{\"name\":\"it's \\\"Rex\\\"\",\"n\":\"line\nbreak\",\"u\":\"é\"}"))
+            .build();
+        HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(response.statusCode() + " " + response.body());
+    }
+}

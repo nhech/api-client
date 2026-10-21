@@ -1,0 +1,3 @@
+curl 'https://api.test/pets?limit=10' \
+  -H 'Accept: application/json' \
+  -H 'X-Token: abc'

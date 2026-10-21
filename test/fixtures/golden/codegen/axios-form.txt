@@ -1,0 +1,6 @@
+const response = await axios({
+  method: "post",
+  url: "https://api.test/login",
+  data: new URLSearchParams([["user", "ann lee"], ["pass", "p&ss=1"]])
+});
+console.log(response.status, response.data);

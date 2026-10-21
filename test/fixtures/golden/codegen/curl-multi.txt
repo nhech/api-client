@@ -1,0 +1,4 @@
+curl -X PUT 'https://api.test/up' \
+  -H 'X-A: 1' \
+  --form-string 'note=hi' \
+  -F 'doc=@./a.pdf;type=application/pdf'

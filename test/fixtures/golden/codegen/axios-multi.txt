@@ -1,0 +1,12 @@
+const form = new FormData();
+form.append("note", "hi");
+form.append("doc", await openAsBlob("./a.pdf"), "a.pdf"); // openAsBlob is imported from node:fs
+const response = await axios({
+  method: "put",
+  url: "https://api.test/up",
+  headers: {
+    "X-A": "1"
+  },
+  data: form
+});
+console.log(response.status, response.data);

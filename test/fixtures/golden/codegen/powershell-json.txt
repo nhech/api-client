@@ -1,0 +1,3 @@
+$response = Invoke-WebRequest -Uri 'https://api.test/pets' -Method POST -Headers @{ 'Authorization' = 'Bearer [redacted]' } -ContentType 'application/json' -Body '{"name":"it''s \"Rex\"","n":"line
+break","u":"é"}'
+$response.Content

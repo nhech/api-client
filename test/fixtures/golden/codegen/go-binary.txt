@@ -1,0 +1,23 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	// The body is binary (12 bytes): pass a reader over the bytes.
+	request, err := http.NewRequest("POST", "https://api.test/bin", nil)
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Add("Content-Type", "application/octet-stream")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(response.Body)
+	fmt.Println(response.StatusCode, string(data))
+}

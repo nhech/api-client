@@ -1,0 +1,10 @@
+// readFile is imported from node:fs/promises
+const response = await axios({
+  method: "post",
+  url: "https://api.test/raw",
+  headers: {
+    "Content-Type": "application/octet-stream"
+  },
+  data: await readFile("./data.bin")
+});
+console.log(response.status, response.data);

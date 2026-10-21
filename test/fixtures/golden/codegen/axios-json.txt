@@ -1,0 +1,10 @@
+const response = await axios({
+  method: "post",
+  url: "https://api.test/pets",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer [redacted]"
+  },
+  data: "{\"name\":\"it's \\\"Rex\\\"\",\"n\":\"line\nbreak\",\"u\":\"é\"}"
+});
+console.log(response.status, response.data);

@@ -1,0 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+
+using var client = new HttpClient();
+using var request = new HttpRequestMessage(new HttpMethod("POST"), "https://api.test/login");
+request.Content = new FormUrlEncodedContent(new List<KeyValuePair<string, string>> {
+    new("user", "ann lee"),
+    new("pass", "p&ss=1")
+});
+using var response = await client.SendAsync(request);
+Console.WriteLine((int)response.StatusCode + " " + await response.Content.ReadAsStringAsync());

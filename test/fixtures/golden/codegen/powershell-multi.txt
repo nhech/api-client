@@ -1,0 +1,2 @@
+$response = Invoke-WebRequest -Uri 'https://api.test/up' -Method PUT -Headers @{ 'X-A' = '1' } -Form @{ 'note' = 'hi'; 'doc' = Get-Item './a.pdf' }
+$response.Content

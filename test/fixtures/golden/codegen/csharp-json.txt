@@ -1,0 +1,12 @@
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+
+using var client = new HttpClient();
+using var request = new HttpRequestMessage(new HttpMethod("POST"), "https://api.test/pets");
+request.Headers.TryAddWithoutValidation("Authorization", "Bearer [redacted]");
+request.Content = new StringContent("{\"name\":\"it's \\\"Rex\\\"\",\"n\":\"line\nbreak\",\"u\":\"é\"}", Encoding.UTF8);
+request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json");
+using var response = await client.SendAsync(request);
+Console.WriteLine((int)response.StatusCode + " " + await response.Content.ReadAsStringAsync());

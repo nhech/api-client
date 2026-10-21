@@ -1,0 +1,12 @@
+<?php
+$curl = curl_init();
+curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://api.test/login',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+    CURLOPT_POSTFIELDS => 'user=ann+lee&pass=p%26ss%3D1',
+]);
+$response = curl_exec($curl);
+curl_close($curl);
+echo $response;

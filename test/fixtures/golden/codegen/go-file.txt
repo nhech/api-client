@@ -1,0 +1,28 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+func main() {
+	file, err := os.Open("./data.bin")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	request, err := http.NewRequest("POST", "https://api.test/raw", file)
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Add("Content-Type", "application/octet-stream")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(response.Body)
+	fmt.Println(response.StatusCode, string(data))
+}

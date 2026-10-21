@@ -1,0 +1,23 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	request, err := http.NewRequest("GET", "https://api.test/pets?limit=10", nil)
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Add("Accept", "application/json")
+	request.Header.Add("X-Token", "abc")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(response.Body)
+	fmt.Println(response.StatusCode, string(data))
+}

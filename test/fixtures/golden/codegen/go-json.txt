@@ -1,0 +1,24 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+func main() {
+	request, err := http.NewRequest("POST", "https://api.test/pets", strings.NewReader("{\"name\":\"it's \\\"Rex\\\"\",\"n\":\"line\nbreak\",\"u\":\"é\"}"))
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("Authorization", "Bearer [redacted]")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(response.Body)
+	fmt.Println(response.StatusCode, string(data))
+}

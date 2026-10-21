@@ -1,0 +1,9 @@
+import requests
+
+# The body is binary (12 bytes): pass the bytes as data=
+response = requests.request(
+    "POST",
+    "https://api.test/bin",
+    headers={"Content-Type": "application/octet-stream"},
+)
+print(response.status_code, response.text)

@@ -1,0 +1,9 @@
+// The body is binary (12 bytes): send the bytes of a file or a Buffer.
+const response = await axios({
+  method: "post",
+  url: "https://api.test/bin",
+  headers: {
+    "Content-Type": "application/octet-stream"
+  }
+});
+console.log(response.status, response.data);

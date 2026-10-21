@@ -5,6 +5,8 @@ import { locate, variablesOf } from '../../src/engine/prepare';
 import { readRequest, writeRequest } from '../../src/format/schema';
 import type { YMap } from '../../src/format/yaml';
 import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
+import { generateCode } from '../../src/codegen/languages';
+import { codeNotes, codeRequestFrom } from '../../src/view/code';
 import { parseToHost, type OAuthStatusView, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
 import { configureAppPanel } from './appPanel';
 import { RequestRunner, type SendEnvironment } from './sender';
@@ -99,7 +101,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
 
   private post(message: ToView): void {
     // The list of variables and the state of the token come whenever the files change; "what the page was last told" is about the file and the send, so they are left out.
-    if (message.type !== 'vars' && message.type !== 'oauth') this.last = message;
+    if (message.type !== 'vars' && message.type !== 'oauth' && message.type !== 'code') this.last = message;
     this.recent.push(message);
     if (this.recent.length > 50) this.recent.shift();
     void this.panel.webview.postMessage(message);
@@ -139,6 +141,21 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     if (input === undefined || input.auth.kind !== 'oauth2') { this.postStatus({ applies: false, state: 'none' }); return; }
     const status = await this.env.oauth.status(input);
     this.postStatus({ applies: true, ...status, ...(failure === undefined ? {} : { message: failure }) });
+  }
+
+  /** What was written as code last, for the Copy button. */
+  private lastCode = '';
+
+  /** Writes the request as it would be sent now, in a language: the variables replaced, the secrets left out. */
+  private writeCode(language: string): void {
+    const path = this.relativePath();
+    const prepared = path === undefined ? undefined : this.env.describe(path, this.state().request);
+    if (prepared === undefined) { this.lastCode = ''; this.post({ type: 'code', language, text: '', notes: ['This request is not in a collection that is loaded, so it cannot be written as code.'] }); return; }
+    const warnings = [...prepared.problems, ...prepared.built.warnings];
+    if (prepared.built.unresolved.length > 0) warnings.push(`These variables have no value, so they are written as they stand: ${prepared.built.unresolved.join(', ')}.`);
+    if (prepared.problems.length > 0) { this.lastCode = ''; this.post({ type: 'code', language, text: '', notes: codeNotes(warnings, []) }); return; }
+    this.lastCode = generateCode(language, codeRequestFrom(prepared.built.wire, prepared.built.redactions)) ?? '';
+    this.post({ type: 'code', language, text: this.lastCode, notes: codeNotes(warnings, prepared.built.redactions) });
   }
 
   private postStatus(status: OAuthStatusView): void {
@@ -188,6 +205,10 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
       await this.runner.copy(message.pretty);
     } else if (message.type === 'oauth') {
       await this.token(message.action);
+    } else if (message.type === 'code') {
+      this.writeCode(message.language);
+    } else if (message.type === 'copyCode') {
+      if (this.lastCode !== '') { await vscode.env.clipboard.writeText(this.lastCode); vscode.window.setStatusBarMessage('API Client: the code is copied.', 2500); }
     }
   }
 
