@@ -10,7 +10,7 @@ Measured on 2026-10-22 on a Windows laptop with the files on an SSD, with anothe
 What this says:
 
 - The side bar is not the cost: the tree of 10,000 requests is built in about 20 ms, and a filter in 5 ms.
-- The cost is reading and parsing the files, and checking the `.http` copy of each request, and **it is paid again for the whole collection when one file changes** (a save, a pull, a branch switch; the change is waited for a quarter of a second first, and a burst counts once). Up to a thousand requests nobody notices; at ten thousand every edit holds the extension host for several seconds. A collection that large should be split into several collections (they are loaded together, but a folder with fewer files is also easier to review) or have the `.http` copies turned off (`apiClient.mirror.mode` = `off`), which takes away about half of that time.
+- The cost is reading and parsing the files, and checking the `.http` copy of each request, and **it is paid again for the whole collection when one file changes** (a save, a pull, a branch switch; the change is waited for a quarter of a second first, and a burst counts once). Up to a thousand requests nobody notices; at ten thousand every edit holds the extension host for several seconds. Splitting such a collection in several does not help (they are all read together); turning the `.http` copies off (`apiClient.mirror.mode` = `off`) takes away about half of that time.
 - Memory: 80 to 90 MB for 10,000 requests.
 - Limits that keep a hostile folder from being worse than this: 5,000 entries in one folder, 32 levels of folders, 100,000 nodes, 5 MB for one file (`src/storage/fs.ts`).
 
