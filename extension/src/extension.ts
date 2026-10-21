@@ -79,6 +79,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, editorOptions),
     vscode.window.registerCustomEditorProvider(ENVIRONMENT_VIEW_TYPE, environmentEditors, editorOptions),
     vscode.window.registerCustomEditorProvider(CONTAINER_VIEW_TYPE, containerEditors, editorOptions),
+    vscode.commands.registerCommand('apiClient.clearVariables', () => { sending.clearVariables(); }),
     reports, workspace, collections, environments, collections.view, environmentsView, historyView, status, workspace.onDidChange(showStatus),
     vscode.workspace.registerTextDocumentContentProvider(REPORT_SCHEME, reports),
     vscode.commands.registerCommand(IMPORT_COMMAND, async (): Promise<void> => { WizardPanel.show(context, host, await candidates()); }),

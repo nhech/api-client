@@ -1,7 +1,7 @@
 import { isAbsolute, relative } from 'node:path';
 import * as vscode from 'vscode';
 import { newRequest } from '../../src/core/model';
-import { variablesOf } from '../../src/engine/prepare';
+import { locate, variablesOf } from '../../src/engine/prepare';
 import { readRequest, writeRequest } from '../../src/format/schema';
 import type { YMap } from '../../src/format/yaml';
 import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
@@ -50,6 +50,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     this.subscriptions.push(
       panel.webview.onDidReceiveMessage((raw: unknown) => { this.receive(raw).catch(() => undefined); }),
       env.workspace.onDidChange(() => { if (this.ready) this.postVariables(); }),
+      env.onDidChangeVariables(() => { if (this.ready) this.postVariables(); }),
       vscode.workspace.onDidChangeTextDocument(event => {
         if (event.document !== document || event.contentChanges.length === 0) return;
         if (this.selfChanges > 0) { this.selfChanges--; return; }
@@ -121,7 +122,8 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
   private postVariables(): void {
     const loaded = this.env.workspace.loaded;
     const path = this.relativePath();
-    this.post({ type: 'vars', ...(loaded === undefined || path === undefined ? { vars: [], complete: false } : variablesOf(loaded, path, this.env.workspace.activeEnvironmentId)) });
+    const collection = loaded === undefined || path === undefined ? undefined : locate(loaded, path)?.collection.path;
+    this.post({ type: 'vars', ...(loaded === undefined || path === undefined ? { vars: [], complete: false } : variablesOf(loaded, path, this.env.workspace.activeEnvironmentId, this.env.runtime.scope(this.env.contextOf(collection ?? '')))) });
   }
 
   private async handle(message: ToHost): Promise<void> {

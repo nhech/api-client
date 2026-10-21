@@ -12,10 +12,10 @@ const vscode = require('vscode');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const exchange = process.env.SHOTS_EXCHANGE;
 
-async function shot(name, width, height, settle) {
+async function shot(name, width, height, settle, script) {
   await vscode.commands.executeCommand('notifications.clearAll');
   await vscode.commands.executeCommand('notifications.hideToasts');
-  fs.writeFileSync(path.join(exchange, `${name}.request`), JSON.stringify({ name, width, height, settle }));
+  fs.writeFileSync(path.join(exchange, `${name}.request`), JSON.stringify({ name, width, height, settle, script }));
   const done = path.join(exchange, `${name}.done`);
   for (let waited = 0; !fs.existsSync(done) && waited < 60000; waited += 100) await sleep(100);
   if (!fs.existsSync(done)) throw new Error(`The picture ${name} was not taken.`);
@@ -54,7 +54,7 @@ exports.run = async function run() {
     };
     put('api-client/collections/pet-store/collection.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAA\nname: Pet Store\nbaseUrl: "{{baseUrl}}"\nauth:\n  kind: bearer\n  token: "{{token}}"\n');
     put('api-client/collections/pet-store/pets/folder.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAB\nname: Pets\n');
-    put('api-client/collections/pet-store/pets/list-pets.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABC\nname: List pets\nmethod: GET\nurl: /pets\nquery:\n  - name: limit\n    value: 10\n  - name: status\n    value: available\n    enabled: false\nheaders:\n  - name: Accept\n    value: application/json\n');
+    put('api-client/collections/pet-store/pets/list-pets.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABC\nname: List pets\nmethod: GET\nurl: /pets\nquery:\n  - name: limit\n    value: 10\n  - name: status\n    value: available\n    enabled: false\nheaders:\n  - name: Accept\n    value: application/json\ntests:\n  - expr: status == 200\n  - expr: json $.total == 4\n  - expr: json $.pets count >= 1\n  - expr: header content-type includes json\n  - expr: duration < 1\n  - expr: json $.next exists\n  - expr: body hasStuff\ncaptures:\n  - expr: petId = json $.pets[0].id\n  - expr: access_token = json $.pets[0].name\n  - expr: missing = json $.nothing\n');
     put('api-client/collections/pet-store/pets/create-pet.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABD\nname: Create pet\nmethod: POST\nurl: /pets\nbody:\n  kind: json\n  text: |-\n    {\n      "name": "Rex",\n      "tag": "dog"\n    }\n');
     put('api-client/collections/pet-store/pets/get-pet.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABE\nname: Get a pet\nmethod: GET\nurl: "{{baseUrl}}/pets/{petId}?key={{apiKey}}&request={{$guid}}"\npathParams:\n  - name: petId\n    value: 1\n');
     put('api-client/collections/pet-store/health.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABF\nname: Health check\nurl: http://127.0.0.1:1/health\n');
@@ -84,6 +84,11 @@ exports.run = async function run() {
     await list.receive({ type: 'send' });
     await answer(list, 'response');
     await shot('request-answer', 1400, 860, 1200);
+
+    // The tests and the captures: the results beside the request, and the lines that make them.
+    const clickTab = (label, last) => `d => { const tabs = [...d.querySelectorAll('[role=tab]')].filter(tab => tab.textContent.startsWith('${label}')); const tab = tabs[${last ? 'tabs.length - 1' : '0'}]; if (tab) { tab.click(); return 'clicked'; } return 'none'; }`;
+    await shot('response-tests', 1400, 860, 1200, clickTab('Tests', true));
+    await shot('request-tests', 1400, 860, 1200, clickTab('Tests', false));
 
     // The same on a narrow editor: the answer goes below the request.
     await vscode.commands.executeCommand('workbench.action.closeSidebar');

@@ -488,7 +488,7 @@ exports.run = async function run() {
   const environmentView = () => test.environmentEditor(environmentUri.toString());
   await until(() => environmentView()?.isReady === true && environmentView().lastMessage()?.type === 'document', 'the environment is open and the page is told what it holds');
   assert.deepEqual(environmentView().violations, [], 'under the policy of the page');
-  const initial = environmentView().lastMessage();
+  const initial = environmentView().messages().find(message => message.type === 'document' && message.cause === 'init');
   assert.deepEqual([initial.cause, initial.screen, initial.environment.name, initial.active, initial.readOnly], ['init', 'environment', 'Dev', false, undefined]);
   assert.deepEqual(initial.environment.vars.map(item => [item.name, item.secret, item.value]), [['base', false, base], ['token', true, 'super-secret-value-9']], 'the secret value is put back from the private file');
 
@@ -614,4 +614,92 @@ exports.run = async function run() {
   await vscode.commands.executeCommand('apiClient.rename', test.client().collections.find(node => node.label === 'Created'), 'Renamed by command');
   await until(() => test.client().collections.some(node => node.label === 'Renamed by command'), 'the rename command works with a name given to it');
   assert.ok(fs.existsSync(onDisk('api-client/collections/renamed-by-command/collection.yml')));
+
+  // 14. Tests and captures: the tests of the request and of its collection are judged against the response, what the captures read is
+  //     saved for the next requests (a secret name is hidden), and nothing is written into the files.
+  const http2 = require('node:http');
+  const seenTests = [];
+  const testServer = http2.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      seenTests.push(req.url);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('X-Rate', '7');
+      res.end('{"ok":true,"token":"captured-token-1","id":42,"items":[1,2,3]}');
+    });
+  });
+  await new Promise(resolve => testServer.listen(0, '127.0.0.1', resolve));
+  const testBase = 'http://127.0.0.1:' + testServer.address().port;
+  try {
+    put('api-client/environments/dev.env.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAC\nname: Dev\nvars:\n  - name: base\n    value: ' + testBase + '\n');
+    await test.client().workspace.setActiveEnvironment('01J9Z4V0N2XK7Q3M8T5R6Y1AAC');
+    await until(() => test.client().workspace.loaded?.environments.find(item => item.environment.name === 'Dev')?.environment.vars[0]?.value === testBase, 'the environment points at the server');
+    await vscode.commands.executeCommand('vscode.openWith', collectionUri, 'apiClient.container');
+    await until(() => collectionView()?.isReady === true && collectionView().lastMessage()?.type === 'document', 'the settings of the collection are open again');
+    await collectionView().receive({ type: 'edit', rev: collectionRev(), ops: [{ op: 'insert', path: ['tests'], index: 0, value: { expr: 'duration < 60000', enabled: true } }] });
+    const reopened = await vscode.workspace.openTextDocument(collectionUri);
+    assert.ok(/\ntests:\n {2}- expr: duration < 60000\n/.test(reopened.getText()), 'the test is in the file of the collection');
+    await reopened.save();
+    put('api-client/collections/shop/tested.req.yml', [
+      'schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B11', 'name: Tested', 'url: "{{base}}/json"',
+      'tests:', '  - expr: status == 200', '  - expr: json $.ok == true', '  - expr: json $.items count == 3', '  - expr: header x-rate > 5', '  - expr: json $.id == 41', '  - expr: bogus line', '  - expr: status == 500', '    enabled: false',
+      'captures:', '  - expr: page = json $.id', '  - expr: access_token = json $.token', '  - expr: missing = json $.nothing', '  - expr: "global: rate = header x-rate"', ''
+    ].join('\n'));
+    put('api-client/collections/shop/uses-saved.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1B12\nname: Uses saved\nurl: "{{base}}/json?page={{page}}&token={{access_token}}&rate={{rate}}"\n');
+    await until(() => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Uses saved') && test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === 'Tested'), 'the requests are loaded');
+    const openAndWait = async name => {
+      const uri = uriOf('api-client/collections/shop/' + name);
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'apiClient.request');
+      await until(() => test.requestEditor(uri.toString())?.isReady === true, name + ' is open');
+      return test.requestEditor(uri.toString());
+    };
+    const lastResponse = view => view.messages().filter(message => message.type === 'response').at(-1);
+
+    // 14a. The tests are judged, the invalid one fails with a reason, the switched-off one is not run, and the collection's test is there.
+    const tested = await openAndWait('tested.req.yml');
+    await tested.receive({ type: 'send' });
+    await until(() => lastResponse(tested) !== undefined, 'the answer to the tested request');
+    const judged = lastResponse(tested).response;
+    assert.deepEqual(judged.tests.map(item => [item.expr, item.from, item.ok]), [
+      ['duration < 60000', 'Shop', true], ['status == 200', 'request', true], ['json $.ok == true', 'request', true], ['json $.items count == 3', 'request', true], ['header x-rate > 5', 'request', true], ['json $.id == 41', 'request', false], ['bogus line', 'request', false]
+    ]);
+    assert.equal(judged.tests[5].message, 'got 42');
+    assert.match(judged.tests[6].message, /not something to test/);
+
+    // 14b. What the captures read is saved; a secret name is hidden in the view, and a failed capture changes nothing.
+    assert.deepEqual(judged.saved.map(item => [item.variable, item.ok, item.scope, item.secret, item.value]), [['page', true, 'active', false, '42'], ['access_token', true, 'active', true, ''], ['missing', false, 'active', false, ''], ['rate', true, 'global', false, '7']]);
+    assert.equal(judged.saved[2].message, 'nothing at $.nothing');
+    assert.ok(!JSON.stringify([judged.saved, judged.tests, judged.sent, judged.headers]).includes('captured-token-1'), 'the value of the secret is not in what is said about the captures (the body of the response is the response itself)');
+    for (const name of fs.readdirSync(path.join(workspace, 'api-client', 'collections', 'shop'))) {
+      const full = path.join(workspace, 'api-client', 'collections', 'shop', name);
+      if (fs.statSync(full).isFile()) assert.ok(!fs.readFileSync(full, 'utf8').includes('captured-token-1'), name + ' holds no saved value');
+    }
+
+    // 14c. The next request uses them; the secret is hidden in what is shown of the request; the page is told the variables exist.
+    const usesSaved = await openAndWait('uses-saved.req.yml');
+    await usesSaved.receive({ type: 'send' });
+    await until(() => lastResponse(usesSaved) !== undefined, 'the answer to the second request');
+    assert.equal(seenTests.at(-1), '/json?page=42&token=captured-token-1&rate=7', 'the saved values went out');
+    const second = lastResponse(usesSaved).response;
+    assert.equal(second.sent.url, testBase + '/json?page=42&token=[redacted]&rate=7', 'the secret value is hidden in what was sent');
+    assert.ok(!second.warnings.some(warning => /page|access_token|rate/.test(warning)), 'none of the saved variables is missing (the one the collection asks for in its authentication is)');
+    const knownVariables = usesSaved.messages().filter(message => message.type === 'vars').at(-1).vars;
+    assert.deepEqual(knownVariables.filter(item => ['page', 'access_token', 'rate'].includes(item.name)).map(item => [item.name, item.source, item.secret, item.value === '' ? 'empty' : 'value']), [['access_token', 'this run', true, 'empty'], ['page', 'this run', false, 'value'], ['rate', 'this run', false, 'value']]);
+
+    // 14d. Another environment does not see an environment value, and clearing forgets them.
+    await test.client().workspace.setActiveEnvironment(undefined);
+    await usesSaved.receive({ type: 'send' });
+    await until(() => usesSaved.messages().filter(message => message.type === 'failed' || message.type === 'response').length >= 2, 'the answer without an environment');
+    await test.client().workspace.setActiveEnvironment('01J9Z4V0N2XK7Q3M8T5R6Y1AAC');
+    await vscode.commands.executeCommand('apiClient.clearVariables');
+    await until(() => usesSaved.messages().filter(message => message.type === 'vars').at(-1).vars.every(item => item.source !== 'this run'), 'after clearing nothing is from a run');
+    const countBefore = usesSaved.messages().filter(message => message.type === 'response').length;
+    await usesSaved.receive({ type: 'send' });
+    await until(() => usesSaved.messages().filter(message => message.type === 'response').length > countBefore, 'the answer after clearing');
+    assert.equal(seenTests.at(-1), '/json?page={{page}}&token={{access_token}}&rate={{rate}}', 'sent as written once the values are gone');
+    assert.ok(lastResponse(usesSaved).response.warnings.some(warning => /page.*access_token.*rate|These variables have no value.*page/.test(warning)), 'and said so');
+  } finally {
+    testServer.closeAllConnections();
+    testServer.close();
+  }
 };

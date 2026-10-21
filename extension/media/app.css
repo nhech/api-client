@@ -122,3 +122,20 @@ input.title:hover, input.title:focus { border-color: var(--vscode-input-border, 
 .hint.warn { color: var(--vscode-errorForeground); }
 button.send:disabled { opacity: 0.5; cursor: default; }
 .check input { margin: 0; }
+
+/* Tests, captures and their results. */
+.grid-row.expr { grid-template-columns: 22px minmax(200px, 1fr) 28px; }
+.grid-row.expr input.expr { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); }
+.grid-row.expr input[aria-invalid="true"] { border-color: var(--vscode-inputValidation-errorBorder); }
+.row-error { margin: -2px 0 4px 28px; color: var(--vscode-errorForeground); font-size: 0.9em; }
+.suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+button.chip { color: var(--vscode-foreground); background: var(--vscode-badge-background); border: 1px solid transparent; border-radius: 10px; padding: 1px 10px; }
+button.chip:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.wide-form { max-width: 860px; }
+details.help { margin-top: 12px; color: var(--vscode-descriptionForeground); }
+details.help summary { cursor: pointer; color: var(--vscode-foreground); }
+details.help code, .hint code { font-family: var(--vscode-editor-font-family); background: var(--vscode-textCodeBlock-background); padding: 0 3px; border-radius: 2px; }
+.result-pass { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); font-weight: 600; }
+.result-fail { color: var(--vscode-testing-iconFailed, var(--vscode-errorForeground)); font-weight: 600; }
+
+table.data td.nowrap { white-space: nowrap; overflow-wrap: normal; }

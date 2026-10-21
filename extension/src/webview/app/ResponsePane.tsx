@@ -122,11 +122,47 @@ function SentPane(props: { view: ResponseView }) {
   );
 }
 
+function TestsPane(props: { view: ResponseView }) {
+  const { tests, saved } = props.view;
+  const passed = tests.filter(test => test.ok).length;
+  return (
+    <>
+      {tests.length === 0 ? <p class="hint">This request has no tests. Add some in the Tests tab of the request.</p> : (
+        <>
+          <p class="status-line" role="status"><strong class={passed === tests.length ? 'result-pass' : 'result-fail'}>{passed} of {tests.length} passed</strong></p>
+          <table class="data" aria-label="Test results">
+            <thead><tr><th scope="col">Result</th><th scope="col">Test</th><th scope="col">From</th><th scope="col">Details</th></tr></thead>
+            <tbody>{tests.map(test => <tr><td class={test.ok ? 'result-pass nowrap' : 'result-fail nowrap'}>{test.ok ? 'Passed' : 'Failed'}</td><td class="cell">{test.expr}</td><td class="nowrap">{test.from}</td><td>{test.message}</td></tr>)}</tbody>
+          </table>
+        </>
+      )}
+      {saved.length > 0 ? (
+        <>
+          <h3>Saved from the response</h3>
+          <table class="data" aria-label="Saved variables">
+            <thead><tr><th scope="col">Result</th><th scope="col">Variable</th><th scope="col">Value</th></tr></thead>
+            <tbody>{saved.map(item => (
+              <tr>
+                <td class={item.ok ? 'result-pass nowrap' : 'result-fail nowrap'}>{item.ok ? (item.action === 'delete' ? 'Removed' : 'Saved') : 'Not saved'}</td>
+                <td class="cell">{item.variable === '' ? item.expr : item.variable}{item.scope === 'active' ? '' : ` (${item.scope})`}</td>
+                <td class="cell">{!item.ok ? item.message : item.action === 'delete' ? '' : item.secret ? '(a secret: not shown)' : item.value}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function Answer(props: { view: ResponseView; port: HostPort }) {
   const [tab, setTab] = useState('body');
   const view = props.view;
+  const passed = view.tests.filter(test => test.ok).length;
+  const hasTests = view.tests.length > 0 || view.saved.length > 0;
   const tabs: TabSpec[] = [
     { id: 'body', label: 'Body' }, { id: 'headers', label: 'Headers', badge: String(view.headers.length) }, { id: 'cookies', label: 'Cookies', badge: view.cookies.length === 0 ? '' : String(view.cookies.length) },
+    ...(hasTests ? [{ id: 'tests', label: 'Tests', badge: view.tests.length === 0 ? '' : `${passed}/${view.tests.length}` }] : []),
     { id: 'request', label: 'Request' }, { id: 'timeline', label: 'Timeline' }
   ];
   return (
@@ -137,6 +173,7 @@ function Answer(props: { view: ResponseView; port: HostPort }) {
         <span>{formatSize(view.size)}</span>
         <span class="muted">HTTP/{view.httpVersion}</span>
         {view.onDisk ? <span class="muted">kept in a file</span> : null}
+        {view.tests.length > 0 ? <span class={passed === view.tests.length ? 'result-pass' : 'result-fail'}>{passed === view.tests.length ? 'All' : `${passed} of`} {view.tests.length} {view.tests.length === 1 ? 'test' : 'tests'} passed</span> : null}
       </p>
       {view.warnings.map(warning => <div class="banner warning" role="status"><span>{warning}</span></div>)}
       <Tabs tabs={tabs} active={tab} onSelect={setTab} label="Response">
@@ -144,6 +181,7 @@ function Answer(props: { view: ResponseView; port: HostPort }) {
         {tab === 'headers' ? <Table head={['Name', 'Value']} rows={view.headers} label="Response headers" empty="The response has no headers." /> : null}
         {tab === 'cookies' ? <Table head={['Name', 'Value', 'Domain', 'Path', 'Expires', 'Flags']} label="Cookies set by the response" empty="The response sets no cookies."
           rows={view.cookies.map(cookie => [cookie.name, cookie.value, cookie.domain, cookie.path, cookie.expires, [cookie.secure ? 'Secure' : '', cookie.httpOnly ? 'HttpOnly' : '', cookie.sameSite === '' ? '' : `SameSite=${cookie.sameSite}`].filter(flag => flag !== '').join(' ')])} /> : null}
+        {tab === 'tests' ? <TestsPane view={view} /> : null}
         {tab === 'request' ? <SentPane view={view} /> : null}
         {tab === 'timeline' ? <Timeline view={view} /> : null}
       </Tabs>

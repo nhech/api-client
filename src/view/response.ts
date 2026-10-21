@@ -1,5 +1,6 @@
+import type { CaptureResult, CaptureScope, TestResult, TestSubject } from '../core/assert';
 import { parseSetCookie } from '../core/cookies';
-import { redactedValue, redactValues } from '../core/redact';
+import { isSecretName, redactedValue, redactValues } from '../core/redact';
 import { isoTime } from '../core/vars';
 import type { RedirectHop, Timings, TlsInfo, WireRequest, WireResponse } from '../engine/types';
 import { printable } from '../util/chars';
@@ -60,6 +61,20 @@ export interface SentView {
   body: string;
 }
 
+/** A variable a capture set (or removed), as the pane shows it: the value of a secret is not in it. */
+export interface SavedView {
+  expr: string;
+  from: string;
+  ok: boolean;
+  variable: string;
+  scope: CaptureScope;
+  action: 'set' | 'delete';
+  /** What was saved, cut to 200 characters; empty for a secret. */
+  value: string;
+  secret: boolean;
+  message: string;
+}
+
 export interface ResponseView {
   status: number;
   statusText: string;
@@ -75,6 +90,9 @@ export interface ResponseView {
   warnings: string[];
   cookies: CookieView[];
   sent: SentView;
+  /** What the tests of the request and of its folders made of the response, and what its captures saved. */
+  tests: TestResult[];
+  saved: SavedView[];
   /** The engine cut the body at the limit of the settings. */
   truncated: boolean;
   /** The body is in a file, not in memory. */
@@ -397,6 +415,8 @@ export interface ResponseViewInput {
   redactions: readonly string[];
   /** What was said before sending: variables with no value, and the like. */
   warnings: readonly string[];
+  tests?: readonly TestResult[];
+  captures?: readonly CaptureResult[];
 }
 
 const headerOf = (headers: readonly (readonly [string, string])[], name: string): string => headers.find(([key]) => key.toLowerCase() === name)?.[1] ?? '';
@@ -421,6 +441,23 @@ export function buildResponseView(input: ResponseViewInput): ResponseView {
     headers: response.headers.map(([name, value]) => [printable(name), printable(value)]),
     body, size: response.size, wireBytes: response.wireBytes, timings: response.timings, redirects: response.redirects,
     finalUrl: printable(redactValues(response.finalUrl, input.redactions)), tls: response.tls, warnings, cookies,
-    sent: describeSent(response.sent, input.redactions), truncated: response.truncated, onDisk: response.body.kind === 'file'
+    sent: describeSent(response.sent, input.redactions), tests: [...(input.tests ?? [])], saved: (input.captures ?? []).map(savedView),
+    truncated: response.truncated, onDisk: response.body.kind === 'file'
   };
+}
+
+function savedView(result: CaptureResult): SavedView {
+  const secret = isSecretName(result.variable);
+  const value = secret || result.action === 'delete' ? '' : result.value.length > 200 ? `${result.value.slice(0, 197)}...` : result.value;
+  return { expr: result.expr, from: result.from, ok: result.ok, variable: printable(result.variable), scope: result.scope, action: result.action, value: printable(value), secret, message: printable(result.message) };
+}
+
+/** What the tests of a request see of its response: the status, the time, the headers and the body as text (undefined, with the reason, when it is not text or too large). */
+export function testSubject(response: WireResponse, bytes: Uint8Array): TestSubject {
+  const base = { status: response.status, durationMs: Math.round(response.timings.totalMs), headers: response.headers };
+  const { mediaType, charset } = mediaTypeOf(headerOf(response.headers, 'content-type'));
+  if (response.size === 0) return { ...base, body: '' };
+  if (bytes.length < response.size) return { ...base, body: undefined, bodyNote: `The body (${formatSize(response.size)}) is too large to be tested.` };
+  if (IMAGES[mediaType] !== undefined || (BINARY_TYPES.test(mediaType) && languageOf(mediaType) === undefined) || looksBinary(bytes)) return { ...base, body: undefined, bodyNote: 'The body is not text.' };
+  return { ...base, body: decodeBodyText(bytes, charset).text };
 }

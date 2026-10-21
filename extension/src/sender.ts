@@ -1,15 +1,18 @@
 import { promises as disk } from 'node:fs';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
+import { runCaptures, runTests } from '../../src/core/assert';
 import { CookieJar } from '../../src/core/cookies';
 import type { Request } from '../../src/core/model';
+import { RuntimeVariables, type RuntimeContext } from '../../src/core/runtime';
+import { resolveText } from '../../src/core/vars';
 import { confinedFile } from '../../src/engine/files';
-import { prepareSend } from '../../src/engine/prepare';
+import { locate, prepareSend } from '../../src/engine/prepare';
 import { proxyConfigFromEnv, type ProxyConfig } from '../../src/engine/proxy';
 import { send } from '../../src/engine/send';
 import { EngineError, type WireResponse } from '../../src/engine/types';
 import type { ToView } from '../../src/view/request-protocol';
-import { buildResponseView, decodeBodyText, formatJson, formatXml, VIEW_READ_BYTES, type ResponseView } from '../../src/view/response';
+import { buildResponseView, decodeBodyText, formatJson, formatXml, testSubject, VIEW_READ_BYTES, type ResponseView } from '../../src/view/response';
 import { printable } from '../../src/util/chars';
 import { realClock, type ClientWorkspace } from './clientWorkspace';
 
@@ -18,15 +21,38 @@ const SPILL_LIMIT_BYTES = 256 * 1024 * 1024;
 /** The most of a body that is opened in an editor tab; a larger one can be saved. */
 const OPEN_LIMIT_BYTES = 32 * 1024 * 1024;
 
-/** What every request editor shares when it sends: the files, the cookie jar, and where large responses are put. */
+/** The most tests and captures one send runs: more than that is a request somebody made to be slow. */
+const MAX_TESTS = 500;
+const MAX_CAPTURES = 100;
+
+/** What every request editor shares when it sends: the files, the cookie jar, the variables that requests have set, and where large responses are put. */
 export class SendEnvironment implements vscode.Disposable {
   readonly jar = new CookieJar(() => Date.now());
+  /** What the captures of the responses saved; the editors are told when it changes. */
+  readonly runtime = new RuntimeVariables();
+  private readonly changed = new vscode.EventEmitter<void>();
+  readonly onDidChangeVariables = this.changed.event;
   private readonly spillDir: string;
 
   constructor(context: vscode.ExtensionContext, readonly workspace: ClientWorkspace) {
     this.spillDir = join(context.globalStorageUri.fsPath, 'spill');
     // A response that was spilled to a file belongs to a page that is gone when the extension starts again.
     void disk.rm(this.spillDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+
+  /** The context a request is in, for the variables that were saved: the active environment and the collection it is in. */
+  contextOf(collection: string): RuntimeContext {
+    return { environmentId: this.workspace.activeEnvironmentId, collection };
+  }
+
+  /** Forgets every variable that a response saved. */
+  clearVariables(): void {
+    this.runtime.clear();
+    this.changed.fire();
+  }
+
+  announceVariables(): void {
+    this.changed.fire();
   }
 
   spill(): { dir: string; maxBytes: number } {
@@ -44,7 +70,9 @@ export class SendEnvironment implements vscode.Disposable {
     return noProxy === '' ? base : { ...base, noProxy };
   }
 
-  dispose(): void { /* nothing is kept running */ }
+  dispose(): void {
+    this.changed.dispose();
+  }
 }
 
 async function readPrefix(body: WireResponse['body'], limit: number): Promise<Uint8Array> {
@@ -89,8 +117,9 @@ export class RequestRunner implements vscode.Disposable {
     const id = this.nextId++;
     const loaded = this.env.workspace.loaded;
     if (loaded === undefined) { this.fail(id, 'invalid-request', 'No folder is open, so there are no collections to send from.'); return; }
+    const collectionPath = locate(loaded, path)?.collection.path ?? '';
     const prepared = prepareSend({
-      loaded, path, request, environmentId: this.env.workspace.activeEnvironmentId, clock: realClock,
+      loaded, path, request, environmentId: this.env.workspace.activeEnvironmentId, clock: realClock, runtime: this.env.runtime.scope(this.env.contextOf(collectionPath)),
       resolveFile: (collectionPath, relative) => {
         const folder = this.env.workspace.folder();
         return folder === undefined ? undefined : confinedFile(join(folder.uri.fsPath, ...collectionPath.split('/')), relative);
@@ -114,7 +143,15 @@ export class RequestRunner implements vscode.Disposable {
         ...(prepared.effective.settings.cookies ? { cookies: this.env.jar } : {})
       });
       const bytes = await readPrefix(response.body, VIEW_READ_BYTES);
-      const view = buildResponseView({ response, bytes, redactions: prepared.built.redactions, warnings });
+      // The tests are judged first, with the variables as they were when the request went out; then the captures save what they read.
+      const resolve = (text: string): { text: string; unresolved: readonly string[] } => { const resolved = resolveText(text, prepared.scopes, { clock: realClock }); return { text: resolved.text, unresolved: resolved.unresolved }; };
+      const subject = testSubject(response, bytes);
+      const tests = runTests(prepared.effective.tests.slice(0, MAX_TESTS), subject, resolve);
+      const captures = runCaptures(request.captures.filter(item => item.enabled && item.expr.trim() !== '').slice(0, MAX_CAPTURES).map(item => ({ expr: item.expr, from: 'request' })), subject, resolve);
+      const context = this.env.contextOf(prepared.collection.path);
+      for (const capture of captures) this.env.runtime.apply(capture, context);
+      if (captures.some(capture => capture.ok)) this.env.announceVariables();
+      const view = buildResponseView({ response, bytes, redactions: prepared.built.redactions, warnings, tests, captures });
       this.last = { response, view };
       this.post({ type: 'response', id, response: view });
     } catch (error) {

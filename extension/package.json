@@ -154,6 +154,11 @@
         "title": "Collection or Folder Settings",
         "category": "API Client",
         "icon": "$(gear)"
+      },
+      {
+        "command": "apiClient.clearVariables",
+        "title": "Clear Saved Variables",
+        "category": "API Client"
       }
     ],
     "views": {

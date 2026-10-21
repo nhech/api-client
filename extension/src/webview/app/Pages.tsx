@@ -5,6 +5,8 @@ import { AuthEditor } from './AuthEditor';
 import { CodeEditor } from './CodeEditor';
 import { KeyValueGrid, Tabs, type TabSpec } from './components';
 import { SettingsForm } from './SettingsForm';
+import { ExpressionList } from './Expressions';
+import { checkTest, TestsHelp } from './TestsForm';
 import { documentState, edit, flushNow, notice, working, type HostPort } from './store';
 import { VarsGrid } from './Variables';
 
@@ -63,7 +65,7 @@ function ContainerPage(props: { container: Container; kind: 'collection' | 'fold
   const c = props.container;
   const tabs: TabSpec[] = [
     { id: 'general', label: 'General' }, { id: 'headers', label: 'Headers', badge: countRows(c.headers) }, { id: 'auth', label: 'Auth', badge: c.auth.kind === 'inherit' || c.auth.kind === 'none' ? '' : '•' },
-    { id: 'vars', label: 'Variables', badge: countRows(c.vars) }, { id: 'settings', label: 'Settings', badge: Object.keys(c.settings).length === 0 ? '' : String(Object.keys(c.settings).length) }
+    { id: 'vars', label: 'Variables', badge: countRows(c.vars) }, { id: 'tests', label: 'Tests', badge: countRows(c.tests.map(row => ({ enabled: row.enabled, name: row.expr }))) }, { id: 'settings', label: 'Settings', badge: Object.keys(c.settings).length === 0 ? '' : String(Object.keys(c.settings).length) }
   ];
   const where = props.kind === 'collection' ? 'the collection' : 'the folder';
   return (
@@ -88,6 +90,13 @@ function ContainerPage(props: { container: Container; kind: 'collection' | 'fold
             <p class="hint">Available to every request in {where}, and beating the variables of the active environment.</p>
             <VarsGrid rows={c.vars} path={['vars']} reveal={reveal} />
             {c.vars.some(variable => variable.secret) ? <label class="check"><input type="checkbox" checked={reveal} onChange={event => setReveal((event.target as HTMLInputElement).checked)} /><span>Show the values of secret variables</span></label> : null}
+          </>
+        ) : null}
+        {tab === 'tests' ? (
+          <>
+            <p class="hint">Checked after every request in {where}, together with the tests of the request itself.</p>
+            <ExpressionList rows={c.tests} path={['tests']} label="Test" placeholder="status < 500" check={checkTest} suggestions={[{ label: 'Status is not an error', expr: 'status < 400' }, { label: 'Responds in under 2 s', expr: 'duration < 2000' }]} />
+            <TestsHelp />
           </>
         ) : null}
         {tab === 'settings' ? <SettingsForm settings={c.settings} path={['settings']} what={props.kind} /> : null}

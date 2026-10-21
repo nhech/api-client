@@ -1,6 +1,6 @@
 {
   "_comment": "What the extension package may hold. Read by scripts/package-extension.cjs (the package) and test/unit/purity.test.ts (the built bundles). Raise a limit or add a module in the commit that needs it, and say why in the message.",
-  "maxPackageBytes": 368640,
+  "maxPackageBytes": 460800,
   "files": [
     "[Content_Types].xml",
     "extension.vsixmanifest",

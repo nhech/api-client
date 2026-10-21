@@ -36,11 +36,11 @@ const getJson = url => new Promise((resolve, reject) => {
 });
 
 /** A minimal Chrome DevTools Protocol client over the WebSocket that Node provides. */
-async function connect() {
-  for (let attempt = 0; attempt < 120; attempt++) {
+async function connect(match = target => target.type === 'page' && /workbench/.test(target.url), attempts = 120) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const targets = await getJson(`http://127.0.0.1:${PORT}/json`);
-      const page = targets.find(target => target.type === 'page' && /workbench/.test(target.url));
+      const page = targets.find(match);
       if (page) {
         const socket = new WebSocket(page.webSocketDebuggerUrl);
         await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
@@ -55,6 +55,24 @@ async function connect() {
   throw new Error('The editor did not open its debugging port.');
 }
 
+/**
+ * Runs a function (given as text, taking the document) in every webview of the editor, so that a picture can be taken of a tab that is not the first one. The
+ * script is ours, from the test suite; nothing from a page or a file is run.
+ */
+async function inWebviews(script) {
+  const targets = (await getJson(`http://127.0.0.1:${PORT}/json`)).filter(target => /vscode-webview/.test(target.url));
+  const wrapped = `(() => { const docs = [document]; const inner = document.getElementById('active-frame'); if (inner && inner.contentDocument) docs.push(inner.contentDocument); return JSON.stringify(docs.map(d => { try { return (${script})(d); } catch (e) { return String(e); } })); })()`;
+  const outcomes = [];
+  for (const target of targets) {
+    const socket = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+    const answer = await new Promise(resolve => { socket.onmessage = event => resolve(JSON.parse(event.data)); socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: wrapped, returnByValue: true } })); });
+    socket.close();
+    outcomes.push(answer.result && answer.result.result ? answer.result.result.value : answer.error);
+  }
+  return outcomes;
+}
+
 async function takeShots(exchange, theme) {
   const cdp = await connect();
   const taken = [];
@@ -67,6 +85,7 @@ async function takeShots(exchange, theme) {
         fs.rmSync(path.join(exchange, file));
         await cdp.send('Emulation.setDeviceMetricsOverride', { width: request.width, height: request.height, deviceScaleFactor: 1, mobile: false });
         await sleep(request.settle || 900);
+        if (request.script) { await inWebviews(request.script); await sleep(500); }
         // The top 30 pixels are the title bar of the window (the name of the window, which says it is a development host); the picture starts below it.
         const shot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 30, width: request.width, height: request.height - 30, scale: 1 } });
         const name = `${request.name}${theme === 'dark' ? '' : `-${theme}`}.png`;
