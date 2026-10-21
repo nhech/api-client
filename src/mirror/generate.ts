@@ -1,4 +1,4 @@
-import { MULTIPART_BOUNDARY } from '../convert/body';
+import { leavesFolder, MULTIPART_BOUNDARY } from '../convert/body';
 import { protectBodyText } from '../convert/body-secrets';
 import { SECRET_VARIABLE, SecretStore } from '../convert/secrets';
 import { hasLiteral, mapLiteral, oneLine, splitOutsideVariables } from '../convert/text';
@@ -9,6 +9,7 @@ import { renderRequest } from '../emit/http';
 import { identifier } from '../emit/names';
 import type { ImpAuth, ImpBody, ImpHeader, ImpQuery, ImpRequest } from '../model/ir';
 import { textHash } from '../util/hash';
+import { httpSafe } from './safe';
 
 /**
  * The `.http` file that is written next to a request (`list-pets.req.yml` gives `list-pets.http`), for people who use the files with REST
@@ -122,15 +123,18 @@ function impOf(input: MirrorInput, store: SecretStore, withBody: boolean): ImpRe
     case 'xml': body = { kind: 'text', contentType: 'application/xml', text: protectBodyText(spec.text, inText('body')) }; contentType = 'application/xml'; break;
     case 'form': body = { kind: 'form', fields: spec.fields.filter(field => field.name !== '').map(field => ({ name: field.name, value: protectedBy(store, collection, 'form', field.name, field.value), enabled: field.enabled })) }; contentType = 'application/x-www-form-urlencoded'; break;
     case 'graphql': body = { kind: 'graphql', query: protectBodyText(spec.query, inText('body')), variables: protectBodyText(spec.variables, inText('body')) }; contentType = 'application/json'; break;
-    case 'multipart':
-      body = {
-        kind: 'multipart',
-        parts: spec.parts.filter(part => part.name !== '').map(part => (part.kind === 'file'
-          ? { name: part.name, filePath: fromMirror(part.file, input.depth), enabled: part.enabled }
-          : { name: part.name, value: protectedBy(store, collection, 'form', part.name, part.value), enabled: part.enabled }))
-      };
+    case 'multipart': {
+      // A `.http` tool reads the file that a part names, wherever it is: a path that leaves the folder of the collection is not written (the client itself refuses it when it sends).
+      const parts: Extract<ImpBody, { kind: 'multipart' }>['parts'] = [];
+      for (const part of spec.parts.filter(item => item.name !== '')) {
+        if (part.kind === 'file' && leavesFolder(part.file)) notes.push(`[the file part ${oneLine(part.name).text} is not written: its path leaves the folder of the collection]`);
+        else if (part.kind === 'file') parts.push({ name: part.name, filePath: fromMirror(part.file, input.depth), enabled: part.enabled });
+        else parts.push({ name: part.name, value: protectedBy(store, collection, 'form', part.name, part.value), enabled: part.enabled });
+      }
+      body = { kind: 'multipart', parts };
       contentType = `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
       break;
+    }
     case 'binary': notes.push(`[the body is the file ${oneLine(spec.file).text}: it is not written here]`); break;
     default: break;
   }
@@ -180,6 +184,6 @@ export function mirrorOf(input: MirrorInput): Mirror {
     lines.splice(at < 0 ? lines.length : at, 0, line);
     block = lines.join('\n');
   }
-  block = `${block}\n`;
+  block = httpSafe(`${block}\n`);
   return { block, hash: textHash(block), secrets: store.variables };
 }

@@ -28,12 +28,13 @@ export interface Neutralized {
 
 const MAX_PASSES = 16;
 
-export function neutralizeExpressions(text: string): Neutralized {
+/** `plain` says which spans are left alone: the plain variables of the conversion by default; the mirror of a request passes the words of the client. */
+export function neutralizeExpressions(text: string, plain: (inner: string) => boolean = isPlainVariable): Neutralized {
   if (!text.includes('{{')) return { text, count: 0 };
   let current = text;
   let count = 0;
   for (let pass = 0; pass < MAX_PASSES; pass++) {
-    const spans = variableSpans(current).filter(([start, end]) => !isPlainVariable(current.slice(start + 2, end - 2)));
+    const spans = variableSpans(current).filter(([start, end]) => !plain(current.slice(start + 2, end - 2)));
     if (spans.length === 0) break;
     let out = '';
     let at = 0;

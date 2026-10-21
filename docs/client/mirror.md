@@ -16,6 +16,11 @@ Variables stay as `{{variables}}`: nothing is resolved. **The file never holds a
 
 A body that a `.http` tool would read as something else (a line starting with `###`, `<`, `>` or `//`) is left out with a note, because the emitter would otherwise have to put it in another file.
 
+**What the tools read into the file** (`src/mirror/safe.ts`, `src/mirror/generate.ts`). The tools that read a `.http` file run in a place of trust, and a request can come with a cloned repository, so the file never carries what they would act on:
+
+- httpYac runs the text between `{{` and `}}` as JavaScript, and REST Client and httpYac put an environment variable into the request for `{{$processEnv NAME}}`. In the mirror only a plain variable name (letters, digits, `_` and `-`: **a name with a dot is not written as it is**, because `process.env.X` is a path that is read) and the dynamic words of the client with arguments the client accepts (`{{$guid}}`, `{{$randomInt 1 6}}`) are written as they are. Anything else has its braces separated (`{ {` and `} }`), which every tool reads as text, and so does a `{{` that is never closed.
+- The tools read the file that a multipart part names, wherever it is. A file part whose path leaves the folder of the collection (an absolute path, a drive, `~`, `..`) is **not written**: a comment says so. The client itself refuses such a path when it sends.
+
 The first line:
 
 ```

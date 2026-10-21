@@ -147,7 +147,9 @@ test('A multipart body names its files from the folder of the mirror, and the bo
   assert.match(deep, /# \[disabled form field\] off=x\n/);
   assert.match(block({ method: 'POST', body }, { depth: 0 }), /\n< \.\/files\/a\.pdf\n/);
   const absolute: Body = { kind: 'multipart', parts: [{ name: 'doc', kind: 'file', value: '', file: '/abs/a.pdf', contentType: '', enabled: true }] };
-  assert.match(block({ method: 'POST', body: absolute }, { depth: 3 }), /\n< \/abs\/a\.pdf\n/);
+  const written = block({ method: 'POST', body: absolute }, { depth: 3 });
+  assert.ok(!written.includes('/abs/a.pdf') && !/\n< /.test(written), 'a path that leaves the folder of the collection is not written: a .http tool would read the file');
+  assert.match(written, /# \[the file part doc is not written: its path leaves the folder of the collection\]/);
   const existing = block({ method: 'POST', headers: [kv('Content-Type', 'multipart/form-data')], body }, { depth: 0 });
   assert.equal(existing.match(/Content-Type: multipart/g)?.length, 1, 'the content type of a multipart body is the one with the boundary');
 });
