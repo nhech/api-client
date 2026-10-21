@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { isAbsolute, relative } from 'node:path';
 import * as vscode from 'vscode';
 import { newRequest } from '../../src/core/model';
+import { variablesOf } from '../../src/engine/prepare';
 import { readRequest, writeRequest } from '../../src/format/schema';
 import type { YMap } from '../../src/format/yaml';
 import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
@@ -16,9 +17,9 @@ export const REQUEST_VIEW_TYPE = 'apiClient.request';
 export interface RequestEditorTestView {
   readonly isReady: boolean;
   readonly violations: string[];
-  /** What the page was last told. */
+  /** What the page was last told about the file and the send (not the list of variables). */
   lastMessage(): ToView | undefined;
-  /** The last messages the page was told, oldest first. */
+  /** The last messages the page was told, the lists of variables included, oldest first. */
   messages(): readonly ToView[];
   readonly isSending: boolean;
   state(): RequestState;
@@ -49,6 +50,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     this.env = env;
     this.subscriptions.push(
       panel.webview.onDidReceiveMessage((raw: unknown) => { this.receive(raw).catch(() => undefined); }),
+      env.workspace.onDidChange(() => { if (this.ready) this.postVariables(); }),
       vscode.workspace.onDidChangeTextDocument(event => {
         if (event.document !== document || event.contentChanges.length === 0) return;
         if (this.selfChanges > 0) { this.selfChanges--; return; }
@@ -91,7 +93,8 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
   }
 
   private post(message: ToView): void {
-    this.last = message;
+    // The list of variables comes whenever the files change; "what the page was last told" is about the file and the send, so it is left out.
+    if (message.type !== 'vars') this.last = message;
     this.recent.push(message);
     if (this.recent.length > 50) this.recent.shift();
     void this.panel.webview.postMessage(message);
@@ -115,11 +118,19 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     return path.startsWith('..') || isAbsolute(path) ? undefined : path;
   }
 
+  /** Tells the page which variables are defined for this request, as the files and the active environment say now. */
+  private postVariables(): void {
+    const loaded = this.env.workspace.loaded;
+    const path = this.relativePath();
+    this.post({ type: 'vars', ...(loaded === undefined || path === undefined ? { vars: [], complete: false } : variablesOf(loaded, path, this.env.workspace.activeEnvironmentId)) });
+  }
+
   private async handle(message: ToHost): Promise<void> {
     if (message.type === 'ready') {
       this.ready = true;
       this.violations.splice(0, this.violations.length, ...message.violations);
       this.post({ type: 'init', ...this.state() });
+      this.postVariables();
     } else if (message.type === 'openAsText') {
       await vscode.commands.executeCommand('vscode.openWith', this.document.uri, 'default');
     } else if (message.type === 'edit') {

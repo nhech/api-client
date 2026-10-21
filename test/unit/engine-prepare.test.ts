@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import type { Clock } from '../../src/core/clock';
 import { newContainer, newRequest, type Container, type Environment, type Request, type Var } from '../../src/core/model';
 import { confinedFile } from '../../src/engine/files';
-import { locate, prepareSend, type PrepareInput } from '../../src/engine/prepare';
+import { locate, prepareSend, variablesOf, type PrepareInput } from '../../src/engine/prepare';
 import type { ContainerNode, Loaded, RequestNode } from '../../src/storage/store';
 
 const clock: Clock = { now: () => 1_700_000_000_000, random: () => 0.5 };
@@ -156,4 +156,14 @@ test('A link on the way to a file is refused, whether the link is the file or a 
       rmSync(outside, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   });
+});
+
+test('The editor is given the variables of a request, and is told when it cannot know them', () => {
+  const setup = fixture({ folderHost: true });
+  const known = variablesOf(setup.loaded, setup.path, 'E1');
+  assert.equal(known.complete, true);
+  assert.deepEqual(known.vars.map(item => [item.name, item.source]), [['host', 'folder Orders'], ['only-folder', 'folder Orders'], ['token', 'environment dev']]);
+  assert.deepEqual(variablesOf(setup.loaded, setup.path, undefined).vars.map(item => [item.name, item.source]).at(-1), ['token', 'workspace']);
+  assert.ok(known.vars.every(item => !item.secret || item.value === ''), 'secrets have no value');
+  assert.deepEqual(variablesOf(setup.loaded, 'api-client/loose.req.yml', 'E1'), { vars: [], complete: false });
 });

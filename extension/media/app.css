@@ -109,3 +109,7 @@ pre.plain { white-space: pre-wrap; overflow-wrap: anywhere; }
 .bars { display: flex; height: 14px; border: 1px solid var(--vscode-panel-border, transparent); margin: 4px 0 10px; overflow: hidden; }
 .bar-part { display: block; height: 100%; }
 .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 2px; }
+
+/* The name of the request above its address. */
+input.title { width: 100%; min-height: 0; padding: 2px 4px; font-size: 1.15em; font-weight: 600; color: inherit; background: transparent; border: 1px solid transparent; }
+input.title:hover, input.title:focus { border-color: var(--vscode-input-border, var(--vscode-panel-border, transparent)); background: var(--vscode-input-background); }

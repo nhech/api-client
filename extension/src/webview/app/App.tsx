@@ -121,6 +121,9 @@ function Editor(props: { request: Request; port: HostPort }) {
   ];
   return (
     <div class="request">
+      <input class="title" aria-label="Name of the request" placeholder="Name of the request" value={r.name} spellcheck={false}
+        onInput={event => { const value = (event.target as HTMLInputElement).value; if (value.trim() !== '') edit({ op: 'set', path: ['name'], value }); }}
+        onBlur={event => { (event.target as HTMLInputElement).value = r.name; flushNow(); }} />
       <div class="bar">
         <Method value={r.method} />
         <CodeEditor value={r.url} oneLine label="Address" placeholder="https://example.com/path or {{baseUrl}}/path" onChange={value => edit({ op: 'set', path: ['url'], value })} onSubmit={send} onBlur={flushNow} />

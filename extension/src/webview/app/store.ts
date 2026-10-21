@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
 import type { Request } from '../../../../src/core/model';
+import type { VariableInfo } from '../../../../src/core/vars';
 import { applyEditOps } from '../../../../src/view/edit';
 import type { EditOp, RequestState, ToHost, ToView } from '../../../../src/view/request-protocol';
 import type { ResponseView } from '../../../../src/view/response';
@@ -24,6 +25,9 @@ export const confirmed = signal<RequestState | undefined>(undefined);
 export const request = signal<Request | undefined>(undefined);
 /** Something the person should be told: an edit that was refused, a file that changed under their hands. */
 export const notice = signal<string | undefined>(undefined);
+
+/** The variables the request can use, and whether that list is the whole truth (it is not for a file outside a collection). */
+export const variables = signal<{ vars: VariableInfo[]; complete: boolean }>({ vars: [], complete: false });
 
 /** Whether a request is on its way, and since when (to show how long it has taken). */
 export const sending = signal<{ id: number; since: number } | undefined>(undefined);
@@ -96,6 +100,10 @@ export function receive(message: ToView): void {
     queue = [];
     inFlight = false;
     sendWhenSettled = false;
+    return;
+  }
+  if (message.type === 'vars') {
+    variables.value = { vars: message.vars, complete: message.complete };
     return;
   }
   if (message.type === 'sending') {

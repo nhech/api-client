@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { Clock } from '../../src/core/clock';
 import type { Level } from '../../src/core/inherit';
 import { newContainer, newEnvironment, newWorkspaceFile, type Var } from '../../src/core/model';
-import { dynamicValue, isoTime, resolveText, scopeOf, tokenize, variableScopes, type Scope } from '../../src/core/vars';
+import { describeVariables, dynamicValue, isKnownDynamic, isoTime, resolveText, scopeOf, tokenize, variableScopes, type Scope } from '../../src/core/vars';
 
 const fixed = (now = 1_700_000_000_000, random = 0.5): Clock => ({ now: () => now, random: () => random });
 /** A clock whose randomness is a repeatable sequence. */
@@ -162,4 +162,25 @@ test('The scopes of a request run from what it set while running, through the fo
   assert.equal(resolve('{{off}} {{onlyEnv}} {{onlyWorkspace}} {{c}}', scopes).text, '{{off}} e w c');
   assert.equal(scopeOf([variable('a', '1'), variable('a', '2'), variable('', 'nameless')]).get('a')?.value, '2', 'the last of a repeated name wins');
   assert.equal(scopeOf([variable('', 'nameless')]).size, 0);
+});
+
+test('The variables a request can use are listed once each, the strongest definition winning, with where each comes from and no value for a secret', () => {
+  const collection: Level = { kind: 'collection', name: 'Shop', container: { ...newContainer('c', 'Shop'), vars: [variable('host', 'collection-host'), variable('only-collection', 'c'), variable('off', 'x', { enabled: false })] } };
+  const folder: Level = { kind: 'folder', name: 'Orders', container: { ...newContainer('f', 'Orders'), vars: [variable('host', 'folder-host'), variable('token', 'folder-secret', { secret: true })] } };
+  const environment = { ...newEnvironment('e', 'Dev'), vars: [variable('host', 'env-host'), variable('only-env', 'e'), variable('token', 'env-secret', { secret: true }), variable('', 'nameless')] };
+  const workspace = { ...newWorkspaceFile(), vars: [variable('only-workspace', 'w'), variable('host', 'workspace-host'), variable('only-env', 'shadowed')] };
+  const listed = describeVariables({ levels: [collection, folder], environment, workspace, runtime: new Map([['run', { value: 'r', secret: false }], ['hidden', { value: 'shh', secret: true }]]) });
+  assert.deepEqual(listed.map(item => [item.name, item.value, item.secret, item.source]), [
+    ['hidden', '', true, 'this run'], ['host', 'folder-host', false, 'folder Orders'], ['only-collection', 'c', false, 'collection Shop'], ['only-env', 'e', false, 'environment Dev'],
+    ['only-workspace', 'w', false, 'workspace'], ['run', 'r', false, 'this run'], ['token', '', true, 'folder Orders']
+  ]);
+  assert.ok(!JSON.stringify(listed).includes('secret') || !JSON.stringify(listed).includes('folder-secret'), 'the value of a secret is nowhere');
+  assert.ok(!JSON.stringify(listed).includes('shh') && !JSON.stringify(listed).includes('env-secret'));
+  assert.deepEqual(describeVariables({ levels: [], workspace: newWorkspaceFile() }), []);
+  assert.equal(describeVariables({ levels: [], workspace, runtime: new Map([['host', { value: 'run-host', secret: false }]]) }).find(item => item.name === 'host')?.value, 'run-host', 'what a run has set beats the files');
+});
+
+test('A dynamic word is known when it makes a value', () => {
+  for (const word of ['$guid', '$uuid', '$timestamp', '$isoTimestamp', '$randomInt', '$randomInt 1 6', '$randomBoolean', '$randomString 8', '$randomEmail', '$timestamp 1 h', '$timestamp -2 d']) assert.equal(isKnownDynamic(word), true, word);
+  for (const word of ['$nothing', '$randomInt x', '$guid extra', '$', 'guid', '']) assert.equal(isKnownDynamic(word), false, word);
 });

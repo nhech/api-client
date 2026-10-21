@@ -238,7 +238,14 @@ const MUTATIONS = [
   { id: "M218", rule: "Organise: a drop on what is being moved does nothing", file: "src/storage/organise.ts", find: "nodes.some(node => node.path === target.path)) return { ok: false, reason: '' };", replace: "false) return { ok: false, reason: '' };" },
   { id: "M219", rule: "Organise: moved entries are put before the chosen one", file: "src/storage/organise.ts", find: "const index = at < 0 ? rest.length : at;", replace: "const index = rest.length;" },
   { id: "M220", rule: "Organise: a moved entry is not listed twice", file: "src/storage/organise.ts", find: "const rest = existing.filter(slug => !moved.includes(slug));", replace: "const rest = [...existing];" },
-  { id: "M221", rule: "Organise: a parent is found for an entry at any depth", file: "src/storage/organise.ts", find: "if (child.kind !== 'request') {\n        const found = walk(child);", replace: "if (child.kind !== 'request') {\n        const found = walk(child) && undefined;" }
+  { id: "M221", rule: "Organise: a parent is found for an entry at any depth", file: "src/storage/organise.ts", find: "if (child.kind !== 'request') {\n        const found = walk(child);", replace: "if (child.kind !== 'request') {\n        const found = walk(child) && undefined;" },
+  { id: "M222", rule: "Variables: the value of a secret is not given to the editor", file: "src/core/vars.ts", find: "found.set(name, { name, value: value.secret ? '' : value.value, secret: value.secret, source });", replace: "found.set(name, { name, value: value.value, secret: value.secret, source });" },
+  { id: "M223", rule: "Variables: the value of a secret that a run set is not given to the editor either", file: "src/core/vars.ts", find: "found.set(name, { name, value: value.secret ? '' : value.value, secret: value.secret, source: 'this run' });", replace: "found.set(name, { name, value: value.value, secret: value.secret, source: 'this run' });" },
+  { id: "M224", rule: "Variables: the nearest definition is the one listed", file: "src/core/vars.ts", find: "if (!found.has(name)) found.set(name,", replace: "found.set(name," },
+  { id: "M225", rule: "Variables: the list is in the order of the names", file: "src/core/vars.ts", find: ".sort((a, b) => compareCodePoints(a.name, b.name))", replace: "" },
+  { id: "M226", rule: "Variables: a dynamic word is known when it makes a value", file: "src/core/vars.ts", find: "dynamicValue(expression, CONSTANT_CLOCK) !== undefined", replace: "dynamicValue(expression, CONSTANT_CLOCK) === undefined" },
+  { id: "M227", rule: "Variables: each says where it comes from", file: "src/core/vars.ts", find: "take(level.container.vars, `${level.kind} ${level.name}`);", replace: "take(level.container.vars, 'folder');" },
+  { id: "M228", rule: "Variables: a request outside a collection has an incomplete list", file: "src/engine/prepare.ts", find: "if (located === undefined) return { vars: [], complete: false };", replace: "if (located === undefined) return { vars: [], complete: true };" }
 ];
 
 function run(mutation) {

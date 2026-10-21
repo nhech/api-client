@@ -1,4 +1,5 @@
 import type { Request } from '../core/model';
+import type { VariableInfo } from '../core/vars';
 import type { Finding } from '../format/schema';
 import type { ResponseView } from './response';
 
@@ -46,6 +47,8 @@ export type ToView =
   /** The file changed: by an edit of the page (`self`), on disk, or by an undo in the text editor. */
   | ({ type: 'doc'; cause: 'self' | 'disk' | 'undo' } & RequestState)
   | { type: 'rejected'; rev: number; reason: string }
+  /** The variables the request can use (from its folders, the active environment and the workspace), so that the page can mark a name as known or not; `complete` is false when they cannot be known. */
+  | { type: 'vars'; vars: VariableInfo[]; complete: boolean }
   /** A send began; `id` says which one the answers below belong to. */
   | { type: 'sending'; id: number }
   | { type: 'response'; id: number; response: ResponseView }

@@ -1,6 +1,7 @@
 import type { Clock } from './clock';
 import type { Environment, Var, WorkspaceFile } from './model';
 import type { Level } from './inherit';
+import { compareCodePoints } from '../util/chars';
 
 /**
  * Variables. `{{name}}` is replaced by the value of the nearest scope that has it, `{{$guid}}` and the other `{{$...}}` words
@@ -249,4 +250,36 @@ export function variableScopes(input: ScopeInput): Scope[] {
   if (input.dotenv !== undefined) scopes.push(input.dotenv);
   scopes.push(scopeOf(input.workspace.vars));
   return scopes;
+}
+
+// ---- what the editor shows about variables ----
+
+/** A variable as the editor shows it: where it comes from, and its value unless it is a secret (the value of a secret never leaves the extension). */
+export interface VariableInfo {
+  name: string;
+  value: string;
+  secret: boolean;
+  /** "collection Shop", "folder Orders", "environment Dev", "workspace". */
+  source: string;
+}
+
+const CONSTANT_CLOCK: Clock = { now: () => 0, random: () => 0 };
+
+/** Whether the text between the braces is a dynamic word that makes a value ("$guid", "$randomInt 1 6"). */
+export const isKnownDynamic = (expression: string): boolean => dynamicValue(expression, CONSTANT_CLOCK) !== undefined;
+
+/** Every variable a request can use, once each (the strongest definition), with where it comes from, in the order of the names. */
+export function describeVariables(input: ScopeInput): VariableInfo[] {
+  const found = new Map<string, VariableInfo>();
+  const take = (vars: readonly Var[], source: string): void => {
+    for (const [name, value] of scopeOf(vars)) if (!found.has(name)) found.set(name, { name, value: value.secret ? '' : value.value, secret: value.secret, source });
+  };
+  if (input.runtime !== undefined) for (const [name, value] of input.runtime) found.set(name, { name, value: value.secret ? '' : value.value, secret: value.secret, source: 'this run' });
+  for (let index = input.levels.length - 1; index >= 0; index--) {
+    const level = input.levels[index] as Level;
+    take(level.container.vars, `${level.kind} ${level.name}`);
+  }
+  if (input.environment !== undefined) take(input.environment.vars, `environment ${input.environment.name}`);
+  take(input.workspace.vars, 'workspace');
+  return [...found.values()].sort((a, b) => compareCodePoints(a.name, b.name));
 }

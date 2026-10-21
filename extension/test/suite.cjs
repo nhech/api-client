@@ -325,6 +325,16 @@ exports.run = async function run() {
     assert.ok(!view.sent.url.includes('super-secret'), 'nor in the address');
     assert.ok(view.timings.totalMs >= 0 && view.size > 0);
     assert.deepEqual(sendView.violations, [], 'drawing the answer broke no rule of the policy');
+    // The page is told which variables the request can use, so that it can mark a name as known or not; the value of a secret is not among them.
+    const told = sendView.messages().filter(message => message.type === 'vars').at(-1);
+    assert.equal(told.complete, true);
+    assert.deepEqual(told.vars.filter(item => ['base', 'token'].includes(item.name)).map(item => [item.name, item.secret, item.value === '' ? 'empty' : 'value', item.source]), [['base', false, 'value', 'environment Dev'], ['token', true, 'empty', 'environment Dev']]);
+    assert.ok(!JSON.stringify(told).includes('super-secret-value-9'), 'the secret never reaches the page');
+    const countBefore = sendView.messages().filter(message => message.type === 'vars').length;
+    await test.client().workspace.setActiveEnvironment(undefined);
+    await until(() => sendView.messages().filter(message => message.type === 'vars').length > countBefore, 'a change of environment is told to the page');
+    assert.equal(sendView.messages().filter(message => message.type === 'vars').at(-1).vars.some(item => item.name === 'base'), false, 'without the environment its variables are gone');
+    await test.client().workspace.setActiveEnvironment('01J9Z4V0N2XK7Q3M8T5R6Y1AAC');
 
     // 10b. The same request again: the cookie of the server goes with it (the jar), and the first answer is replaced.
     await sendView.receive({ type: 'send' });
@@ -379,6 +389,7 @@ exports.run = async function run() {
     await until(() => test.requestEditor(loose.toString())?.isReady === true, 'the loose file is open');
     await test.requestEditor(loose.toString()).receive({ type: 'send' });
     assert.match((await answer(test.requestEditor(loose.toString()), 'failed')).message, /not in a collection/);
+    assert.deepEqual(test.requestEditor(loose.toString()).messages().filter(message => message.type === 'vars').at(-1).complete, false, 'a file outside a collection has no list of variables to be judged by');
     const unreadableView = test.requestEditor(vscode.Uri.file(path.join(workspace, 'api-client', 'collections', 'shop', 'unreadable.req.yml')).toString());
     if (unreadableView) {
       await unreadableView.receive({ type: 'send' });

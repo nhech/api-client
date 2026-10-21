@@ -1,7 +1,7 @@
 import type { Clock } from '../core/clock';
 import { effectiveRequest, type EffectiveRequest, type Level } from '../core/inherit';
 import type { Request } from '../core/model';
-import { variableScopes, type VarValue } from '../core/vars';
+import { describeVariables, variableScopes, type VarValue, type VariableInfo } from '../core/vars';
 import type { ContainerNode, EnvironmentNode, Loaded, RequestNode } from '../storage/store';
 import { buildWire, type Built } from './build';
 import { sendOptionsFrom, type SendOptions } from './send';
@@ -91,4 +91,13 @@ export function prepareSend(input: PrepareInput): Prepared | undefined {
     built.warnings.push('The address had no scheme, so http:// was used.');
   }
   return { built, effective, collection: located.collection, environment, options: sendOptionsFrom(effective.settings), problems };
+}
+
+/** The variables a request can use, for the editor to mark `{{names}}` as known or not; `complete` is false when the request is not in a loaded collection, so that nothing is marked unknown. */
+export function variablesOf(loaded: Loaded, path: string, environmentId: string | undefined): { vars: VariableInfo[]; complete: boolean } {
+  const located = locate(loaded, path);
+  if (located === undefined) return { vars: [], complete: false };
+  const levels: Level[] = located.chain.map(container => ({ kind: container === located.collection ? 'collection' : 'folder', name: container.container.name, container: container.container }));
+  const environment = environmentId === undefined ? undefined : loaded.environments.find(item => item.environment.id === environmentId);
+  return { vars: describeVariables({ levels, workspace: loaded.workspace.file, ...(environment === undefined ? {} : { environment: environment.environment }) }), complete: true };
 }
