@@ -173,7 +173,13 @@ export function resolveText(text: string, scopes: readonly Scope[], options: Res
   let truncated = false;
   let size = 0;
 
-  const note = (list: string[], name: string): void => { if (!list.includes(name)) list.push(name); };
+  // Each list keeps its order of first sight, and a set says whether a name is in it: a list that is searched for every name is quadratic in the number of names (80,000 names took 9 seconds).
+  const sets = new Map<string[], Set<string>>();
+  const note = (list: string[], name: string): void => {
+    let seen = sets.get(list);
+    if (seen === undefined) { seen = new Set(list); sets.set(list, seen); }
+    if (!seen.has(name)) { seen.add(name); list.push(name); }
+  };
   const lookup = (name: string): VarValue | undefined => {
     for (const scope of scopes) {
       const found = scope.get(name);

@@ -49,7 +49,13 @@ export function buildWire(input: BuildInput): Built {
   const redactions = new Set<string>();
   const problems: string[] = [];
   const warnings: string[] = [];
-  const note = (list: string[], names: readonly string[]): void => { for (const name of names) if (!list.includes(name)) list.push(name); };
+  // A set beside each list says what is in it: searching a list for every name is quadratic in the number of names.
+  const sets = new Map<string[], Set<string>>();
+  const note = (list: string[], names: readonly string[]): void => {
+    let seen = sets.get(list);
+    if (seen === undefined) { seen = new Set(list); sets.set(list, seen); }
+    for (const name of names) if (!seen.has(name)) { seen.add(name); list.push(name); }
+  };
   const options: ResolveOptions = { clock };
 
   const resolve = (text: string): string => {

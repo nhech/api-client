@@ -152,3 +152,18 @@ test('Many findings of one kind are counted, not all written out: the report sta
   assert.match(report, /\| \.\.\. and 1800 more \| \| \|/, 'the table of written folders is cut, with a count');
   assert.match(report, /- \.\.\. and \d+ more/, 'a list of places is cut, with a count');
 });
+
+test('A request with tens of thousands of different variables that have no value is put together in one pass: 80,000 names took 9 seconds', async () => {
+  const { resolveText } = await import('../../src/core/vars');
+  const { buildWire } = await import('../../src/engine/build');
+  const { newRequest } = await import('../../src/core/model');
+  const { effectiveRequest } = await import('../../src/core/inherit');
+  const clock = { now: () => 0, random: () => 0 };
+  const text = Array.from({ length: 80_000 }, (_, index) => `{{v${index}}}`).join(',');
+  within('resolveText', 2000, () => { const result = resolveText(text, [], { clock }); assert.equal(result.unresolved.length, 80_000); assert.equal(result.unresolved[0], 'v0'); assert.equal(result.unresolved[79_999], 'v79999'); });
+  const request = { ...newRequest('R', 'many'), url: 'https://x.test/a', headers: [{ name: 'X-Many', value: text, enabled: true, description: '' }, { name: 'X-Many-2', value: text, enabled: true, description: '' }] };
+  within('buildWire', 4000, () => {
+    const built = buildWire({ request, effective: effectiveRequest(request, [], {}), scopes: [], clock, resolveFile: () => undefined });
+    assert.equal(built.unresolved.length, 80_000, 'the same names in two headers are noted once');
+  });
+});
