@@ -8,7 +8,7 @@ const dev: RuntimeContext = { environmentId: 'E-dev', collection: 'api-client/co
 const names = (variables: RuntimeVariables, context: RuntimeContext): [string, string, boolean][] =>
   [...variables.scope(context)].map(([name, value]): [string, string, boolean] => [name, value.value, value.secret]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
 
-test('A captured value is seen where its scope says: the environment, the collection, or everywhere', () => {
+test('A captured value is seen where its scope says: the environment, every environment of the collection, or the session of the collection', () => {
   const variables = new RuntimeVariables();
   variables.apply(result('a', 'env-value'), dev);
   variables.apply(result('b', 'collection-value', { scope: 'local' }), dev);
@@ -16,7 +16,7 @@ test('A captured value is seen where its scope says: the environment, the collec
   assert.deepEqual(names(variables, dev), [['a', 'env-value', false], ['b', 'collection-value', false], ['c', 'everywhere', false]]);
   assert.deepEqual(names(variables, { ...dev, environmentId: 'E-prod' }), [['b', 'collection-value', false], ['c', 'everywhere', false]], 'another environment does not see the values of the first');
   assert.deepEqual(names(variables, { ...dev, environmentId: undefined }), [['b', 'collection-value', false], ['c', 'everywhere', false]], 'nor does no environment');
-  assert.deepEqual(names(variables, { ...dev, collection: 'api-client/collections/blog' }), [['a', 'env-value', false], ['c', 'everywhere', false]], 'another collection does not see a local value');
+  assert.deepEqual(names(variables, { ...dev, collection: 'api-client/collections/blog' }), [], 'another collection sees nothing that this one set, in any scope');
   variables.apply(result('d', 'no-env'), { ...dev, environmentId: undefined });
   assert.deepEqual(names(variables, { ...dev, environmentId: undefined }).map(item => item[0]), ['b', 'c', 'd'], 'with no environment, values have a place of their own');
 });
@@ -68,4 +68,21 @@ test('A value is cut at a size, and no more than a thousand names are kept (a na
   variables.apply(result('v0', '', { action: 'delete', scope: 'global' }), dev);
   variables.apply(result('fresh', '1', { scope: 'global' }), dev);
   assert.equal(variables.scope(dev).get('fresh')?.value, '1', 'room made by a delete is used');
+});
+
+test('What one collection sets is never seen by another: a capture in a repository that came from somewhere else cannot change what a request of yours is sent to', () => {
+  const variables = new RuntimeVariables();
+  const evil: RuntimeContext = { environmentId: 'E-dev', collection: 'api-client/collections/evil' };
+  const mine: RuntimeContext = { environmentId: 'E-dev', collection: 'api-client/collections/shop' };
+  variables.apply(result('host', 'evil.example', { scope: 'global' }), evil);
+  variables.apply(result('base', 'https://evil.example', { scope: 'active' }), evil);
+  variables.apply(result('other', 'x', { scope: 'local' }), evil);
+  variables.change('global', { set: [['viaScript', 'x']], unset: [] }, evil);
+  variables.change('active', { set: [['viaScript2', 'x']], unset: [] }, evil);
+  assert.deepEqual(names(variables, mine), [], 'the same environment, another collection');
+  assert.deepEqual([...variables.snapshot(mine).global, ...variables.snapshot(mine).active, ...variables.snapshot(mine).local], []);
+  assert.equal(names(variables, evil).length, 5, 'the collection that set them sees them');
+  variables.apply(result('host', 'api.shop.example', { scope: 'global' }), mine);
+  assert.equal(variables.scope(mine).get('host')?.value, 'api.shop.example');
+  assert.equal(variables.scope(evil).get('host')?.value, 'evil.example', 'and neither changes the other');
 });

@@ -9,8 +9,13 @@ import type { VarValue } from './vars';
  * one, so it is hidden wherever values are shown or written down.
  *
  * Where a value is visible follows its scope: `active` for the active environment (switching the environment switches the values),
- * `local` for the collection of the request that set it, `global` everywhere. When the same name is set in several, the nearest wins:
- * the collection, then the environment, then everywhere.
+ * `local` for every environment, `global` for the whole session. When the same name is set in several, the nearest wins: the collection,
+ * then the environment, then the session.
+ *
+ * EVERY scope belongs to the collection of the request that set it. A capture is text in a request file, and a request file can come with a
+ * cloned repository: if `global: host = value evil.example` in one collection were seen by the requests of another, sending a request of the
+ * first would turn every `{{host}}` of the second into the address of an attacker, with the credentials of the second still attached. So a
+ * collection never sees what another set, whatever the scope says.
  */
 export interface RuntimeContext {
   /** The active environment, or undefined when there is none. */
@@ -39,7 +44,12 @@ export const MAX_RUNTIME_VALUE_CHARS = 256 * 1024;
 export class RuntimeVariables {
   private readonly active = new Map<string, Map<string, string>>();
   private readonly local = new Map<string, Map<string, string>>();
-  private readonly global = new Map<string, string>();
+  private readonly global = new Map<string, Map<string, string>>();
+
+  /** The environment and the collection together: the same environment in two collections is two places. */
+  private activeKey(context: RuntimeContext): string {
+    return JSON.stringify([context.environmentId ?? '', context.collection]);
+  }
 
   private bucket(store: Map<string, Map<string, string>>, key: string): Map<string, string> {
     let bucket = store.get(key);
@@ -48,14 +58,13 @@ export class RuntimeVariables {
   }
 
   get size(): number {
-    let count = this.global.size;
-    for (const bucket of this.active.values()) count += bucket.size;
-    for (const bucket of this.local.values()) count += bucket.size;
+    let count = 0;
+    for (const store of [this.active, this.local, this.global]) for (const bucket of store.values()) count += bucket.size;
     return count;
   }
 
   private target(scope: RuntimeScope, context: RuntimeContext): Map<string, string> {
-    return scope === 'global' ? this.global : scope === 'local' ? this.bucket(this.local, context.collection) : this.bucket(this.active, context.environmentId ?? '');
+    return scope === 'global' ? this.bucket(this.global, context.collection) : scope === 'local' ? this.bucket(this.local, context.collection) : this.bucket(this.active, this.activeKey(context));
   }
 
   private put(scope: RuntimeScope, name: string, value: string | undefined, context: RuntimeContext): void {
@@ -80,9 +89,9 @@ export class RuntimeVariables {
   /** The values of a context, by scope, as plain maps that can be changed without touching these. */
   snapshot(context: RuntimeContext): RuntimeScopes {
     return {
-      active: new Map(this.active.get(context.environmentId ?? '')),
+      active: new Map(this.active.get(this.activeKey(context))),
       local: new Map(this.local.get(context.collection)),
-      global: new Map(this.global)
+      global: new Map(this.global.get(context.collection))
     };
   }
 
@@ -93,8 +102,8 @@ export class RuntimeVariables {
       if (values === undefined) return;
       for (const [name, value] of values) merged.set(name, { value, secret: isSecretName(name) });
     };
-    put(this.global);
-    put(this.active.get(context.environmentId ?? ''));
+    put(this.global.get(context.collection));
+    put(this.active.get(this.activeKey(context)));
     put(this.local.get(context.collection));
     return merged;
   }

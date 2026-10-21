@@ -50,7 +50,7 @@ test('A snapshot is a copy by scope for one context: changing it does not change
   snapshot.global.delete('g');
   assert.deepEqual([variables.scope(dev).get('e')?.value, variables.scope(dev).get('c')?.value, variables.scope(dev).get('g')?.value], ['1', '2', '3']);
   const other = variables.snapshot({ environmentId: 'E-prod', collection: 'api-client/collections/blog' });
-  assert.deepEqual([other.active.size, other.local.size, other.global.size], [0, 0, 1], 'another environment and collection see only the global ones');
+  assert.deepEqual([other.active.size, other.local.size, other.global.size], [0, 0, 0], 'another collection sees none of them, in any scope');
   assert.equal(variables.snapshot({ environmentId: undefined, collection: dev.collection }).active.size, 0);
 });
 
