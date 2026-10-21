@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildWizardHtml, contentSecurityPolicy } from '../../src/wizard/html';
 
@@ -47,19 +47,36 @@ test('The script of the panel puts nothing in the page as HTML, loads nothing an
   assert.ok(!/\bhref\b|\bsrc\s*:|\bsrc=/i.test(code), 'the script creates no link or image');
 });
 
-test('The manifest, the code and the package agree: two commands, one empty view, nothing that runs by itself, and the files the panel needs', () => {
-  const manifest = JSON.parse(read('extension/package.json')) as {
-    activationEvents: string[]; icon: string; contributes: { commands: { command: string }[]; views: Record<string, { id: string; visibility?: string }[]>; viewsWelcome: { view: string; contents: string }[] };
-  };
-  const source = read('extension/src/extension.ts');
-  const constant = (name: string): string | undefined => new RegExp(`export const ${name} = '([^']+)'`).exec(source)?.[1];
-  const commands = manifest.contributes.commands.map(entry => entry.command);
-  assert.deepEqual(commands, [constant('IMPORT_COMMAND'), constant('STEPS_COMMAND')], 'the commands in the manifest are the ones the code registers');
-  assert.equal(manifest.contributes.views['explorer']?.[0]?.id, /const START_VIEW = '([^']+)'/.exec(source)?.[1]);
-  assert.equal(manifest.contributes.views['explorer']?.[0]?.visibility, 'collapsed', 'the view does not wake the extension up at start');
+test('The manifest, the code and the package agree: every command, view and menu entry has its counterpart, and nothing runs by itself', () => {
+  interface Manifest {
+    activationEvents: string[]; icon: string;
+    contributes: {
+      commands: { command: string }[]; views: Record<string, { id: string }[]>; viewsWelcome: { view: string; contents: string }[];
+      viewsContainers: { activitybar: { id: string; icon: string }[] }; menus: Record<string, { command: string }[]>;
+    };
+  }
+  const manifest = JSON.parse(read('extension/package.json')) as Manifest;
+  const sources = readdirSync(join(root, 'extension', 'src'), { recursive: true, encoding: 'utf8' }).filter(name => name.endsWith('.ts')).map(name => read('extension/src/' + name.replaceAll('\\', '/')));
+  const code = sources.join('\n');
+  const constants = new Map<string, string>([...code.matchAll(/(?:export )?const ([A-Z_]+) = '([^']+)'/g)].map(match => [match[1] as string, match[2] as string]));
+  const resolve = (literal: string | undefined, constant: string | undefined): string | undefined => literal ?? (constant === undefined ? undefined : constants.get(constant));
+  const registered = new Set([...code.matchAll(/(?:registerCommand|register)\(\s*(?:'([^']+)'|([A-Z_]+))/g)].map(match => resolve(match[1], match[2])).filter((id): id is string => id !== undefined && id.startsWith('apiClient.')));
+  const declared = manifest.contributes.commands.map(entry => entry.command);
+  assert.deepEqual([...registered].sort(), [...declared].sort(), 'the commands in the manifest are the ones the code registers, and the other way round');
+
+  const created = new Set([...code.matchAll(/(?:createTreeView|registerTreeDataProvider)(?:<[^>]*>)?\(\s*(?:'([^']+)'|([A-Z_]+))/g)].map(match => resolve(match[1], match[2])));
+  const views = Object.values(manifest.contributes.views).flat().map(view => view.id);
+  assert.deepEqual([...created].filter((id): id is string => id !== undefined).sort(), [...views].sort(), 'every view of the manifest is created, and nothing else is');
+
+  const menuCommands = Object.values(manifest.contributes.menus).flat().map(entry => entry.command);
+  for (const id of menuCommands) assert.ok(declared.includes(id) || /^(?:workbench|revealInExplorer)\./.test(id), 'a menu entry for a command that does not exist: ' + id);
+  for (const welcome of manifest.contributes.viewsWelcome) {
+    assert.ok(views.includes(welcome.view), 'a welcome text for a view that does not exist: ' + welcome.view);
+    for (const match of welcome.contents.matchAll(/\(command:([^)]+)\)/g)) assert.ok(declared.includes(match[1] as string) || /^workbench\./.test(match[1] as string), 'a welcome button for a command that does not exist: ' + match[1]);
+  }
   assert.deepEqual(manifest.activationEvents, [], 'no activation event of its own');
-  assert.ok(manifest.contributes.viewsWelcome[0]?.contents.includes(`(command:${commands[0]})`), 'the welcome button opens the panel');
   assert.ok(existsSync(join(root, 'extension', ...manifest.icon.split('/'))), 'the icon is there');
+  for (const container of manifest.contributes.viewsContainers.activitybar) assert.ok(existsSync(join(root, 'extension', ...container.icon.split('/'))), 'the icon of the side bar is there');
   assert.ok(existsSync(join(root, 'extension', 'media', 'wizard.css')));
   const ignore = read('extension/.vscodeignore').split('\n').map(line => line.trim());
   assert.ok(!ignore.some(line => /^(?:dist|media)(?:\/|$)/.test(line) || line === '**'), 'the built files and the media are packaged');

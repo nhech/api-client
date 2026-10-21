@@ -52,6 +52,69 @@
   "contributes": {
     "commands": [
       {
+        "command": "apiClient.newRequest",
+        "title": "New Request...",
+        "category": "API Client",
+        "icon": "$(add)"
+      },
+      {
+        "command": "apiClient.newFolder",
+        "title": "New Folder...",
+        "category": "API Client",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "apiClient.newCollection",
+        "title": "New Collection...",
+        "category": "API Client",
+        "icon": "$(library)"
+      },
+      {
+        "command": "apiClient.newEnvironment",
+        "title": "New Environment...",
+        "category": "API Client",
+        "icon": "$(add)"
+      },
+      {
+        "command": "apiClient.setEnvironment",
+        "title": "Change Environment...",
+        "category": "API Client",
+        "icon": "$(symbol-variable)"
+      },
+      {
+        "command": "apiClient.filter",
+        "title": "Filter Requests...",
+        "category": "API Client",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "apiClient.clearFilter",
+        "title": "Clear Filter",
+        "category": "API Client",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "apiClient.refresh",
+        "title": "Refresh",
+        "category": "API Client",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "apiClient.openRequest",
+        "title": "Open Request",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.openAsText",
+        "title": "Open as Text",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.revealInExplorer",
+        "title": "Reveal in Explorer",
+        "category": "API Client"
+      },
+      {
         "command": "apiClient.importThunder",
         "title": "Import from Thunder Client...",
         "category": "API Client"
@@ -63,6 +126,21 @@
       }
     ],
     "views": {
+      "apiClient": [
+        {
+          "id": "apiClient.collections",
+          "name": "Collections"
+        },
+        {
+          "id": "apiClient.environments",
+          "name": "Environments"
+        },
+        {
+          "id": "apiClient.history",
+          "name": "History",
+          "visibility": "collapsed"
+        }
+      ],
       "explorer": [
         {
           "id": "apiClient.start",
@@ -74,10 +152,153 @@
     },
     "viewsWelcome": [
       {
+        "view": "apiClient.collections",
+        "contents": "Open a folder to keep your requests in it, as plain files that Git can track.\n[Open Folder](command:workbench.action.files.openFolder)",
+        "when": "workspaceFolderCount == 0"
+      },
+      {
+        "view": "apiClient.collections",
+        "contents": "No collections yet. A collection is a folder of requests with what they share: a base address, headers, authentication.\n[New Collection](command:apiClient.newCollection)\n[Import from Thunder Client](command:apiClient.importThunder)",
+        "when": "workspaceFolderCount > 0"
+      },
+      {
+        "view": "apiClient.environments",
+        "contents": "An environment holds variables such as the address of a server, for {{name}} in your requests.\n[New Environment](command:apiClient.newEnvironment)",
+        "when": "workspaceFolderCount > 0"
+      },
+      {
+        "view": "apiClient.history",
+        "contents": "The requests you send appear here."
+      },
+      {
         "view": "apiClient.start",
         "contents": "Move your Thunder Client collections and environments to plain .http files.\n[Open the importer](command:apiClient.importThunder)\nNothing is written until you press Import. Local only: no account, no network, no telemetry."
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "apiClient",
+          "title": "API Client",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "apiClient.openRequest",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.openAsText",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.revealInExplorer",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.clearFilter",
+          "when": "apiClient.filtering"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "apiClient.newRequest",
+          "when": "view == apiClient.collections",
+          "group": "navigation@1"
+        },
+        {
+          "command": "apiClient.newCollection",
+          "when": "view == apiClient.collections",
+          "group": "navigation@2"
+        },
+        {
+          "command": "apiClient.filter",
+          "when": "view == apiClient.collections && !apiClient.filtering",
+          "group": "navigation@3"
+        },
+        {
+          "command": "apiClient.clearFilter",
+          "when": "view == apiClient.collections && apiClient.filtering",
+          "group": "navigation@3"
+        },
+        {
+          "command": "apiClient.refresh",
+          "when": "view == apiClient.collections",
+          "group": "navigation@4"
+        },
+        {
+          "command": "apiClient.importThunder",
+          "when": "view == apiClient.collections",
+          "group": "1_import"
+        },
+        {
+          "command": "apiClient.newEnvironment",
+          "when": "view == apiClient.environments",
+          "group": "navigation@1"
+        },
+        {
+          "command": "apiClient.refresh",
+          "when": "view == apiClient.environments",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "apiClient.newRequest",
+          "when": "view == apiClient.collections && viewItem =~ /^(collection|folder)$/",
+          "group": "1_create@1"
+        },
+        {
+          "command": "apiClient.newFolder",
+          "when": "view == apiClient.collections && viewItem =~ /^(collection|folder)$/",
+          "group": "1_create@2"
+        },
+        {
+          "command": "apiClient.openAsText",
+          "when": "view == apiClient.collections && viewItem =~ /^(request|broken)$/",
+          "group": "2_open@1"
+        },
+        {
+          "command": "apiClient.revealInExplorer",
+          "when": "view == apiClient.collections && viewItem =~ /^(collection|folder|request|broken)$/",
+          "group": "9_manage@1"
+        },
+        {
+          "command": "apiClient.setEnvironment",
+          "when": "view == apiClient.environments && viewItem == environment",
+          "group": "inline"
+        },
+        {
+          "command": "apiClient.setEnvironment",
+          "when": "view == apiClient.environments && viewItem == environment",
+          "group": "1_active@1"
+        },
+        {
+          "command": "apiClient.openAsText",
+          "when": "view == apiClient.environments && viewItem =~ /^(environment|environment.active|broken)$/",
+          "group": "2_open@1"
+        },
+        {
+          "command": "apiClient.revealInExplorer",
+          "when": "view == apiClient.environments",
+          "group": "9_manage@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "API Client",
+      "properties": {
+        "apiClient.root": {
+          "type": "string",
+          "default": "api-client",
+          "scope": "resource",
+          "markdownDescription": "The folder of the workspace where the collections, the environments and the settings of the client are kept, as plain files."
+        }
+      }
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

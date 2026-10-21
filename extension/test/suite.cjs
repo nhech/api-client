@@ -167,4 +167,41 @@ exports.run = async function run() {
   assert.equal(again.isReady, true, 'the new page loaded');
   await again.receive({ type: 'useCandidate', id: 0 });
   assert.equal(again.view().step, 'review');
+
+  // 8. The side bar of the client: it reads the files of the workspace, follows changes on disk (a pull, an edit by hand), filters, and
+  //    every command of the manifest is registered.
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const registered = await vscode.commands.getCommands(true);
+  for (const entry of manifest.contributes.commands) assert.ok(registered.includes(entry.command), 'registered: ' + entry.command);
+  const put = (relative, content) => {
+    const target = path.join(workspace, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+  };
+  assert.deepEqual(test.client().collections, [], 'no collection before there are files');
+  put('api-client/collections/shop/collection.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAA\nname: Shop\n');
+  put('api-client/collections/shop/list.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABC\nname: List things\nmethod: GET\nurl: http://x.test/things\n');
+  put('api-client/environments/dev.env.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAC\nname: Dev\nvars:\n  - name: a\n    value: 1\n');
+  const until = async (check, what) => { for (let waited = 0; !check() && waited < 8000; waited += 100) await sleep(100); assert.ok(check(), what); };
+  await until(() => test.client().collections.length === 1, 'the watcher loads the new files without a refresh');
+  let collections = test.client().collections;
+  assert.deepEqual([collections[0].kind, collections[0].label, collections[0].description], ['collection', 'Shop', '1 request']);
+  assert.deepEqual(collections[0].children.map(child => [child.label, child.description, child.contextValue]), [['List things', 'GET', 'request']]);
+  assert.deepEqual(test.client().environments.map(node => [node.label, node.description]), [['Dev', '1 variable']]);
+
+  put('api-client/collections/shop/second.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1ABD\nname: Second\nmethod: POST\nurl: http://x.test/second\n');
+  await until(() => test.client().collections[0].children.length === 2, 'a file added on disk shows up');
+  test.client().setFilter('second');
+  collections = test.client().collections;
+  assert.deepEqual(collections[0].children.map(child => child.label), ['Second'], 'the filter keeps what matches');
+  test.client().setFilter('');
+  assert.equal(test.client().collections[0].children.length, 2, 'clearing the filter shows everything again');
+
+  put('api-client/collections/shop/broken.req.yml', 'name: [oops\n');
+  await until(() => test.client().collections.some(node => node.kind === 'broken'), 'a file that cannot be read is listed, not hidden');
+  assert.match(test.client().collections.find(node => node.kind === 'broken').tooltip, /line 1, column 7/);
+  fs.rmSync(path.join(workspace, 'api-client', 'collections', 'shop', 'second.req.yml'));
+  await until(() => test.client().collections[0].children.length === 1, 'a file removed on disk goes away');
+  await vscode.commands.executeCommand('apiClient.openRequest', 'api-client/collections/shop/list.req.yml');
+  await until(() => vscode.window.activeTextEditor?.document.uri.fsPath.endsWith('list.req.yml') === true || vscode.window.tabGroups.activeTabGroup.activeTab?.label === 'list.req.yml', 'opening a request opens its file');
 };

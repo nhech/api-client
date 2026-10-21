@@ -11,12 +11,19 @@
     "extension/media/icon.png",
     "extension/media/wizard.css",
     "extension/package.json",
-    "extension/readme.md"
+    "extension/readme.md",
+    "extension/media/activity.svg"
   ],
   "bundles": {
     "extension/dist/extension.js": {
       "kind": "host",
-      "requires": ["node:crypto", "node:fs", "node:os", "node:path", "vscode"]
+      "requires": [
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "vscode"
+      ]
     },
     "extension/dist/wizard.js": {
       "kind": "page"
