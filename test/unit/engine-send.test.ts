@@ -46,6 +46,9 @@ test('A GET sends the request as written: header names in their own spelling and
   assert.equal(headerValues(server.requests[0] as never, 'accept')[0], '*/*');
   assert.equal(response.finalUrl, `${server.url}/echo?a=1&b=two%20words`);
   assert.deepEqual(response.redirects, []);
+  assert.deepEqual([response.sent.method, response.sent.url], ['GET', `${server.url}/echo?a=1&b=two%20words`], 'the response says what was sent');
+  assert.deepEqual(headerOf(response.sent.headers, 'accept-encoding'), ['gzip, deflate, br'], 'with the headers the engine added');
+  assert.deepEqual(headerOf(response.sent.headers, 'x-dup'), ['a', 'b']);
 }));
 
 test('Default headers are added only when the request has none of that name, whatever its spelling, and can be switched off', withServer(async server => {
@@ -97,7 +100,8 @@ test('Redirects are followed and listed; the method, the body and the headers fo
   const payload = { kind: 'bytes' as const, bytes: new TextEncoder().encode('payload') };
   for (const status of [301, 302, 303]) {
     server.requests.length = 0;
-    await send({ method: 'POST', url: `${server.url}/redirect/1?status=${status}`, headers: [['Content-Type', 'text/plain'], ['X-Keep', 'yes']], body: payload }, BASE);
+    const followed = await send({ method: 'POST', url: `${server.url}/redirect/1?status=${status}`, headers: [['Content-Type', 'text/plain'], ['X-Keep', 'yes']], body: payload }, BASE);
+    assert.deepEqual([followed.sent.method, followed.sent.url, followed.sent.body], ['GET', `${server.url}/redirect/0?status=${status}`, undefined], `${status}: what was sent is the last request, not the first`);
     const after = server.requests[1] as never as { method: string; body: Buffer };
     assert.equal(after.method, 'GET', `${status}`);
     assert.equal(after.body.length, 0, `${status}`);
@@ -238,6 +242,7 @@ test('Cookies: what the server sets is handed to the store, and what the store h
   assert.deepEqual(stored, [{ url: '/set-cookies', values: ['a=1; Path=/', 'b=2; Path=/; HttpOnly'] }]);
   const merged = await send(get(`${server.url}/echo`, [['Cookie', 'mine=x']]), { ...BASE, cookies: store });
   assert.deepEqual(headerValues(server.requests[1] as never, 'cookie'), ['mine=x; a=1; b=2']);
+  assert.deepEqual(merged.sent.headers.filter(([name]) => name === 'Cookie'), [['Cookie', 'mine=x; a=1; b=2']], 'the cookie that went out is in what was sent');
   assert.equal(merged.status, 200);
   await send(get(`${server.url}/echo`), { ...BASE, cookies: store });
   assert.deepEqual(headerValues(server.requests[2] as never, 'cookie'), ['a=1; b=2']);

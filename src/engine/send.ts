@@ -101,8 +101,8 @@ export async function send(request: WireRequest, options: SendOptions): Promise<
         if (setCookies.length > 0) options.cookies.store(new URL(attempt.url), setCookies);
       }
       const hop = decision as Hop | undefined;
-      if (hop === undefined) return { ...result, redirects, finalUrl: current.url };
-      if (!hop.follow) return { ...result, redirects, finalUrl: current.url, warnings: [...result.warnings, `Not followed: ${hop.reason}.`] };
+      if (hop === undefined) return { ...result, redirects, finalUrl: current.url, sent: attempt };
+      if (!hop.follow) return { ...result, redirects, finalUrl: current.url, sent: attempt, warnings: [...result.warnings, `Not followed: ${hop.reason}.`] };
       if (redirects.length >= options.maxRedirects) throw new EngineError('too-many-redirects', `The server redirected more than ${options.maxRedirects} times.`, 'It may be a loop; raise the limit in the settings if it is not.');
       redirects.push({ url: current.url, status: result.status });
       current = hop.request;

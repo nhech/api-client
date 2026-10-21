@@ -86,6 +86,48 @@ function pathMatches(requestPath: string, cookiePath: string): boolean {
   return cookiePath.endsWith('/') || requestPath.charAt(cookiePath.length) === '/';
 }
 
+/** A `Set-Cookie` header read, before any rule of the jar is applied. */
+export interface SetCookie {
+  name: string;
+  value: string;
+  /** The Domain attribute, lower case and without a leading dot; empty when the header has none. */
+  domain: string;
+  /** The Path attribute as sent; empty when the header has none. */
+  path: string;
+  maxAge: number | undefined;
+  /** Epoch milliseconds of the Expires attribute. */
+  expires: number | undefined;
+  secure: boolean;
+  httpOnly: boolean;
+  sameSite: string;
+}
+
+/** The name, value and attributes of a `Set-Cookie` header; undefined when it is too long, has no name, or has a control character or too much in it to be a cookie. */
+export function parseSetCookie(header: string): SetCookie | undefined {
+  if (header.length > JAR_LIMITS.headerBytes) return undefined;
+  const parts = header.split(';');
+  const first = parts.shift() ?? '';
+  const equals = first.indexOf('=');
+  if (equals < 0) return undefined;
+  const name = first.slice(0, equals).trim();
+  const value = first.slice(equals + 1).trim();
+  if (name === '' || /[\u0000-\u001f\u007f]/.test(name + value) || name.length + value.length > JAR_LIMITS.cookieBytes) return undefined;
+  const cookie: SetCookie = { name, value, domain: '', path: '', maxAge: undefined, expires: undefined, secure: false, httpOnly: false, sameSite: '' };
+  for (const part of parts) {
+    const at = part.indexOf('=');
+    const key = (at < 0 ? part : part.slice(0, at)).trim().toLowerCase();
+    const raw = at < 0 ? '' : part.slice(at + 1).trim();
+    if (key === 'domain') cookie.domain = raw.replace(/^\./, '').toLowerCase();
+    else if (key === 'path') cookie.path = raw;
+    else if (key === 'max-age') { if (/^-?\d{1,15}$/.test(raw)) cookie.maxAge = Number(raw); }
+    else if (key === 'expires') cookie.expires = parseCookieDate(raw);
+    else if (key === 'secure') cookie.secure = true;
+    else if (key === 'httponly') cookie.httpOnly = true;
+    else if (key === 'samesite') cookie.sameSite = raw;
+  }
+  return cookie;
+}
+
 const isLocalHost = (host: string): boolean => host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127\./.test(host);
 
 export class CookieJar {
@@ -95,36 +137,11 @@ export class CookieJar {
 
   /** Parses a `Set-Cookie` header received from `url` and keeps the cookie if it is allowed; an expired one removes the cookie it replaces. */
   private accept(url: URL, header: string, time: number): void {
-    if (header.length > JAR_LIMITS.headerBytes) return;
-    const parts = header.split(';');
-    const first = parts.shift() ?? '';
-    const equals = first.indexOf('=');
-    if (equals < 0) return;
-    const name = first.slice(0, equals).trim();
-    const value = first.slice(equals + 1).trim();
-    if (name === '' || /[\u0000-\u001f\u007f]/.test(name + value) || name.length + value.length > JAR_LIMITS.cookieBytes) return;
-
+    const parsed = parseSetCookie(header);
+    if (parsed === undefined) return;
+    const { name, value, domain: domainAttribute, path: pathAttribute, maxAge, expires, secure, httpOnly, sameSite } = parsed;
     const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
     const secureOrigin = url.protocol === 'https:' || isLocalHost(host);
-    let domainAttribute = '';
-    let pathAttribute = '';
-    let maxAge: number | undefined;
-    let expires: number | undefined;
-    let secure = false;
-    let httpOnly = false;
-    let sameSite = '';
-    for (const part of parts) {
-      const at = part.indexOf('=');
-      const key = (at < 0 ? part : part.slice(0, at)).trim().toLowerCase();
-      const raw = at < 0 ? '' : part.slice(at + 1).trim();
-      if (key === 'domain') domainAttribute = raw.replace(/^\./, '').toLowerCase();
-      else if (key === 'path') pathAttribute = raw;
-      else if (key === 'max-age') { if (/^-?\d{1,15}$/.test(raw)) maxAge = Number(raw); }
-      else if (key === 'expires') expires = parseCookieDate(raw);
-      else if (key === 'secure') secure = true;
-      else if (key === 'httponly') httpOnly = true;
-      else if (key === 'samesite') sameSite = raw;
-    }
     if (domainAttribute !== '' && !domainAllowed(domainAttribute, host)) return;
     if (secure && !secureOrigin) return;
     if (name.startsWith('__Secure-') && !secure) return;

@@ -35,7 +35,7 @@ export interface ExchangeOptions {
   proxy?: ResolvedProxy;
 }
 
-export type ExchangeResult = Omit<WireResponse, 'redirects' | 'finalUrl'>;
+export type ExchangeResult = Omit<WireResponse, 'redirects' | 'finalUrl' | 'sent'>;
 
 const now = (): number => performance.now();
 

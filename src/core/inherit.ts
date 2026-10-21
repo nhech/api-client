@@ -50,8 +50,10 @@ export interface EffectiveRequest {
 /** A URL that is not absolute and does not start with a variable is prefixed with the base URL. */
 export function applyBaseUrl(url: string, baseUrl: string): string {
   if (url === '' || baseUrl === '') return url;
-  const lower = url.toLowerCase();
-  return lower.startsWith('http://') || lower.startsWith('https://') || url.startsWith('{{') ? url : baseUrl + url;
+  // Spaces before the address (a paste) do not make it relative.
+  const start = url.trimStart();
+  const lower = start.toLowerCase();
+  return lower.startsWith('http://') || lower.startsWith('https://') || start.startsWith('{{') ? url : baseUrl + url;
 }
 
 function mergeSettings(...layers: SettingsOverride[]): Settings {

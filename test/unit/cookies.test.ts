@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CookieJar, JAR_LIMITS, parseCookieDate } from '../../src/core/cookies';
+import { CookieJar, JAR_LIMITS, parseCookieDate, parseSetCookie } from '../../src/core/cookies';
 
 /** A jar with a clock the test moves. */
 function jarAt(start = Date.UTC(2026, 0, 1, 12, 0, 0)) {
@@ -154,4 +154,14 @@ test('A hostile Set-Cookie header costs time proportional to its size', () => {
   jar.store(url('https://x.test/'), [`a=${'x'.repeat(8000)}`, `${';'.repeat(8000)}`, `a=1${'; Domain=x.test'.repeat(500)}`, `a=1; Expires=${'Mon '.repeat(2000)}`]);
   for (let index = 0; index < 2000; index++) jar.store(url('https://x.test/'), [`k${index % 100}=${index}`]);
   assert.ok(performance.now() - started < 1500);
+});
+
+test('A Set-Cookie header is read into its name, value and attributes, and one that is too long, nameless or holds a control character is not a cookie', () => {
+  assert.deepEqual(parseSetCookie('id=a=b; Domain=.Example.COM; Path=/x; Max-Age=60; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Secure; HttpOnly; SameSite=Strict'), {
+    name: 'id', value: 'a=b', domain: 'example.com', path: '/x', maxAge: 60, expires: Date.UTC(2026, 9, 21, 7, 28, 0), secure: true, httpOnly: true, sameSite: 'Strict'
+  });
+  assert.deepEqual(parseSetCookie('a=1'), { name: 'a', value: '1', domain: '', path: '', maxAge: undefined, expires: undefined, secure: false, httpOnly: false, sameSite: '' });
+  assert.equal(parseSetCookie('a=1; Max-Age=abc')?.maxAge, undefined, 'a Max-Age that is not a number is ignored');
+  assert.equal(parseSetCookie('a=1; Max-Age=-1')?.maxAge, -1);
+  for (const bad of ['', 'novalue', '=nameless', 'a=b\u0001c', 'a\u007f=1', 'a=' + 'x'.repeat(JAR_LIMITS.cookieBytes), 'a=1; Path=/' + 'x'.repeat(JAR_LIMITS.headerBytes)]) assert.equal(parseSetCookie(bad), undefined, JSON.stringify(bad.slice(0, 30)));
 });

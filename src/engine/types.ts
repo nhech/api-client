@@ -72,6 +72,8 @@ export interface WireResponse {
   timings: Timings;
   redirects: RedirectHop[];
   finalUrl: string;
+  /** The request as it went over the wire the last time: with the headers the engine added (User-Agent, Accept, Cookie) and the method and body after any redirect. */
+  sent: WireRequest;
   tls?: TlsInfo;
   /** Things the person should know: a certificate that was not checked, a redirect that was not followed, an encoding that was not undone. */
   warnings: string[];
