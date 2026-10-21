@@ -22,12 +22,15 @@ export interface Cookie {
 
 export const JAR_LIMITS = { totalCookies: 3000, cookiesPerDomain: 150, cookieBytes: 4096, headerBytes: 8192 } as const;
 
-/** Two-label public suffixes that a Domain attribute may not claim. A full list is a later improvement; every single-label domain is refused anyway. */
+/** Two-label public suffixes that a Domain attribute may not claim. A full list is a later improvement; every single-label domain is refused anyway, and so is a country's second level (COUNTRY_SECOND_LEVEL). */
 const PUBLIC_SUFFIXES: ReadonlySet<string> = new Set([
   'co.uk', 'org.uk', 'gov.uk', 'ac.uk', 'me.uk', 'com.au', 'net.au', 'org.au', 'edu.au', 'co.nz', 'co.jp', 'ne.jp', 'or.jp', 'ac.jp', 'com.br', 'com.cn', 'com.hk', 'com.sg', 'com.tw',
   'com.mx', 'co.in', 'co.za', 'co.kr', 'com.tr', 'com.ar', 'github.io', 'gitlab.io', 'herokuapp.com', 'appspot.com', 'blogspot.com', 'cloudfront.net', 'azurewebsites.net',
   'netlify.app', 'vercel.app', 'pages.dev', 'workers.dev', 'web.app', 'firebaseapp.com', 'amazonaws.com', 's3.amazonaws.com', 'compute.amazonaws.com'
 ]);
+
+/** The second levels that countries use under their two-letter domain (co.nz, com.au, ac.jp, ...): a name such as these is not a site but a place where many sites are. */
+const COUNTRY_SECOND_LEVEL = /^(?:co|com|net|org|gov|edu|ac|ne|or|go|mil|nom|sch|ltd|plc|me|id|info|biz)\.[a-z]{2}$/;
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
@@ -67,7 +70,7 @@ const isIp = (host: string): boolean => /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) |
 /** Whether a Domain attribute may be claimed by a page on `host`: the host itself or a parent of it that is not a public suffix. */
 function domainAllowed(domain: string, host: string): boolean {
   if (domain === host) return true;
-  if (isIp(host) || isIp(domain) || !domain.includes('.') || PUBLIC_SUFFIXES.has(domain)) return false;
+  if (isIp(host) || isIp(domain) || !domain.includes('.') || PUBLIC_SUFFIXES.has(domain) || COUNTRY_SECOND_LEVEL.test(domain)) return false;
   return host.endsWith(`.${domain}`);
 }
 

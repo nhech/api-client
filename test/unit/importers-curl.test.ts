@@ -226,3 +226,13 @@ test('--data-raw never reads a file, and -d with an @ does', () => {
   const file = request("curl https://x.test/a -d '@payload.txt'");
   assert.deepEqual(file.request.body, { kind: 'binary', file: 'payload.txt' });
 });
+
+test('A file that leads out of the folder of the collection is kept by its name only, with a note', () => {
+  const form = request("curl https://x.test/up -F 'a=@/etc/passwd' -F 'b=@C:\\Users\\me\\key.pem;type=text/plain' -F 'c=@../../secret.txt' -F 'd=@~/id_rsa' -F 'e=@docs/ok.txt'");
+  assert.deepEqual(form.request.body.kind === 'multipart' ? form.request.body.parts.map(part => part.file) : [], ['passwd', 'key.pem', 'secret.txt', 'id_rsa', 'docs/ok.txt'], 'a path inside the folder is left as it is');
+  assert.equal(form.notes.filter(note => /leads out of the folder of the collection/.test(note)).length, 4);
+  assert.match(form.notes.join('\n'), /The path \/etc\/passwd leads out of the folder of the collection: only the name of the file, passwd, was kept/);
+  assert.deepEqual(request('curl -T /home/me/up.bin https://x.test/a').request.body, { kind: 'binary', file: 'up.bin' });
+  assert.deepEqual(request('curl --data-binary @../x/payload.json https://x.test/a').request.body, { kind: 'binary', file: 'payload.json' });
+  assert.equal(request("curl --data-urlencode 'v@/etc/hosts' https://x.test/a").request.body.kind, 'none', 'a value read from a file is not read, and is no body');
+});

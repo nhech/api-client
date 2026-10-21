@@ -86,3 +86,14 @@ export function describePending(pending: readonly PendingScript[]): string[] {
     return `${script.status === 'new' ? 'New' : 'Changed'}: the script ${script.phase === 'pre' ? 'before the request' : 'after the answer'} of ${printable(script.from).slice(0, 80)} (${lines} ${lines === 1 ? 'line' : 'lines'})`;
   });
 }
+
+/**
+ * The beginning of a script as the question shows it: the lines as they are (a script is read by its lines, so a line break is kept, and a tab is two spaces),
+ * each made printable so that nothing hidden or reversing the text is in it, cut to a number of lines and of characters, with `...` when there is more.
+ */
+export function previewOf(code: string, maxLines: number, maxChars: number): string {
+  const rows = code.replace(/\r\n?/g, '\n').split('\n').map(row => printable(row.replace(/\t/g, '  ')));
+  const shown = rows.slice(0, maxLines).join('\n');
+  const cut = shown.length > maxChars ? `${shown.slice(0, maxChars)}...` : shown;
+  return `${cut}${rows.length > maxLines || shown.length > maxChars ? '\n...' : ''}`;
+}

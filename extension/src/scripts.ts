@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import * as vscode from 'vscode';
-import { approve, describePending, pendingScripts, readApproved, type ApprovedScript, type PendingScript, type ScriptToRun } from '../../src/script/consent';
+import { approve, describePending, pendingScripts, previewOf, readApproved, type ApprovedScript, type PendingScript, type ScriptToRun } from '../../src/script/consent';
 import { ScriptSandbox } from '../../src/script/sandbox';
 import { printable } from '../../src/util/chars';
 
@@ -86,11 +86,7 @@ export class ScriptService implements vscode.Disposable {
   private detail(pending: readonly PendingScript[]): string {
     const lines = describePending(pending);
     const parts = pending.map((script, index) => {
-      const code = printable(script.code);
-      const rows = code.split('\n');
-      const shown = rows.slice(0, PREVIEW_LINES).join('\n');
-      const cut = shown.length > PREVIEW_CHARS ? `${shown.slice(0, PREVIEW_CHARS)}...` : shown;
-      return `${lines[index] ?? ''}\n${cut}${rows.length > PREVIEW_LINES || shown.length > PREVIEW_CHARS ? '\n...' : ''}`;
+      return `${lines[index] ?? ''}\n${previewOf(script.code, PREVIEW_LINES, PREVIEW_CHARS)}`;
     });
     const text = `A script can read all of your variables, secrets included, and send them anywhere. Allow it only if you trust whoever wrote it.\n\n${parts.join('\n\n')}`;
     return text.length > DETAIL_CHARS ? `${text.slice(0, DETAIL_CHARS)}...` : text;

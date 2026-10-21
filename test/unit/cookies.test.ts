@@ -165,3 +165,11 @@ test('A Set-Cookie header is read into its name, value and attributes, and one t
   assert.equal(parseSetCookie('a=1; Max-Age=-1')?.maxAge, -1);
   for (const bad of ['', 'novalue', '=nameless', 'a=b\u0001c', 'a\u007f=1', 'a=' + 'x'.repeat(JAR_LIMITS.cookieBytes), 'a=1; Path=/' + 'x'.repeat(JAR_LIMITS.headerBytes)]) assert.equal(parseSetCookie(bad), undefined, JSON.stringify(bad.slice(0, 30)));
 });
+
+test('A cookie cannot claim the whole second level of a country, even one that is not in the short list of shared hosts', () => {
+  const { jar } = jarAt();
+  jar.store(url('https://shop.example.co.nz/'), ['a=1; Domain=co.nz', 'b=1; Domain=com.pe', 'c=1; Domain=ac.th', 'd=1; Domain=org.za', 'e=1; Domain=example.co.nz']);
+  assert.deepEqual(jar.list().map(cookie => cookie.name), ['e'], 'only the registered name under it can be claimed');
+  assert.equal(header(jar, 'https://other.example.co.nz/'), 'e=1');
+  assert.equal(header(jar, 'https://victim.co.nz/'), undefined);
+});

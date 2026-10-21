@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import type { Clock } from '../../src/core/clock';
 import { NodeFs } from '../../src/storage/node-fs';
 import { DEFAULT_ROOT, Store, type Loaded } from '../../src/storage/store';
+import { clientRoot } from '../../src/storage/root';
 
 /**
  * The client's files of the workspace: the folder they live in, the tree that was last loaded from them, the active
@@ -36,8 +37,7 @@ export class ClientWorkspace implements vscode.Disposable {
 
   /** The folder of the client's files inside the workspace folder, `api-client` unless the setting says another. */
   root(): string {
-    const configured = vscode.workspace.getConfiguration('apiClient').get<string>('root', DEFAULT_ROOT).trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    return /^[\w.-]+(?:\/[\w.-]+)*$/.test(configured) && !configured.split('/').includes('..') ? configured : DEFAULT_ROOT;
+    return clientRoot(vscode.workspace.getConfiguration('apiClient').get<string>('root', DEFAULT_ROOT));
   }
 
   get loaded(): Loaded | undefined {

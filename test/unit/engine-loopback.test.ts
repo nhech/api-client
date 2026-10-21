@@ -159,3 +159,49 @@ test('It listens on 127.0.0.1 only, and a request with a very large header is re
   assert.ok(big === 431 || big === 0, `refused (${big})`);
   loopback.close();
 });
+
+/** A port that is free on 127.0.0.1 and on ::1, or undefined when this machine has no ::1. */
+async function freePortOnBoth(): Promise<number | undefined> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const six = createServer();
+    try { await new Promise<void>((resolve, reject) => { six.once('error', reject); six.listen(0, '::1', resolve); }); } catch { return undefined; }
+    const port = (six.address() as AddressInfo).port;
+    await new Promise<void>(resolve => six.close(() => resolve()));
+    const four = createServer();
+    try {
+      await new Promise<void>((resolve, reject) => { four.once('error', reject); four.listen(port, '127.0.0.1', resolve); });
+      await new Promise<void>(resolve => four.close(() => resolve()));
+      return port;
+    } catch { /* taken on 127.0.0.1: try another */ }
+  }
+  return undefined;
+}
+
+test('An address with the name localhost is answered on both 127.0.0.1 and ::1, so that the browser reaches the server whichever it resolves the name to', async t => {
+  const port = await freePortOnBoth();
+  if (port === undefined) { t.skip('this machine has no ::1'); return; }
+  const loopback = await startLoopback({ redirectUrl: `http://localhost:${port}/callback`, state: 's1', timeoutMs: 10_000 });
+  try {
+    const refused = await get(`http://[::1]:${port}/callback?code=x&state=wrong`, { host: `localhost:${port}` });
+    assert.equal(refused.status, 400, 'it is the server of the attempt that answers on ::1');
+    const answer = await get(`http://[::1]:${port}/callback?code=the-code&state=s1`, { host: `localhost:${port}` });
+    assert.equal(answer.status, 200);
+    assert.deepEqual(await loopback.result, { ok: true, code: 'the-code' });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(await refusedConnection(`http://[::1]:${port}/callback?code=late&state=s1`), true, 'and it is gone on ::1 too');
+  } finally { loopback.close(); }
+});
+
+test('When another process already holds the port on ::1, a localhost address is refused: the answer could go to it', async t => {
+  const port = await freePortOnBoth();
+  if (port === undefined) { t.skip('this machine has no ::1'); return; }
+  const squatter = createServer((req, res) => { res.end('squatter'); });
+  await new Promise<void>(resolve => squatter.listen(port, '::1', resolve));
+  try {
+    await assert.rejects(startLoopback({ redirectUrl: `http://localhost:${port}/callback`, state: 's1' }), /already in use on ::1/);
+    assert.equal(await refusedConnection(`http://127.0.0.1:${port}/callback?code=x&state=s1`), true, 'and nothing is left listening on 127.0.0.1');
+    const loopback = await startLoopback({ redirectUrl: `http://127.0.0.1:${port}/callback`, state: 's1', timeoutMs: 10_000 });
+    assert.equal(loopback.redirectUri, `http://127.0.0.1:${port}/callback`, 'an address with 127.0.0.1 is not held to it: only that interface is used');
+    loopback.close();
+  } finally { await new Promise<void>(resolve => squatter.close(() => resolve())); }
+});

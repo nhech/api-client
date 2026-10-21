@@ -82,3 +82,12 @@ test('The writer adds to .gitignore only the private files it really writes', as
     assert.equal(readFileSync(only.path('.gitignore'), 'utf8'), 'http-client.private.env.json\n');
   } finally { only.cleanup(); }
 });
+
+test('A pattern that a later line of the file takes back is not ignored, and is written again below it; one that is taken back and then written again is fine', () => {
+  const taken = '*.local.yml\n.runs/\n!*.local.yml\n';
+  assert.deepEqual(ensureIgnored(taken, ['*.local.yml', '.runs/']), { text: `${taken}*.local.yml\n`, change: 'updated' });
+  assert.deepEqual(ensureIgnored('!*.local.yml\n*.local.yml\n', ['*.local.yml']), { text: '!*.local.yml\n*.local.yml\n', change: 'present' });
+  assert.deepEqual(ensureIgnored('!**/*.local.yml\r\n*.local.yml\r\n!/*.local.yml', ['*.local.yml']), { text: '!**/*.local.yml\r\n*.local.yml\r\n!/*.local.yml\r\n*.local.yml\r\n', change: 'updated' }, 'in any of the forms that mean the same, and the line end of the file is kept');
+  assert.deepEqual(ensureIgnored('!other\n*.local.yml\n', ['*.local.yml']), { text: '!other\n*.local.yml\n', change: 'present' }, 'taking back something else changes nothing');
+  assert.deepEqual(ensureIgnored('# !*.local.yml\n*.local.yml\n', ['*.local.yml']).change, 'present', 'a comment takes nothing back');
+});

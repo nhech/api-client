@@ -157,13 +157,17 @@ async function run(id: number, source: string, input: string, limits: Limits): P
     const guest = error instanceof GuestError;
     const message = error instanceof Error ? error.message.slice(0, 2000) : 'the script failed';
     const name = error instanceof GuestError ? error.guestName : error instanceof Error ? error.name.slice(0, 100) : 'Error';
-    send({ type: 'done', id, ok: false, error: { name, message }, recycle: !guest || /out of memory/i.test(message) });
+    send({ type: 'done', id, ok: false, error: { name, message }, recycle: !guest || /out of memory/i.test(message) || interrupted || pending.size > 0 });
   } finally {
     closed = true;
     for (const [, operation] of waiting) operation.reject(new Error('the run ended'));
     waiting.clear();
-    try { context?.dispose(); } catch { /* the runtime is disposed next */ }
-    try { runtime.dispose(); } catch { /* the worker is recycled by the extension when this happens */ }
+    // A run that was cut off, or that left an operation of the extension waiting, still holds objects of the engine, and freeing the runtime then makes the engine abort and
+    // print to the console. The worker is recycled after such a run, and everything it holds goes with it.
+    if (!interrupted && pending.size === 0) {
+      try { context?.dispose(); } catch { /* the runtime is disposed next */ }
+      try { runtime.dispose(); } catch { /* the worker is recycled by the extension when this happens */ }
+    }
   }
 }
 

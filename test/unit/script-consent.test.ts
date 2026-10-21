@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { approve, describePending, digest, MAX_APPROVED, MAX_SNAPSHOT_CHARS, pendingScripts, readApproved, scriptKey, type ApprovedScript, type ScriptToRun } from '../../src/script/consent';
+import { approve, describePending, previewOf, digest, MAX_APPROVED, MAX_SNAPSHOT_CHARS, pendingScripts, readApproved, scriptKey, type ApprovedScript, type ScriptToRun } from '../../src/script/consent';
 
 /** The consent to run the scripts of a collection: what is agreed to is a script with exactly that text, and anything else is asked about. */
 
@@ -74,4 +74,17 @@ test('The question names each script, in words, with its size and a name that ca
   const previous = approve([], pendingScripts([script('R1', 'a();')], []));
   assert.deepEqual(describePending(pendingScripts([script('R1', 'a();\nb();', 'pre', 'request')], previous)), ['Changed: the script before the request of request (2 lines)']);
   assert.equal(describePending(pendingScripts([script('R1', 'a();', 'pre', 'n'.repeat(500))], []))[0]?.length, 'New: the script before the request of  (1 line)'.length + 80);
+});
+
+test('The question shows the lines of a script as lines: a line break is kept, and what is hidden in a line is made visible', () => {
+  const code = ['// sign the request', 'const t = Date.now();', "\tpm.request.headers.upsert({ key: 'X-Sign', value: String(t) });", '', "pm.test('ok', () => {});"].join('\n');
+  assert.equal(previewOf(code, 12, 1500), "// sign the request\nconst t = Date.now();\n  pm.request.headers.upsert({ key: 'X-Sign', value: String(t) });\n\npm.test('ok', () => {});");
+  assert.equal(previewOf('a\r\nb\rc', 12, 1500), 'a\nb\nc', 'every kind of line end');
+  assert.equal(previewOf('safe();\u202e hidden();\u200b', 12, 1500), 'safe();? hidden();?', 'a character that reverses the text or is invisible');
+  const long = Array.from({ length: 30 }, (_, index) => `line ${index};`).join('\n');
+  const shown = previewOf(long, 12, 1500).split('\n');
+  assert.equal(shown.length, 13);
+  assert.deepEqual([shown[0], shown[11], shown[12]], ['line 0;', 'line 11;', '...'], 'twelve lines, then a mark that there is more');
+  assert.equal(previewOf('x'.repeat(2000), 12, 1500), `${'x'.repeat(1500)}...\n...`.replace('...\n...', '...\n...'), 'a long line is cut');
+  assert.equal(previewOf('', 12, 1500), '');
 });

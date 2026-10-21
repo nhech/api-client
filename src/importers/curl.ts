@@ -1,3 +1,4 @@
+import { leavesFolder } from '../convert/body';
 import type { Auth, Body, KV, Part, Request, SettingsOverride } from '../core/model';
 import { printable } from '../util/chars';
 import { blankRequest } from './types';
@@ -183,6 +184,17 @@ function addHeader(state: State, spec: string): void {
   if (state.headers.length < CURL_LIMITS.headers) state.headers.push(row(name, value));
 }
 
+/**
+ * A file named in the command is a file of the folder of the collection. A path that leads out of it (an absolute path, a drive, `~`, `..`) is the
+ * kind of thing a command copied from somewhere may carry on purpose, so only the name of the file is kept, and the note says so.
+ */
+function localFile(state: State, path: string): string {
+  if (!leavesFolder(path)) return path;
+  const name = path.split(/[\\/]/).filter(piece => piece !== '' && piece !== '..' && piece !== '~').pop() ?? '';
+  state.notes.push(`The path ${printable(path.slice(0, 100))} leads out of the folder of the collection: only the name of the file, ${printable(name.slice(0, 100))}, was kept.`);
+  return name;
+}
+
 /** A part of `-F name=value`, `name=@file;type=text/plain;filename=x`, `name=<file`. */
 function addForm(state: State, spec: string, literal: boolean): void {
   const equals = spec.indexOf('=');
@@ -191,7 +203,8 @@ function addForm(state: State, spec: string, literal: boolean): void {
   const rest = spec.slice(equals + 1);
   const part: Part = { name, kind: 'text', value: rest, file: '', contentType: '', enabled: true };
   if (!literal && rest.startsWith('@')) {
-    const [file = '', ...modifiers] = rest.slice(1).split(';');
+    const [named = '', ...modifiers] = rest.slice(1).split(';');
+    const file = localFile(state, named);
     part.kind = 'file'; part.file = file; part.value = '';
     for (const modifier of modifiers) { const m = /^\s*type=(.+)$/i.exec(modifier); if (m?.[1] !== undefined) part.contentType = m[1].trim(); }
     state.notes.push(`The file ${printable(file.slice(0, 100))} of the form field ${printable(name.slice(0, CURL_LIMITS.nameChars))} is read from the folder of the collection: put it there.`);
@@ -211,13 +224,13 @@ function addData(state: State, name: string, value: string): void {
     // `content`, `=content`, `name=content`, `@file`, `name@file`.
     const equals = value.indexOf('=');
     const at = value.indexOf('@');
-    if (equals < 0 && at >= 0) { state.fileBody = value.slice(at + 1); state.notes.push('A --data-urlencode value is read from a file, which is not read here: type it in.'); return; }
+    if (equals < 0 && at >= 0) { state.notes.push('A --data-urlencode value is read from a file, which is not read here: type it in.'); return; }
     state.data.push({ raw: equals <= 0 ? encodeForm(value.slice(equals + 1)) : `${value.slice(0, equals)}=${encodeForm(value.slice(equals + 1))}` });
     return;
   }
   if (name !== 'data-raw' && value.startsWith('@')) {
-    state.fileBody = value.slice(1);
-    state.notes.push(`The body is read from the file ${printable(value.slice(1, 101))}: put it in the folder of the collection, and set it in the Body tab.`);
+    state.fileBody = localFile(state, value.slice(1));
+    state.notes.push(`The body is read from the file ${printable(state.fileBody.slice(0, 100))}: put it in the folder of the collection, and set it in the Body tab.`);
     return;
   }
   state.data.push({ raw: value });
@@ -264,7 +277,7 @@ export function parseCurl(input: string): CurlResult {
       case 'max-time': { const seconds = Number(value); if (Number.isFinite(seconds) && seconds > 0) state.maxTime = Math.round(seconds * 1000); break; }
       case 'http1.1': state.httpVersion = '1.1'; break;
       case 'http2': case 'http2-prior-knowledge': state.httpVersion = '2'; break;
-      case 'upload-file': state.upload = value; break;
+      case 'upload-file': state.upload = localFile(state, value); break;
       case 'digest': state.digest = true; break;
       default:
         if (!QUIET.has(name) && !ignored.has(name)) { ignored.add(name); state.notes.push(`The option ${printable(name.length === 1 ? `-${name}` : `--${name}`.slice(0, 40))} has no place in a request and was left out.`); }

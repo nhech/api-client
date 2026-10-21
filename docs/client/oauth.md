@@ -26,7 +26,7 @@ The address of the token server comes from the collection, which can come from s
 
 ## The sign-in answer (authorization code)
 
-A server on this computer, bound to `127.0.0.1` only, that waits for one answer and closes (`src/engine/loopback.ts`). It accepts a request for the one agreed path, with the `Host` header of the agreed address (a page of the web cannot reach it through a name that points here), and the `state` made for this attempt (compared in constant time); anything else is answered and ignored, it does not end the wait. It reads no body, answers with a fixed page that repeats nothing of the request, and gives up after 5 minutes or when the person cancels. A redirect address registered with the provider is used as it is, but only on this computer, with a port.
+A server on this computer, bound to `127.0.0.1` only (and to `::1` as well when the registered address says `localhost`, which a browser may resolve to either; if another process already holds that port on `::1` the sign-in is refused, because the answer could go to it), that waits for one answer and closes (`src/engine/loopback.ts`). It accepts a request for the one agreed path, with the `Host` header of the agreed address (a page of the web cannot reach it through a name that points here), and the `state` made for this attempt (compared in constant time); anything else is answered and ignored, it does not end the wait. It reads no body, answers with a fixed page that repeats nothing of the request, and gives up after 5 minutes or when the person cancels. A redirect address registered with the provider is used as it is, but only on this computer, with a port.
 
 ## In the page
 

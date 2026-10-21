@@ -1,10 +1,10 @@
 import { timingSafeEqual } from 'node:crypto';
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { printable } from '../util/chars';
 
 /**
  * The place the provider sends the person back to after they signed in, for the authorization code grant: a server on this computer, on
- * 127.0.0.1 only, that waits for one answer and closes. What it accepts is narrow so that nothing else on the machine or the network can
+ * 127.0.0.1 only (and ::1 too when the registered address says `localhost`, which a browser may resolve to either), that waits for one answer and closes. What it accepts is narrow so that nothing else on the machine or the network can
  * steer it: a request for the one path that was agreed, with the `Host` header of the address that was agreed (a page of the web cannot
  * reach it through a name that points here), and the `state` that was made for this attempt (a request without it, or with another, is
  * answered and ignored: it does not end the wait). It reads no body, answers with a fixed page that repeats nothing of the request, and
@@ -64,9 +64,15 @@ export async function startLoopback(options: LoopbackOptions): Promise<Loopback>
 
   let finish: (result: LoopbackResult) => void = () => undefined;
   const result = new Promise<LoopbackResult>(resolve => { finish = resolve; });
-  const server = createServer({ maxHeaderSize: 8 * 1024 });
-  server.headersTimeout = 10_000;
-  server.requestTimeout = 10_000;
+  const make = (): Server => {
+    const created = createServer({ maxHeaderSize: 8 * 1024 });
+    created.headersTimeout = 10_000;
+    created.requestTimeout = 10_000;
+    return created;
+  };
+  const server = make();
+  /** The same server on ::1, for an address with the name `localhost`: a process of someone else must not be able to take the answer by listening there. */
+  const others: Server[] = [];
   let done = false;
   const waiting: { timer?: NodeJS.Timeout } = {};
   const end = (outcome: LoopbackResult): void => {
@@ -75,13 +81,13 @@ export async function startLoopback(options: LoopbackOptions): Promise<Loopback>
     if (waiting.timer !== undefined) clearTimeout(waiting.timer);
     options.signal?.removeEventListener('abort', onAbort);
     // The page that tells the person to go back is sent first; then the server is closed, which ends the waiting connection too.
-    setImmediate(() => { server.close(); server.closeAllConnections(); });
+    setImmediate(() => { for (const each of [server, ...others]) { each.close(); each.closeAllConnections(); } });
     finish(outcome);
   };
   const onAbort = (): void => end({ ok: false, error: 'cancelled' });
 
   let expectedHost = '';
-  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
+  const onRequest = (req: IncomingMessage, res: ServerResponse): void => {
     if (done) { reply(res, 410, REFUSED); return; }
     if (req.headers.host !== expectedHost) { reply(res, 400, REFUSED); return; }
     if (req.method !== 'GET') { reply(res, 405, REFUSED); return; }
@@ -100,13 +106,25 @@ export async function startLoopback(options: LoopbackOptions): Promise<Loopback>
     if (code === null || code === '' || code.length > MAX_CODE_CHARS) { reply(res, 400, REFUSED); end({ ok: false, error: 'The provider sent no code back.' }); return; }
     reply(res, 200, PAGE);
     end({ ok: true, code });
-  });
+  };
+  server.on('request', onRequest);
 
   await new Promise<void>((resolve, reject) => {
     const failed = (error: NodeJS.ErrnoException): void => { reject(new Error(error.code === 'EADDRINUSE' ? `The port ${port} is already in use, so the redirect address cannot be listened on.` : `Could not listen on this computer: ${error.message}`)); };
     server.once('error', failed);
     server.listen(port, '127.0.0.1', () => { server.off('error', failed); resolve(); });
   });
+  if (host === 'localhost') {
+    const second = make();
+    second.on('request', onRequest);
+    try {
+      await new Promise<void>((resolve, reject) => { second.once('error', reject); second.listen(port, '::1', () => { second.off('error', reject); resolve(); }); });
+      others.push(second);
+    } catch (error) {
+      // Another process holds the port on ::1: the answer could go to it, so there is no safe place to wait. No IPv6 on this machine is no problem: nothing can reach it there.
+      if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') { server.close(); throw new Error(`The port ${port} is already in use on ::1, which localhost can also mean, so the redirect address cannot be listened on safely. Use 127.0.0.1 in the address, or another port.`); }
+    }
+  }
   const address = server.address();
   const actual = typeof address === 'object' && address !== null ? address.port : port;
   expectedHost = `${host}:${actual}`;

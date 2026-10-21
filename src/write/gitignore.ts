@@ -13,8 +13,19 @@ export type GitignoreChange = 'created' | 'updated' | 'present';
 export function ensureIgnored(current: string | undefined, patterns: string | readonly string[] = PRIVATE_PATTERN): { text: string; change: GitignoreChange } {
   const wanted = typeof patterns === 'string' ? [patterns] : patterns;
   if (current === undefined) return { text: wanted.map(pattern => `${pattern}\n`).join(''), change: 'created' };
-  const present = new Set(current.split(/\r?\n/).map(line => line.trim()));
-  const missing = wanted.filter(pattern => !present.has(pattern) && !present.has(`/${pattern}`) && !present.has(`**/${pattern}`));
+  const lines = current.split(/\r?\n/).map(line => line.trim());
+  // The last rule that says anything about the pattern wins in Git: a pattern that a later line takes back (`!pattern`) is not there, and is written again below it.
+  const forms = (pattern: string): string[] => [pattern, `/${pattern}`, `**/${pattern}`];
+  const lastIndex = (matches: (line: string) => boolean): number => {
+    for (let index = lines.length - 1; index >= 0; index--) if (matches(lines[index] as string)) return index;
+    return -1;
+  };
+  const missing = wanted.filter(pattern => {
+    const own = forms(pattern);
+    const kept = lastIndex(line => own.includes(line));
+    const taken = lastIndex(line => own.some(form => line === `!${form}`));
+    return kept < 0 || taken > kept;
+  });
   if (missing.length === 0) return { text: current, change: 'present' };
   const eol = current.includes('\r\n') ? '\r\n' : '\n';
   const needsBreak = current !== '' && !current.endsWith('\n');
