@@ -1,56 +1,63 @@
-# HTTP Files Importer
+# API Client
 
-Move your [Thunder Client](https://www.thunderclient.com/) collections and environments into plain **`.http` files** that open in [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client), [httpYac](https://marketplace.visualstudio.com/items?itemName=anweber.vscode-httpyac) and the [JetBrains HTTP Client](https://www.jetbrains.com/help/idea/http-client-in-product-code-editor.html).
+A free, **local-first API client for VS Code**. Your requests are plain files in your repository: no account, no limits on collections or requests, no telemetry, no server of ours. Write a request, press Send, read the answer next to it, and review the same files in a pull request.
 
-Everything runs on your machine: no account, no network, no telemetry. Your requests end up in files you can read, diff and commit.
+The extension sends the requests **you** send and, for a request that uses OAuth 2.0, the requests to the token server and the sign-in you configured. Nothing else leaves your machine.
 
-> **Preview.** This first release was built from public information and tested with made-up data, not with a real Thunder Client v4 data folder. If an import goes wrong, please [open an issue](https://github.com/nhech/api-client/issues). Not affiliated with or endorsed by Thunder Client; the name only says which data format is read.
+![A request and its answer side by side, with the collections, environments and history in the side bar](https://raw.githubusercontent.com/nhech/api-client/main/docs/images/request-dark.png)
+
+> **Preview.** The file formats can still change between versions (the files carry `schema: 1` and are migrated). Not affiliated with or endorsed by Thunder Client, Postman, REST Client, httpYac or JetBrains; their names only say which data formats are read or written.
 
 ## Use it
 
-1. Open the folder where you want the files and trust the workspace.
-2. Run **HTTP Files Importer: Import from Thunder Client...** from the Command Palette, or open the **HTTP Files Importer** section of the Explorer and press **Open the importer**. Nothing runs by itself.
-3. Pick the Thunder Client data the panel found, or choose a folder or exported `.json` files. The data is only read.
-4. Read what was found: the counts, and the findings that need your attention. Names and places only, never a value.
-5. Choose the tool you write for (REST Client, httpYac or JetBrains), the folder in your workspace, what to do if it already has files, and whether secrets move to a private file.
-6. Press **Import**. Nothing is written before that, and **Start over** or closing the panel writes nothing.
-7. Open the folder or the report from the panel.
-
-![The importer panel: what was found, the choices, and the Import button that stays in view](https://raw.githubusercontent.com/nhech/api-client/main/docs/images/panel-review.png)
-
-If you prefer the keyboard, **HTTP Files Importer: Import from Thunder Client (step by step)...** asks the same questions in the Command Palette.
-
-![The importer panel after the import, with buttons to open the folder or the report](https://raw.githubusercontent.com/nhech/api-client/main/docs/images/panel-done.png)
-
-The panel follows your VS Code theme, light or dark. It is made of standard buttons, radio buttons and fields, so it can be used with the keyboard.
+1. Open a folder and trust the workspace. The extension is off in Restricted Mode, in the browser and in virtual workspaces.
+2. Open **API Client** in the Activity Bar. **New Collection...**, then **New Request...** on it.
+3. Type an address and press **Ctrl+Enter** (**Cmd+Enter** on a Mac), or the **Send** button.
+4. **New Environment...** for `baseUrl` and the like, and use `{{baseUrl}}/pets` in your requests. Pick the environment in the status bar.
+5. Commit the `api-client/` folder. Secret values are in `*.local.yml` files that the folder's own `.gitignore` keeps out of Git.
 
 ## What you get
 
-- **Folders and files** in the order Thunder Client shows them: one folder per collection, one file per folder.
-- **Inheritance applied.** Headers, authentication, base URL and tests set on a collection or folder are written into each request, as Thunder Client applies them.
-- **Bodies and authentication:** JSON, text, XML, form, multipart (with files) and GraphQL bodies; bearer and basic authentication.
-- **Tests as comment lines.** Thunder Client tests become `# @assert` lines and `set-env-var` becomes `# @capture`. All three tools ignore them, so the request still runs. Scripts are kept as comments and never run.
-- **Environment files** for httpYac and JetBrains (`http-client.env.json`, `http-client.private.env.json`).
-- **REST Client settings filled in for you.** REST Client keeps its variables in a VS Code setting, so for that target the extension writes the shared variables to your workspace settings and the secrets to your user settings (never synced). Comments in your `settings.json` stay and nothing you already have is replaced.
-- **Dynamic variables spelled for the tool you chose**, for example `{{#guid}}` becomes `{{$guid}}` for REST Client and `{{$uuid}}` for JetBrains.
+- **A request editor with the answer beside it.** Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, a binary file), Scripts, Tests, Settings, Docs and Code. The answer has the body (pretty or raw, pictures too), headers, cookies, tests, the console of your scripts, the request as it was sent and a timeline.
+- **Collections, folders and environments** in native trees: drag and drop, rename, duplicate, move, filter. A folder or a collection sets what its requests share (base address, headers, authentication, variables, tests, scripts, settings), and the nearest one wins.
+- **Requests are files**: one YAML file per request, readable in a diff. You can edit them by hand (*Open as Text*) and the editor follows. Next to each request a generated `.http` copy is written for REST Client, httpYac and the JetBrains HTTP Client users (setting `apiClient.mirror.mode`).
+- **Variables and environments**, with secret values kept in files that Git ignores and hidden wherever something is shown or written down.
+- **Authentication:** inherit, none, bearer, basic, API key and **OAuth 2.0** (client credentials, password, authorization code with PKCE, refresh). Tokens live in the secret storage of VS Code.
+- **Tests and captures** in one line each (`status == 200`, `json $.id exists`, `token = json $.access_token`), and **JavaScript scripts** before and after a request (a subset of the Postman `pm` API) in a sandbox, only after you allowed the exact text.
+- **A collection runner** with passes, a pause, a CSV or JSON data file and a JSON or JUnit report.
+- **Imports** from Thunder Client, Postman (collections and environments) and cURL.
+- **The Code tab:** the request as cURL, PowerShell, JavaScript (fetch or axios), Python, Go, C#, PHP or Java, with the secrets left out.
+- **Cookies**, **history** (on this computer, a line for each send by default) and per-request settings for redirects, timeouts and TLS verification.
 
-## Secrets stay out of Git
+![The collection runner with its options, the results and the buttons that save the report](https://raw.githubusercontent.com/nhech/api-client/main/docs/images/runner.png)
 
-Literal tokens, passwords and keys are replaced by `{{variables}}`. They are found by name: in headers, query and form fields, path parameters, the password or token in a URL, and inside JSON, XML, query-string and GraphQL bodies (`"apiKey": "…"`, `<Password>…</Password>`, `client_secret=…`). A token with no name next to it, such as free text in a body, cannot be recognised and stays, so look through the bodies of a collection you did not write before you commit it. Their values go to a private file that is added to `.gitignore` before it is created, and the report names them without showing them. Encrypted variables are never decrypted: an empty entry waits for you to fill it in.
+## Scripts need your consent
 
-## Safe by construction
+A script can read every variable it is given, secrets included, and send them anywhere. So nothing runs until you have said yes to the **exact text**, in a question that shows each script. A pull, a branch switch or an edit asks again, and an import never grants it. Scripts run in QuickJS compiled to WebAssembly, in a worker thread, with limits on time, memory and output, and can reach nothing but a short list of operations that the extension checks. `apiClient.scripts.enabled` turns them off.
 
-A collection can come from anyone, so every value in it is treated as hostile. The data cannot add a request to the file, read a file of yours or run code when you press Send. Files are written through a staging folder and undone on failure or cancel; paths cannot leave the target folder and links are never followed. The core of the extension has no network access and starts no process. Details: [security policy](https://github.com/nhech/api-client/blob/main/SECURITY.md).
+![The Scripts tab of a request, with a script before the request and one after the answer](https://raw.githubusercontent.com/nhech/api-client/main/docs/images/scripts.png)
+
+## Safe with other people's files
+
+A collection can come from anyone, so everything in it is treated as hostile. The files are read as data and never run; paths cannot leave the collection; a redirect never takes your credentials to another origin and never goes from the internet to your machine or network unless you allow it; secrets are covered by what they are and by what they are called; the pages have no network and a strict Content-Security-Policy. The [security notes](https://github.com/nhech/api-client/blob/main/SECURITY.md) say what it defends against, what it does not, and how it was audited.
+
+## Settings
+
+| Setting | Meaning |
+|---|---|
+| `apiClient.root` | the folder of the workspace that holds the client's files (default `api-client`) |
+| `apiClient.mirror.mode` | the `.http` copies: `on` (default), `off`, `gitignored` |
+| `apiClient.history.mode` | `metadata` (default), `full`, `off` |
+| `apiClient.scripts.enabled` | run scripts after you allowed them |
 
 ## Known limits
 
-- Not yet tried on a real Thunder Client v4 data folder (see the note above). Fields it does not know are skipped.
-- OAuth 2.0, AWS, digest and NTLM authentication are not converted; WebSocket, SSE and gRPC requests, history, responses and cookies are skipped. The report lists them.
-- `# @assert` and `# @capture` lines are written, but nothing runs them yet.
-- Needs a trusted, local workspace. Not available in the browser or in virtual workspaces. Remote workspaces (WSL, SSH, containers) have not been tried.
+- HTTP/1.1 only for now; no WebSocket, server-sent events or gRPC; no digest, AWS or NTLM authentication; no client certificates; no SOCKS or PAC proxy (the proxy of VS Code and of the environment is used).
+- Very large collections (ten thousand requests) pay for reading every file again when one changes.
+- Remote SSH, WSL and containers have not been tried by hand.
 
 ## More
 
-- Command line and library: [github.com/nhech/api-client](https://github.com/nhech/api-client)
+- Documentation, the converter from Thunder Client data to `.http` files, and the source: [github.com/nhech/api-client](https://github.com/nhech/api-client)
 - Landing page: [api-client.longtd.me](https://api-client.longtd.me/)
 - Licence: MIT.
