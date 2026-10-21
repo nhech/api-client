@@ -16,6 +16,7 @@ import { ImportService, NOTES_SCHEME } from './importer';
 import { HistoryService, HistoryTree, registerHistory } from './history';
 import { MirrorService } from './mirror';
 import { RunnerManager, type RunnerTestView } from './runner';
+import { SecretFilesGuard } from './secretFiles';
 import { SendEnvironment } from './sender';
 import type { OAuthService } from './oauth';
 import type { ScriptService } from './scripts';
@@ -43,6 +44,8 @@ export interface ImporterTestApi {
   runner(path: string): RunnerTestView | undefined;
   /** The cookies that requests received. */
   cookies: CookieManager;
+  /** The warning about files with secret values that Git would commit. */
+  secretFiles: SecretFilesGuard;
   /** What was sent, and the view that lists it. */
   history: HistoryService;
   /** Bringing in what other tools made: the tests answer the questions. */
@@ -96,13 +99,14 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   const cookies = new CookieManager(context);
   const sending = new SendEnvironment(context, workspace, cookies.jar, history);
   const mirror = new MirrorService(workspace, context);
+  const secretFiles = new SecretFilesGuard(workspace);
   const runner = new RunnerManager(context, sending, workspace);
   const requests = new RequestEditorProvider(context, sending);
   const environmentEditors = new EnvironmentEditorProvider(context, workspace);
   const containerEditors = new ContainerEditorProvider(context, workspace);
   const editorOptions = { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false };
   context.subscriptions.push(
-    sending, runner, cookies, history, historyTree,
+    sending, runner, cookies, history, historyTree, secretFiles,
     vscode.commands.registerCommand('apiClient.cookies', () => cookies.show()),
     vscode.commands.registerCommand('apiClient.clearCookies', () => { cookies.clearAll(); }),
     vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, editorOptions),
@@ -125,7 +129,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), cookies, history, importer, historyView: () => historyTree.snapshot(), panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), cookies, history, importer, secretFiles, historyView: () => historyTree.snapshot(), panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 

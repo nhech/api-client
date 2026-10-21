@@ -1603,4 +1603,38 @@ exports.run = async function run() {
   } finally {
     importService.answers = {};
   }
+
+  // 23. The files with secret values: when Git would commit one (a .gitignore that takes the rule back, a file that was committed before), the person is told once
+  //     for each file; when Git ignores them, or there is no Git, nothing is said.
+  const guard = test.secretFiles;
+  const originalRepository = guard.repositoryOf;
+  const originalWarn = guard.warn;
+  const warnings = [];
+  guard.warn = async message => { warnings.push(message); };
+  put('api-client/environments/guard.env.local.yml', 'schema: 1\nvalues:\n  token: guard-secret-1\n');
+  try {
+    guard.repositoryOf = async () => undefined;
+    await guard.check();
+    assert.deepEqual(warnings, [], 'no Git: nothing to say');
+    guard.repositoryOf = async () => ({ checkIgnore: async paths => new Set(paths) });
+    await guard.check();
+    assert.deepEqual(warnings, [], 'everything is ignored: nothing to say');
+    guard.repositoryOf = async () => ({ checkIgnore: async () => { throw new Error('git is not there'); } });
+    await guard.check();
+    assert.deepEqual(warnings, [], 'a question that cannot be asked is not an alarm');
+    guard.repositoryOf = async () => ({ checkIgnore: async paths => new Set(paths.filter(item => !item.endsWith('guard.env.local.yml'))) });
+    await guard.check();
+    await sleep(2200);
+    assert.equal(warnings.length, 1, 'once, even though the files are looked at again when the tree changes');
+    assert.match(warnings[0], /^API Client: a file with secret values is not ignored by Git and would be committed \(guard\.env\.local\.yml\)\./);
+    await guard.check();
+    assert.equal(warnings.length, 1, 'a file that the person was told about is not told again');
+    guard.repositoryOf = async () => ({ checkIgnore: async paths => new Set(paths.filter(item => !item.endsWith('collection.local.yml'))) });
+    await guard.check();
+    assert.equal(warnings.length, 2, 'another file is a new warning');
+    assert.match(warnings[1], /collection\.local\.yml/);
+  } finally {
+    guard.repositoryOf = originalRepository;
+    guard.warn = originalWarn;
+  }
 };
