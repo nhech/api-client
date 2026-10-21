@@ -533,7 +533,7 @@ exports.run = async function run() {
   const typedInEnvironment = new vscode.WorkspaceEdit();
   typedInEnvironment.replace(environmentUri, new vscode.Range(environmentDocument.positionAt(environmentDocument.getText().indexOf('name: Dev')), environmentDocument.positionAt(environmentDocument.getText().indexOf('name: Dev') + 'name: Dev'.length)), 'name: Typed');
   await vscode.workspace.applyEdit(typedInEnvironment);
-  await until(() => environmentView().lastMessage().cause === 'disk' && environmentView().lastMessage().environment.name === 'Typed', 'a change in the text editor reaches the page');
+  await until(() => environmentView().messages().some(message => message.type === 'document' && message.cause === 'disk' && message.environment.name === 'Typed'), 'a change in the text editor reaches the page');
   await environmentDocument.save();
 
   // 12e. A file that cannot be read opens read-only.
@@ -582,4 +582,36 @@ exports.run = async function run() {
   // 12h. Clicking an environment in the side bar opens it in its editor.
   await vscode.commands.executeCommand('apiClient.openEnvironment', environmentPath);
   await until(() => environmentView()?.isReady === true, 'the command opens the environment');
+
+  // 13. Making something new from scratch, editing it in its page, saving, and finding it again after the editor is closed and opened.
+  await vscode.commands.executeCommand('apiClient.newCollection', undefined, 'Created');
+  await until(() => test.client().collections.some(node => node.label === 'Created'), 'the new collection is listed');
+  const createdNode = () => test.client().collections.find(node => node.label === 'Created');
+  assert.match(readFile('api-client/collections/created/collection.yml'), /^schema: 1\nid: [0-9A-Z]{26}\nname: Created\n/);
+  await vscode.commands.executeCommand('apiClient.newFolder', createdNode(), 'Sub folder');
+  await until(() => createdNode().children.some(child => child.label === 'Sub folder'), 'and the new folder');
+  await vscode.commands.executeCommand('apiClient.newRequest', createdNode().children.find(child => child.label === 'Sub folder'), 'First call');
+  const firstPath = 'api-client/collections/created/sub-folder/first-call.req.yml';
+  assert.ok(fs.existsSync(onDisk(firstPath)), 'the request file is there');
+  const firstUri = uriOf(firstPath);
+  await until(() => test.requestEditor(firstUri.toString())?.isReady === true, 'and it is open in its editor');
+  const firstView = () => test.requestEditor(firstUri.toString());
+  await until(() => firstView().lastMessage()?.type === 'init', 'with what it holds');
+  assert.deepEqual([firstView().lastMessage().request.name, firstView().lastMessage().request.method, firstView().lastMessage().request.url], ['First call', 'GET', '']);
+  await firstView().receive({ type: 'edit', rev: firstView().lastMessage().rev, ops: [{ op: 'set', path: ['method'], value: 'POST' }, { op: 'set', path: ['url'], value: '{{base}}/created' }, { op: 'set', path: ['body'], value: { kind: 'json', text: '{"made":true}' } }] });
+  const firstDocument = await vscode.workspace.openTextDocument(firstUri);
+  assert.equal(firstDocument.isDirty, true);
+  await firstDocument.save();
+  assert.match(readFile(firstPath), /\nmethod: POST\nurl: '\{\{base\}\}\/created'\nbody:\n {2}kind: json\n {2}text: '\{"made":true\}'\n/);
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  await until(() => test.requestEditor(firstUri.toString()) === undefined, 'the editor is closed');
+  await vscode.commands.executeCommand('apiClient.openRequest', firstPath);
+  await until(() => firstView()?.lastMessage()?.type === 'init', 'and opened again');
+  assert.deepEqual([firstView().lastMessage().request.method, firstView().lastMessage().request.url, firstView().lastMessage().request.body], ['POST', '{{base}}/created', { kind: 'json', text: '{"made":true}' }], 'what was saved is what is there');
+  await vscode.commands.executeCommand('apiClient.newEnvironment', undefined, 'Fresh');
+  await until(() => test.client().environments.some(node => node.label === 'Fresh'), 'a new environment is listed');
+  assert.equal(test.client().workspace.activeEnvironmentId, test.client().workspace.loaded.environments.find(item => item.environment.name === 'Fresh').environment.id, 'and it is the active one');
+  await vscode.commands.executeCommand('apiClient.rename', test.client().collections.find(node => node.label === 'Created'), 'Renamed by command');
+  await until(() => test.client().collections.some(node => node.label === 'Renamed by command'), 'the rename command works with a name given to it');
+  assert.ok(fs.existsSync(onDisk('api-client/collections/renamed-by-command/collection.yml')));
 };

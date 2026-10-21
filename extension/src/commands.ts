@@ -19,6 +19,14 @@ function nameProblem(value: string): string | undefined {
   return undefined;
 }
 
+/** The name for something new: the one a caller passed as the second argument of the command (a keybinding, another extension, a test), or what the person types. */
+async function nameFor(given: unknown, prompt: string, value = ''): Promise<string | undefined> {
+  if (typeof given !== 'string') return askName(prompt, value);
+  const problem = nameProblem(given);
+  if (problem !== undefined) throw new Error(problem);
+  return given.trim();
+}
+
 async function askName(prompt: string, value = ''): Promise<string | undefined> {
   const answer = await vscode.window.showInputBox({ prompt, value, validateInput: nameProblem });
   return answer === undefined ? undefined : answer.trim();
@@ -103,37 +111,37 @@ export function registerCommands(context: vscode.ExtensionContext, { workspace, 
     if (uri !== undefined) await vscode.commands.executeCommand('revealInExplorer', uri);
   });
 
-  register('apiClient.newCollection', async () => {
-    const name = await askName('Name of the collection');
+  register('apiClient.newCollection', async (_node?: TreeNode, given?: string) => {
+    const name = await nameFor(given, 'Name of the collection');
     const files = store();
     if (name === undefined || files === undefined) return;
     const created = await files.createCollection(name);
     await workspace.reload();
     await collections.reveal(created.path);
   });
-  register('apiClient.newFolder', async (node?: TreeNode) => {
+  register('apiClient.newFolder', async (node?: TreeNode, given?: string) => {
     const parent = await target(node, 'folder');
     const files = store();
     if (parent === undefined || files === undefined) return;
-    const name = await askName('Name of the folder');
+    const name = await nameFor(given, 'Name of the folder');
     if (name === undefined) return;
     const created = await files.createFolder(parent.path, name);
     await workspace.reload();
     await collections.reveal(created.path);
   });
-  register('apiClient.newRequest', async (node?: TreeNode) => {
+  register('apiClient.newRequest', async (node?: TreeNode, given?: string) => {
     const parent = await target(node, 'request');
     const files = store();
     if (parent === undefined || files === undefined) return;
-    const name = await askName('Name of the request');
+    const name = await nameFor(given, 'Name of the request');
     if (name === undefined) return;
     const created = await files.createRequest(parent.path, name);
     await workspace.reload();
     await collections.reveal(created.path);
     await vscode.commands.executeCommand(OPEN_REQUEST_COMMAND, created.path);
   });
-  register('apiClient.newEnvironment', async () => {
-    const name = await askName('Name of the environment');
+  register('apiClient.newEnvironment', async (_node?: TreeNode, given?: string) => {
+    const name = await nameFor(given, 'Name of the environment');
     const files = store();
     if (name === undefined || files === undefined) return;
     const created = await files.createEnvironment(name);
@@ -148,10 +156,10 @@ export function registerCommands(context: vscode.ExtensionContext, { workspace, 
   };
   const ORGANISABLE = ['collection', 'folder', 'request', 'environment'] as const;
 
-  register('apiClient.rename', async (node?: TreeNode, selected?: TreeNode[]) => {
-    const [entry] = chosen(node, selected, ORGANISABLE);
+  register('apiClient.rename', async (node?: TreeNode, selected?: TreeNode[] | string) => {
+    const [entry] = chosen(node, Array.isArray(selected) ? selected : undefined, ORGANISABLE);
     if (entry === undefined) return;
-    const name = await askName(`New name of the ${entry.kind}`, entry.label);
+    const name = await nameFor(selected, `New name of the ${entry.kind}`, entry.label);
     if (name === undefined || name === entry.label) return;
     await organiser.rename(entry.path, name);
   });
