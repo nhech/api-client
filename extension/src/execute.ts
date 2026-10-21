@@ -34,6 +34,15 @@ export interface ExecuteOptions {
   iteration?: { index: number; count: number; data: Readonly<Record<string, string>> };
 }
 
+/** What was attempted when a request went out: what the history says about it. */
+export interface Attempt {
+  method: string;
+  /** The address as it was first sent, with the variables replaced (the secrets are still in it: whoever writes it down covers them). */
+  url: string;
+  environment: string;
+  redactions: string[];
+}
+
 export type Execution =
   | {
     kind: 'sent';
@@ -47,8 +56,9 @@ export type Execution =
     /** Values to hide in whatever is written down about the request. */
     redactions: string[];
     request: Request;
+    attempt: Attempt;
   }
-  | { kind: 'failed'; code: string; message: string; hint: string; warnings: string[]; report?: ScriptReport }
+  | { kind: 'failed'; code: string; message: string; hint: string; warnings: string[]; report?: ScriptReport; attempt?: Attempt }
   | { kind: 'cancelled' };
 
 /** The scripts that would run for a request, each with the place that its consent is kept under. */
@@ -71,7 +81,9 @@ export async function readPrefix(body: WireResponse['body'], limit: number): Pro
   }
 }
 
-const failed = (code: string, message: string, hint = '', warnings: string[] = [], report?: ScriptReport): Execution => ({ kind: 'failed', code, message: printable(message), hint: printable(hint), warnings, ...(report === undefined || !hasReport(report) ? {} : { report }) });
+const failed = (code: string, message: string, hint = '', warnings: string[] = [], report?: ScriptReport, attempt?: Attempt): Execution => ({ kind: 'failed', code, message: printable(message), hint: printable(hint), warnings, ...(report === undefined || !hasReport(report) ? {} : { report }), ...(attempt === undefined ? {} : { attempt }) });
+
+const attemptOf = (prepared: Prepared): Attempt => ({ method: prepared.built.wire.method, url: prepared.built.wire.url, environment: prepared.environment?.environment.name ?? '', redactions: prepared.built.redactions });
 
 /** What to say about a request that cannot be sent: the problems in the words for the person, with the warnings that came before. */
 function refused(prepared: Prepared, report?: ScriptReport): Execution {
@@ -167,6 +179,7 @@ export async function executeRequest(env: SendEnvironment, path: string, request
   const warnings = [...prepared.built.warnings];
   if (prepared.built.unresolved.length > 0) warnings.push(`These variables have no value, so they were sent as written: ${prepared.built.unresolved.join(', ')}.`);
 
+  const attempt = attemptOf(prepared);
   try {
     const response = await send(prepared.built.wire, {
       ...prepared.options, signal, spill: env.spill(), proxy: env.proxy(),
@@ -182,10 +195,10 @@ export async function executeRequest(env: SendEnvironment, path: string, request
     for (const capture of captures) env.runtime.apply(capture, context);
     if (captures.some(capture => capture.ok)) env.announceVariables();
     if (allowed && prepared.effective.postScripts.length > 0) await runStage(env, 'post', { prepared, request: current, answer: { wire: response, bytes }, report, signal, context, iteration: options.iteration });
-    return { kind: 'sent', response, bytes, tests, captures, report, warnings, redactions: prepared.built.redactions, request: current };
+    return { kind: 'sent', response, bytes, tests, captures, report, warnings, redactions: prepared.built.redactions, request: current, attempt };
   } catch (error) {
     if (error instanceof EngineError && error.code === 'aborted') return { kind: 'cancelled' };
-    if (error instanceof EngineError) return failed(error.code, error.message, error.hint, warnings, report);
-    return failed('network', error instanceof Error ? error.message : 'The request failed.', '', warnings, report);
+    if (error instanceof EngineError) return failed(error.code, error.message, error.hint, warnings, report, attempt);
+    return failed('network', error instanceof Error ? error.message : 'The request failed.', '', warnings, report, attempt);
   }
 }

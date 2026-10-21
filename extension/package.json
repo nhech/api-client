@@ -163,6 +163,29 @@
         "category": "API Client"
       },
       {
+        "command": "apiClient.history.open",
+        "title": "Open",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.history.openRequest",
+        "title": "Open the Request",
+        "category": "API Client",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "apiClient.history.remove",
+        "title": "Remove from History",
+        "category": "API Client",
+        "icon": "$(close)"
+      },
+      {
+        "command": "apiClient.history.clear",
+        "title": "Clear History",
+        "category": "API Client",
+        "icon": "$(clear-all)"
+      },
+      {
         "command": "apiClient.cookies",
         "title": "Show Cookies",
         "category": "API Client"
@@ -271,7 +294,13 @@
       },
       {
         "view": "apiClient.history",
-        "contents": "The requests you send appear here."
+        "contents": "The requests you send appear here. Only the line is kept (the method, the address, the status and the time): headers and bodies are kept only if you choose so in the setting apiClient.history.mode.",
+        "when": "config.apiClient.history.mode != off"
+      },
+      {
+        "view": "apiClient.history",
+        "contents": "The history is turned off, so nothing you send is written down.\n[Change the setting](command:workbench.action.openSettings?%5B%22apiClient.history.mode%22%5D)",
+        "when": "config.apiClient.history.mode == off"
       },
       {
         "view": "apiClient.start",
@@ -289,6 +318,18 @@
     },
     "menus": {
       "commandPalette": [
+        {
+          "command": "apiClient.history.open",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.history.openRequest",
+          "when": "false"
+        },
+        {
+          "command": "apiClient.history.remove",
+          "when": "false"
+        },
         {
           "command": "apiClient.openMirror",
           "when": "false"
@@ -394,6 +435,11 @@
           "command": "apiClient.refresh",
           "when": "view == apiClient.environments",
           "group": "navigation@2"
+        },
+        {
+          "command": "apiClient.history.clear",
+          "when": "view == apiClient.history",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -445,6 +491,31 @@
         {
           "command": "apiClient.revealInExplorer",
           "when": "view == apiClient.environments",
+          "group": "9_manage@1"
+        },
+        {
+          "command": "apiClient.history.openRequest",
+          "when": "view == apiClient.history && viewItem == historyEntry",
+          "group": "inline@1"
+        },
+        {
+          "command": "apiClient.history.remove",
+          "when": "view == apiClient.history && viewItem == historyEntry",
+          "group": "inline@2"
+        },
+        {
+          "command": "apiClient.history.open",
+          "when": "view == apiClient.history && viewItem == historyEntry",
+          "group": "1_open@1"
+        },
+        {
+          "command": "apiClient.history.openRequest",
+          "when": "view == apiClient.history && viewItem == historyEntry",
+          "group": "1_open@2"
+        },
+        {
+          "command": "apiClient.history.remove",
+          "when": "view == apiClient.history && viewItem == historyEntry",
           "group": "9_manage@1"
         },
         {
@@ -512,6 +583,22 @@
           "default": "on",
           "scope": "resource",
           "markdownDescription": "The `.http` file that is written next to each request, for people who use the files with REST Client, JetBrains or httpYac, or read them in a pull request. The request is the source: a `.http` file that you edit is never written over."
+        },
+        "apiClient.history.mode": {
+          "type": "string",
+          "enum": [
+            "metadata",
+            "full",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Keep a line for each request you send: the method, the address, the status, the time and the size.",
+            "Keep the line, the headers and the first 64 KB of the two bodies as well. Secrets that the request was built from, and fields and headers that are named like secrets, are covered, but a token that a server sends back cannot be known.",
+            "Keep nothing."
+          ],
+          "default": "metadata",
+          "scope": "machine",
+          "markdownDescription": "What the History view keeps about the requests you send. It is kept on this computer, for this workspace only (never in the files of the collection, so it is not committed), at most 200 entries for 30 days."
         },
         "apiClient.scripts.enabled": {
           "type": "boolean",

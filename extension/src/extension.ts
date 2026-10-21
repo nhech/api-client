@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { candidatePaths, inspectCandidates } from '../../src/discover';
 import { runImportFlow } from '../../src/host';
 import type { FlowResult } from '../../src/host';
+import type { HistoryNode } from '../../src/history/tree';
 import type { TreeNode } from '../../src/view/tree';
 import { ClientWorkspace } from './clientWorkspace';
 import { ContainerEditorProvider, ENVIRONMENT_VIEW_TYPE, CONTAINER_VIEW_TYPE, EnvironmentEditorProvider, type DocumentEditorTestView } from './documentEditors';
@@ -11,6 +12,7 @@ import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
 import { CookieManager } from './cookies';
+import { HistoryService, HistoryTree, registerHistory } from './history';
 import { MirrorService } from './mirror';
 import { RunnerManager, type RunnerTestView } from './runner';
 import { SendEnvironment } from './sender';
@@ -40,6 +42,9 @@ export interface ImporterTestApi {
   runner(path: string): RunnerTestView | undefined;
   /** The cookies that requests received. */
   cookies: CookieManager;
+  /** What was sent, and the view that lists it. */
+  history: HistoryService;
+  historyView(): HistoryNode[];
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
@@ -69,8 +74,9 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   collections.view = vscode.window.createTreeView('apiClient.collections', { treeDataProvider: collections, showCollapseAll: true, canSelectMany: true, dragAndDropController: collections });
   const environmentsView = vscode.window.createTreeView('apiClient.environments', { treeDataProvider: environments, canSelectMany: true });
   environments.view = environmentsView;
-  // The history is shown here when requests are sent; the view is empty until then.
-  const historyView = vscode.window.createTreeView<never>('apiClient.history', { treeDataProvider: { getTreeItem: item => item, getChildren: () => [] } });
+  const history = new HistoryService(context);
+  const historyTree = new HistoryTree(history);
+  const historyView = vscode.window.createTreeView('apiClient.history', { treeDataProvider: historyTree });
 
   const status = vscode.window.createStatusBarItem('apiClient.environment', vscode.StatusBarAlignment.Left, 100);
   status.name = 'API Client environment';
@@ -85,7 +91,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   };
 
   const cookies = new CookieManager(context);
-  const sending = new SendEnvironment(context, workspace, cookies.jar);
+  const sending = new SendEnvironment(context, workspace, cookies.jar, history);
   const mirror = new MirrorService(workspace, context);
   const runner = new RunnerManager(context, sending, workspace);
   const requests = new RequestEditorProvider(context, sending);
@@ -93,7 +99,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   const containerEditors = new ContainerEditorProvider(context, workspace);
   const editorOptions = { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false };
   context.subscriptions.push(
-    sending, runner, cookies,
+    sending, runner, cookies, history, historyTree,
     vscode.commands.registerCommand('apiClient.cookies', () => cookies.show()),
     vscode.commands.registerCommand('apiClient.clearCookies', () => { cookies.clearAll(); }),
     vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, editorOptions),
@@ -110,10 +116,11 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     vscode.window.registerTreeDataProvider<never>(START_VIEW, { getTreeItem: item => item, getChildren: () => [] })
   );
   registerCommands(context, { runner, workspace, collections, environments, organiser });
+  registerHistory(context, history, workspace);
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), cookies, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), cookies, history, historyView: () => historyTree.snapshot(), panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 

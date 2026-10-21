@@ -1349,4 +1349,142 @@ exports.run = async function run() {
     cookieServer.closeAllConnections();
     cookieServer.close();
   }
+
+  // 21. History: what a send from an editor leaves behind. Only the line by default, nothing when it is turned off, the headers and the bodies when the
+  //     person chooses so, with the secrets covered; an entry opens as a document, goes to its request, can be removed, and all of them can be deleted;
+  //     what OAuth and the scripts send is not recorded, and the file on disk holds no secret.
+  const historyServer = http2.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Set-Cookie', 'hist=cookie-secret-77; Path=/');
+      res.setHeader('X-Request-Id', 'rid-1');
+      res.end('{"ok":true,"access_token":"tok-from-server-55","name":"fine"}');
+    });
+  });
+  await new Promise(resolve => historyServer.listen(0, '127.0.0.1', resolve));
+  const historyBase = 'http://127.0.0.1:' + historyServer.address().port;
+  const historySettings = vscode.workspace.getConfiguration('apiClient');
+  try {
+    // 21a. The sends of the sections above were recorded as lines, the token requests of OAuth were not, and nothing is deleted unless the person says yes.
+    await test.history.ready();
+    assert.ok(test.history.list().length > 0, 'the sends of the earlier sections are in the history');
+    assert.ok(!test.history.list().some(entry => entry.url.endsWith('/token')), 'the exchange of an access token is not a send of the person');
+    assert.ok(test.history.list().every(entry => entry.detail === undefined), 'the default keeps only the line');
+    test.history.confirmClear = async () => false;
+    await vscode.commands.executeCommand('apiClient.history.clear');
+    assert.ok(test.history.list().length > 0, 'a no keeps them');
+    test.history.confirmClear = async () => true;
+    await vscode.commands.executeCommand('apiClient.history.clear');
+    assert.equal(test.history.list().length, 0);
+    assert.deepEqual(test.historyView(), [], 'the view is empty');
+
+    put('api-client/collections/shop/hist-get.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B81', 'name: History get', 'url: ' + historyBase + '/items?api_key=key-in-url-1&page=2', ''].join('\n'));
+    put('api-client/collections/shop/hist-post.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B82', 'name: History post', 'method: POST', 'url: ' + historyBase + '/login', 'headers:', '  - name: Authorization', '    value: Bearer lit-token-9', '  - name: X-Own', '    value: mine', 'body:', '  kind: json', '  text: \'{"user":"ann","password":"hunter22"}\'', ''].join('\n'));
+    put('api-client/collections/shop/hist-down.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B83', 'name: History down', 'url: http://127.0.0.1:1/down', ''].join('\n'));
+    await until(() => ['History get', 'History post', 'History down'].every(label => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === label)), 'the history requests are in the tree');
+    const openHistory = async name => {
+      const uri = uriOf('api-client/collections/shop/' + name);
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'apiClient.request');
+      await until(() => test.requestEditor(uri.toString())?.isReady === true, name + ' is open');
+      return test.requestEditor(uri.toString());
+    };
+    const sendHistory = async view => {
+      const count = () => view.messages().filter(message => message.type === 'response' || message.type === 'failed').length;
+      const before = count();
+      await view.receive({ type: 'send' });
+      await until(() => count() > before, 'an answer');
+      await sleep(150);
+    };
+    const getter = await openHistory('hist-get.req.yml');
+    const poster = await openHistory('hist-post.req.yml');
+    const downer = await openHistory('hist-down.req.yml');
+
+    // 21b. By default a send leaves a line: the secret in the address is covered, nothing else is kept.
+    assert.equal(historySettings.get('history.mode'), 'metadata');
+    await sendHistory(getter);
+    assert.equal(test.history.list().length, 1);
+    const line = test.history.list()[0];
+    assert.equal(line.url, historyBase + '/items?api_key=[redacted]&page=2');
+    assert.deepEqual([line.method, line.status, line.name, line.detail], ['GET', 200, 'History get', undefined]);
+    assert.ok(!JSON.stringify(test.history.list()).includes('key-in-url-1'));
+    const [today] = test.historyView();
+    assert.equal(today.label, 'Today');
+    assert.equal(today.children.length, 1);
+    assert.equal(today.children[0].label, 'GET ' + historyBase.replace('http://', '') + '/items');
+    assert.match(today.children[0].description, /^200 - \d+ ms - \d\d:\d\d$/);
+    assert.equal(today.children[0].icon, 'success');
+
+    // 21c. A send that gets no answer is a line too, with the reason.
+    await sendHistory(downer);
+    assert.equal(test.history.list().length, 2);
+    const down = test.history.list()[0];
+    assert.equal(down.name, 'History down', 'the newest is first');
+    assert.equal(down.status, undefined);
+    assert.ok(typeof down.error === 'string' && down.error.length > 0, 'the reason is kept');
+    assert.equal(test.historyView()[0].children[0].icon, 'failed');
+
+    // 21d. An entry opens as a document that is read, not edited.
+    await vscode.commands.executeCommand('apiClient.history.open', test.historyView()[0].children[0]);
+    const shown = vscode.window.activeTextEditor.document;
+    assert.equal(shown.uri.scheme, 'apiclient-history');
+    assert.match(shown.getText(), /^GET http:\/\/127\.0\.0\.1:1\/down\nFailed: .+\nTime: .+\nRequest: History down \(api-client\/collections\/shop\/hist-down\.req\.yml\)\n/);
+    assert.match(shown.getText(), /The headers and the bodies were not kept/);
+
+    // 21e. With "full" the headers and the bodies are kept, with the secrets covered: by the name of a header, of a field, and of a parameter.
+    await historySettings.update('history.mode', 'full', vscode.ConfigurationTarget.Global);
+    await sendHistory(poster);
+    const full = test.history.list()[0];
+    assert.equal(full.name, 'History post');
+    assert.ok(full.detail, 'the detail is kept');
+    assert.deepEqual(full.detail.requestHeaders.find(([name]) => name === 'Authorization'), ['Authorization', '[redacted]']);
+    assert.deepEqual(full.detail.requestHeaders.find(([name]) => name === 'X-Own'), ['X-Own', 'mine']);
+    assert.equal(full.detail.requestBody, '{"user":"ann","password":"[redacted]"}');
+    assert.equal(full.detail.responseBody, '{"ok":true,"access_token":"[redacted]","name":"fine"}');
+    assert.deepEqual(full.detail.responseHeaders.find(([name]) => name.toLowerCase() === 'set-cookie')?.[1], '[redacted]');
+    assert.deepEqual(full.detail.responseHeaders.find(([name]) => name.toLowerCase() === 'x-request-id')?.[1], 'rid-1');
+    for (const secret of ['hunter22', 'tok-from-server-55', 'cookie-secret-77', 'lit-token-9']) assert.ok(!JSON.stringify(test.history.list()).includes(secret), 'not kept: ' + secret);
+    await vscode.commands.executeCommand('apiClient.history.open', test.historyView()[0].children[0]);
+    const fullText = vscode.window.activeTextEditor.document.getText();
+    assert.match(fullText, /--- Request headers ---\n(.*\n)*Authorization: \[redacted\]\n/);
+    assert.match(fullText, /--- Request body ---\n\{"user":"ann","password":"\[redacted\]"\}\n/);
+    assert.match(fullText, /--- Response body ---\n\{"ok":true,"access_token":"\[redacted\]","name":"fine"\}\n/);
+    assert.ok(!fullText.includes('hunter22') && !fullText.includes('tok-from-server-55'));
+
+    // 21f. The file on disk is the list, and holds no secret.
+    await test.history.write();
+    assert.ok(test.history.file && fs.existsSync(test.history.file), 'the history is written to the storage of the workspace');
+    const onDiskText = fs.readFileSync(test.history.file, 'utf8');
+    assert.equal(JSON.parse(onDiskText).length, test.history.list().length);
+    for (const secret of ['hunter22', 'tok-from-server-55', 'cookie-secret-77', 'lit-token-9', 'key-in-url-1']) assert.ok(!onDiskText.includes(secret), 'not on disk: ' + secret);
+    if (process.platform !== 'win32') assert.equal(fs.statSync(test.history.file).mode & 0o777, 0o600, 'only the person can read it');
+    assert.ok(!test.history.file.startsWith(workspace), 'it is not in the folder of the workspace, so it is not committed');
+
+    // 21g. With "off" nothing is written down.
+    await historySettings.update('history.mode', 'off', vscode.ConfigurationTarget.Global);
+    const countOff = test.history.list().length;
+    await sendHistory(getter);
+    assert.equal(test.history.list().length, countOff, 'nothing was added');
+    await historySettings.update('history.mode', undefined, vscode.ConfigurationTarget.Global);
+
+    // 21h. An entry goes back to its request, and can be removed.
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    const getterUri = uriOf('api-client/collections/shop/hist-get.req.yml');
+    await until(() => test.requestEditor(getterUri.toString()) === undefined, 'the editors are closed');
+    const getNode = test.historyView()[0].children.find(node => node.label.endsWith('/items'));
+    assert.ok(getNode, 'the entry of the first send is listed');
+    await vscode.commands.executeCommand('apiClient.history.openRequest', getNode);
+    await until(() => test.requestEditor(getterUri.toString())?.isReady === true, 'the request of the entry is open');
+    const before = test.history.list().length;
+    await vscode.commands.executeCommand('apiClient.history.remove', getNode);
+    assert.equal(test.history.list().length, before - 1);
+    assert.ok(!test.historyView()[0].children.some(node => node.id === getNode.id), 'the view follows');
+    await vscode.commands.executeCommand('apiClient.history.remove', 'entry:no-such-entry');
+    assert.equal(test.history.list().length, before - 1, 'an entry that is not there is not an error');
+  } finally {
+    test.history.confirmClear = undefined;
+    await historySettings.update('history.mode', undefined, vscode.ConfigurationTarget.Global);
+    historyServer.closeAllConnections();
+    historyServer.close();
+  }
 };

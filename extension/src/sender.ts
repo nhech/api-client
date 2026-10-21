@@ -14,6 +14,7 @@ import { hasReport } from '../../src/view/scripts';
 import { realClock, type ClientWorkspace } from './clientWorkspace';
 import { executeRequest } from './execute';
 import { OAuthService, type TokenRequestInput } from './oauth';
+import type { HistoryService } from './history';
 import { ScriptService } from './scripts';
 
 /** A response whose body goes to a file when it is larger than the memory limit of the settings is kept up to this size. */
@@ -34,7 +35,7 @@ export class SendEnvironment implements vscode.Disposable {
   readonly oauth: OAuthService;
   private readonly spillDir: string;
 
-  constructor(context: vscode.ExtensionContext, readonly workspace: ClientWorkspace, jar: CookieJar) {
+  constructor(context: vscode.ExtensionContext, readonly workspace: ClientWorkspace, jar: CookieJar, readonly history: HistoryService) {
     this.jar = jar;
     this.scripts = new ScriptService(context);
     this.oauth = new OAuthService(context);
@@ -132,10 +133,12 @@ export class RequestRunner implements vscode.Disposable {
     const controller = new AbortController();
     this.running = { id, controller };
     this.post({ type: 'sending', id });
+    const started = Date.now();
     try {
       const outcome = await executeRequest(this.env, path, request, { signal: controller.signal });
       if (outcome.kind === 'cancelled') { this.post({ type: 'cancelled', id }); return; }
       if (outcome.kind === 'failed') {
+        void this.env.history.recordSend(path, request.name, started, outcome, undefined);
         this.post({ type: 'failed', id, code: outcome.code, message: outcome.message, hint: outcome.hint, warnings: outcome.warnings, ...(outcome.report === undefined ? {} : { scripts: outcome.report }) });
         return;
       }
@@ -144,6 +147,7 @@ export class RequestRunner implements vscode.Disposable {
         ...(hasReport(outcome.report) ? { scripts: outcome.report } : {})
       });
       this.last = { response: outcome.response, view };
+      void this.env.history.recordSend(path, request.name, started, outcome, view);
       this.post({ type: 'response', id, response: view });
     } finally {
       this.running = undefined;
