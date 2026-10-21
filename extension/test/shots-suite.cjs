@@ -22,17 +22,17 @@ async function shot(name, width, height, settle) {
 
 exports.run = async function run() {
   await sleep(3000);
-  const extension = vscode.extensions.getExtension('longtd.http-files-importer');
+  const extension = vscode.extensions.getExtension('longtd.api-client');
   // The Explorer view: its welcome text, with the button that opens the panel.
   if (theme === 'dark') {
     await vscode.commands.executeCommand('workbench.view.explorer');
-    await vscode.commands.executeCommand('httpFilesImporter.start.focus');
+    await vscode.commands.executeCommand('apiClient.start.focus');
     await sleep(1500);
     await shot('explorer-view', 1280, 720);
   }
   await vscode.commands.executeCommand('workbench.action.closeSidebar');
 
-  await vscode.commands.executeCommand('httpFilesImporter.importThunder');
+  await vscode.commands.executeCommand('apiClient.importThunder');
   const test = await extension.activate();
   const panel = test.panel();
   for (let waited = 0; !panel.isReady && waited < 15000; waited += 100) await sleep(100);

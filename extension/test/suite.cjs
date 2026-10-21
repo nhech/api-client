@@ -18,10 +18,10 @@ exports.run = async function run() {
   assert.equal(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath.toLowerCase(), workspace.toLowerCase(), 'the throw-away workspace is open');
 
   // 1. The command is declared in the manifest, so the first call activates the extension (no activation event of its own).
-  assert.equal((await vscode.commands.getCommands(true)).includes('httpFilesImporter.importThunder'), false, 'nothing is registered before the command is used');
+  assert.equal((await vscode.commands.getCommands(true)).includes('apiClient.importThunder'), false, 'nothing is registered before the command is used');
 
   // 2. A full run: accept the first item of every Quick Pick (the folder found next to this editor, "Continue", the write).
-  const result = vscode.commands.executeCommand('httpFilesImporter.importThunderSteps');
+  const result = vscode.commands.executeCommand('apiClient.importThunderSteps');
   let finished = false;
   result.then(() => { finished = true; }, () => { finished = true; });
   const report = path.join(workspace, 'api', 'IMPORT_REPORT.md');
@@ -38,7 +38,7 @@ exports.run = async function run() {
   const outcome = await result;
   assert.equal(outcome?.status, 'done', `the flow finished: ${JSON.stringify(outcome)}`);
 
-  assert.ok((await vscode.commands.getCommands(true)).includes('httpFilesImporter.importThunder'), 'the command is registered once the extension is active');
+  assert.ok((await vscode.commands.getCommands(true)).includes('apiClient.importThunder'), 'the command is registered once the extension is active');
 
   // 3. What was written.
   const files = {};
@@ -87,7 +87,7 @@ exports.run = async function run() {
 
   // 5. A second run, cancelled at the first Quick Pick, changes nothing.
   const before = JSON.stringify(Object.keys(files));
-  const second = vscode.commands.executeCommand('httpFilesImporter.importThunderSteps');
+  const second = vscode.commands.executeCommand('apiClient.importThunderSteps');
   await sleep(1500);
   await vscode.commands.executeCommand('workbench.action.closeQuickOpen');
   const cancelled = await second;
@@ -98,12 +98,12 @@ exports.run = async function run() {
 
   // 6. The importer panel: the main command opens it, it loads under its Content-Security-Policy and says so, and the messages the page
   //    sends (here sent as the page would) read the data, plan, and write. Nothing is written until "import".
-  const extension = vscode.extensions.getExtension('longtd.http-files-importer');
+  const extension = vscode.extensions.getExtension('longtd.api-client');
   assert.ok(extension && extension.isActive, 'the extension is active');
   const test = extension.exports;
   assert.ok(test && typeof test.panel === 'function', 'the test interface is there when the runner asks for it');
   assert.equal(test.panel(), undefined, 'no panel before the command');
-  await vscode.commands.executeCommand('httpFilesImporter.importThunder');
+  await vscode.commands.executeCommand('apiClient.importThunder');
   const panel = test.panel();
   assert.ok(panel, 'the command opened the panel');
   const tabs = () => vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(tab => tab.input instanceof vscode.TabInputWebview);
@@ -111,7 +111,7 @@ exports.run = async function run() {
   assert.equal(tabs().length, 1, 'one webview tab is open');
   for (let waited = 0; !panel.isReady && waited < 15000; waited += 100) await sleep(100);
   assert.equal(panel.isReady, true, 'the page loaded and its script ran under the Content-Security-Policy');
-  await vscode.commands.executeCommand('httpFilesImporter.importThunder');
+  await vscode.commands.executeCommand('apiClient.importThunder');
   assert.equal(tabs().length, 1, 'opening it again brings the same panel to the front');
 
   let view = panel.view();
@@ -158,7 +158,7 @@ exports.run = async function run() {
   await vscode.window.tabGroups.close(tabs()[0]);
   for (let waited = 0; test.panel() !== undefined && waited < 5000; waited += 100) await sleep(100);
   assert.equal(test.panel(), undefined, 'the closed panel is forgotten');
-  await vscode.commands.executeCommand('httpFilesImporter.importThunder');
+  await vscode.commands.executeCommand('apiClient.importThunder');
   const again = test.panel();
   assert.ok(again, 'the command opens a new panel after the old one was closed');
   for (let waited = 0; tabs().length === 0 && waited < 5000; waited += 100) await sleep(100);

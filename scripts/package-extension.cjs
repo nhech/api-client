@@ -1,5 +1,5 @@
 // Builds the VS Code package of the extension from the current tree and checks what is in it. No dependencies.
-//   node scripts/package-extension.cjs                 run the checks of the project, build, verify, write .artifacts/http-files-importer-<version>.vsix
+//   node scripts/package-extension.cjs                 run the checks of the project, build, verify, write .artifacts/api-client-<version>.vsix
 //   node scripts/package-extension.cjs --allow-dirty   package a tree that has uncommitted changes (a release is built from a clean one)
 //   node scripts/package-extension.cjs --skip-check    do not run `npm run check` first
 //   node scripts/package-extension.cjs --verify <file> only verify an existing package
@@ -42,9 +42,9 @@ function readZip(buffer) {
   return files;
 }
 
-const EXPECTED = ['[Content_Types].xml', 'extension.vsixmanifest', 'extension/LICENSE.txt', 'extension/changelog.md', 'extension/dist/extension.js', 'extension/dist/wizard.js',
-  'extension/media/icon.png', 'extension/media/wizard.css', 'extension/package.json', 'extension/readme.md'];
-const NODE_MODULES_ALLOWED = ['node:crypto', 'node:fs', 'node:os', 'node:path', 'vscode'];
+// The files, the bundles and the size limit live in one place that the purity test reads as well.
+const rules = JSON.parse(fs.readFileSync(path.join(__dirname, 'package-rules.json'), 'utf8'));
+const EXPECTED = [...rules.files].sort();
 
 function verify(file) {
   const bytes = fs.readFileSync(file);
@@ -55,7 +55,7 @@ function verify(file) {
 
   const packed = JSON.parse(text('extension/package.json') || '{}');
   if (packed.publisher !== 'longtd') fail(`publisher is "${packed.publisher}", not longtd`);
-  if (packed.name !== 'http-files-importer') fail(`name is "${packed.name}"`);
+  if (packed.name !== 'api-client') fail(`name is "${packed.name}"`);
   if (packed.private !== undefined) fail('the manifest is marked private');
   if (packed.preview !== true) fail('the manifest is not marked as a preview');
   if (packed.dependencies !== undefined || packed.devDependencies !== undefined) fail('the manifest lists dependencies');
@@ -68,17 +68,21 @@ function verify(file) {
   const icon = files.get('extension/media/icon.png');
   if (icon === undefined || !icon.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) || icon.readUInt32BE(16) < 128 || icon.readUInt32BE(20) < 128) fail('the icon is not a PNG of at least 128 x 128 pixels');
 
-  // What the code may do: no network, no process, no code from text; the panel script loads nothing.
-  const forbidden = { 'a child process': /child_process|\bspawn\(|\bexecSync\(|\bexecFile\(/, 'the network': /\bfetch\(|XMLHttpRequest|new WebSocket\(|require\(\s*["'](?:node:)?(?:https?|http2|net|tls|dgram|dns)["']\)/, 'code from text': /\beval\(|new Function\(/, 'a source map': /sourceMappingURL/ };
-  for (const name of ['extension/dist/extension.js', 'extension/dist/wizard.js']) {
+  // What the code may do: no process, no code from text, no network API of a page; each bundle requires exactly the modules its rule lists.
+  const forbidden = { 'a child process': /child_process|\bspawn\(|\bexecSync\(|\bexecFile\(/, 'a network API': /\bfetch\(|XMLHttpRequest|new WebSocket\(/, 'code from text': /\beval\(|new Function\(/, 'a source map': /sourceMappingURL/ };
+  for (const [name, rule] of Object.entries(rules.bundles)) {
     const code = text(name);
+    if (code === '') fail(`${name} is empty or missing`);
     for (const [what, pattern] of Object.entries(forbidden)) if (pattern.test(code)) fail(`${name} has ${what}`);
     if (/[A-Z]:\\\\(?:Users|Workspaces)|\/home\/|localaccount|LOCALA~1/.test(code)) fail(`${name} holds a path of the machine that built it`);
+    if (rule.kind === 'page') {
+      if (/\brequire\s*\(|\bimport\s*\(|importScripts/.test(code)) fail(`${name} loads something`);
+      if (/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(code)) fail(`${name} puts HTML in the page`);
+    } else {
+      const required = [...new Set([...code.matchAll(/require\(\s*"([^"]+)"\s*\)/g)].map(match => match[1]))].sort();
+      if (JSON.stringify(required) !== JSON.stringify([...rule.requires].sort())) fail(`${name} requires ${JSON.stringify(required)}; its rule lists ${JSON.stringify(rule.requires)}`);
+    }
   }
-  const required = new Set([...text('extension/dist/extension.js').matchAll(/require\(\s*"([^"]+)"\s*\)/g)].map(match => match[1]));
-  if (JSON.stringify([...required].sort()) !== JSON.stringify(NODE_MODULES_ALLOWED)) fail(`extension.js requires ${JSON.stringify([...required].sort())}`);
-  if (/\brequire\s*\(|\bimport\s*\(|importScripts/.test(text('extension/dist/wizard.js'))) fail('wizard.js loads something');
-  if (/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(text('extension/dist/wizard.js'))) fail('wizard.js puts HTML in the page');
 
   // The README and the changelog: images only from https, none an SVG, no link relative to the repository.
   for (const name of ['extension/readme.md', 'extension/changelog.md']) {
@@ -92,7 +96,7 @@ function verify(file) {
     }
     for (const match of text(name).matchAll(/(?<!!)\[[^\]]*\]\(([^)\s]+)\)/g)) if (!/^(?:https:\/\/|#)/.test(match[1])) fail(`${name}: link ${match[1]} is not an https address`);
   }
-  if (bytes.length > 300 * 1024) fail(`the package is ${bytes.length} bytes; keep it under 300 KB`);
+  if (bytes.length > rules.maxPackageBytes) fail(`the package is ${bytes.length} bytes; the limit in scripts/package-rules.json is ${rules.maxPackageBytes}`);
   return { bytes: bytes.length, files: names.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), version: packed.version };
 }
 
@@ -104,9 +108,9 @@ function main() {
   if (dirty && !flag('--allow-dirty')) throw new Error('The working tree has uncommitted changes: a release is built from a clean checkout of the release commit. Commit first, or pass --allow-dirty for a trial package.');
   if (!flag('--skip-check')) run('npm', ['run', 'check'], root);
   run('npm', ['run', 'package'], extensionRoot);
-  const built = path.join(root, '.artifacts', 'http-files-importer.vsix');
+  const built = path.join(root, '.artifacts', 'api-client.vsix');
   const result = verify(built);
-  const named = path.join(root, '.artifacts', `http-files-importer-${result.version}${dirty ? '-trial' : ''}.vsix`);
+  const named = path.join(root, '.artifacts', `api-client-${result.version}${dirty ? '-trial' : ''}.vsix`);
   fs.copyFileSync(built, named);
   return { file: path.relative(root, named), dirty, ...result };
 }

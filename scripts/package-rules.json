@@ -1,0 +1,25 @@
+{
+  "_comment": "What the extension package may hold. Read by scripts/package-extension.cjs (the package) and test/unit/purity.test.ts (the built bundles). Raise a limit or add a module in the commit that needs it, and say why in the message.",
+  "maxPackageBytes": 307200,
+  "files": [
+    "[Content_Types].xml",
+    "extension.vsixmanifest",
+    "extension/LICENSE.txt",
+    "extension/changelog.md",
+    "extension/dist/extension.js",
+    "extension/dist/wizard.js",
+    "extension/media/icon.png",
+    "extension/media/wizard.css",
+    "extension/package.json",
+    "extension/readme.md"
+  ],
+  "bundles": {
+    "extension/dist/extension.js": {
+      "kind": "host",
+      "requires": ["node:crypto", "node:fs", "node:os", "node:path", "vscode"]
+    },
+    "extension/dist/wizard.js": {
+      "kind": "page"
+    }
+  }
+}

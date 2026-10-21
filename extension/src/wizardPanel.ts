@@ -15,7 +15,7 @@ import { VscodeHost } from './vscodeHost';
  * message it sends is parsed as untrusted (src/wizard/protocol.ts). Folders and files are asked for with VS Code's own
  * dialogs: no path ever comes from the page. Nothing is written until the Import message, which only the Import button sends.
  */
-const VIEW_TYPE = 'httpFilesImporter.panel';
+const VIEW_TYPE = 'apiClient.wizard';
 const REST_CLIENT_ID = 'humao.rest-client';
 
 const shorten = (fsPath: string): string => shortenHome(fsPath, os.homedir());
@@ -64,7 +64,7 @@ export class WizardPanel {
       WizardPanel.current.panel.reveal(undefined, false);
       return WizardPanel.current;
     }
-    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, 'HTTP Files Importer', vscode.ViewColumn.Active, {
+    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, 'API Client: Import', vscode.ViewColumn.Active, {
       enableScripts: true,
       retainContextWhenHidden: false,
       localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'dist'), vscode.Uri.joinPath(context.extensionUri, 'media')]

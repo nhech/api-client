@@ -36,7 +36,7 @@ export function buildWizardHtml(options: WizardHtmlOptions): string {
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${escapeAttribute(contentSecurityPolicy(options.cspSource, options.nonce))}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HTTP Files Importer</title>
+<title>API Client: Import</title>
 <link rel="stylesheet" href="${escapeAttribute(options.styleUri)}">
 </head>
 <body>

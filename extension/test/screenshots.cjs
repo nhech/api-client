@@ -78,7 +78,7 @@ async function takeShots(exchange, theme) {
 }
 
 async function session(theme, executable) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'http-files-importer-shots-')));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'api-client-shots-')));
   const workspace = path.join(root, 'storefront');
   const home = path.join(root, 'home');
   const profile = path.join(home, 'AppData', 'Roaming', 'Code');

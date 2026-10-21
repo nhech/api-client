@@ -90,7 +90,7 @@ function checkbox(key: string, checked: boolean, title: string, note: string, on
 
 function header(): HTMLElement {
   return h('header', { class: 'top' },
-    h('h1', null, 'HTTP Files Importer'),
+    h('h1', null, 'Import from Thunder Client'),
     h('p', { class: 'lead' }, 'Move your Thunder Client collections and environments to plain .http files. Nothing is written until you press Import.'));
 }
 

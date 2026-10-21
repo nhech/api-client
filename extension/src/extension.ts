@@ -8,10 +8,10 @@ import { REPORT_SCHEME, ReportDocuments, VscodeHost } from './vscodeHost';
 import { WizardPanel } from './wizardPanel';
 
 /** The importer panel. */
-export const IMPORT_COMMAND = 'httpFilesImporter.importThunder';
+export const IMPORT_COMMAND = 'apiClient.importThunder';
 /** The same import as a short series of questions in the Command Palette, for people who prefer the keyboard. */
-export const STEPS_COMMAND = 'httpFilesImporter.importThunderSteps';
-const START_VIEW = 'httpFilesImporter.start';
+export const STEPS_COMMAND = 'apiClient.importThunderSteps';
+const START_VIEW = 'apiClient.start';
 
 const platform = (): 'win32' | 'darwin' | 'linux' => (process.platform === 'win32' || process.platform === 'darwin' ? process.platform : 'linux');
 

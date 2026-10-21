@@ -26,7 +26,8 @@ if (!nodeFloor || !vscodeFloor) throw new Error('The Node.js or VS Code minimum 
 // (check that MARKETPLACE_URL opens it first): the build then drops every <!-- unlisted -->...<!-- /unlisted --> block (the "not on the
 // Marketplace yet" notes) and keeps every <!-- listed -->...<!-- /listed --> block (the install buttons, the one-line install command and the
 // structured data that point at the listing). While false, only the markers of the first kind are removed and the second kind is dropped.
-const EXTENSION_ID = `${extensionManifest.publisher}.${extensionManifest.name}`;
+// The listed importer, until the full client is published under its own id (milestone M15 of docs/client/): the manifest now names the new extension.
+const EXTENSION_ID = 'longtd.http-files-importer';
 const MARKETPLACE_URL = `https://marketplace.visualstudio.com/items?itemName=${EXTENSION_ID}`;
 const MARKETPLACE_LISTED = true;
 const UNLISTED_BLOCK = /<!-- unlisted -->([\s\S]*?)<!-- \/unlisted -->/g;
