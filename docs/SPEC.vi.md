@@ -1,7 +1,7 @@
 # Đặc tả importer: Thunder Client → API client mới
 
 Trạng thái: 0.1, 2026-10-21 (xem [CHANGELOG](../CHANGELOG.md)).
-Phạm vi: chỉ phần **nhập dữ liệu từ Thunder Client**. Chưa định nghĩa runtime gửi request.
+Phạm vi: chỉ phần **nhập dữ liệu từ Thunder Client** (bộ chuyển đổi ra file `.http`). Runtime gửi request nay nằm trong cùng extension (mã định danh `longtd.api-client`) và có tài liệu riêng ở [docs/client/](client/) và [SECURITY.md](../SECURITY.md); các ràng buộc dưới đây (C1 đến C4) là của **bộ chuyển đổi**, trừ khi ghi khác.
 
 Tên extension: **HTTP Files Importer** (chốt 2026-10-21; mã định danh `longtd.http-files-importer`). Tên và icon không chứa chữ "Thunder Client"; mô tả và từ khóa chỉ dùng tên đó để chỉ định dạng nguồn ("nhập collection của Thunder Client"), kèm lời nói rõ là không liên kết với Thunder Client (README). Phần còn lại của tài liệu gọi sản phẩm tương lai là "API client".
 
@@ -30,7 +30,7 @@ Schema trên apis.io **không dùng làm nguồn**: đối chiếu với file th
 
 ### 1.2 Không mục tiêu (bản đầu)
 
-- Không chạy script, không gửi request, không gọi mạng khi import.
+- Không chạy script, không gửi request, không gọi mạng khi chuyển đổi hay khi nhập.
 - Không giải mã giá trị môi trường đã mã hóa (§8.4).
 - Không ghi vào thư mục của Thunder Client. Không xóa, không sửa nguồn.
 - Không hỗ trợ WebSocket, SSE, gRPC (§5.9).
@@ -39,7 +39,7 @@ Schema trên apis.io **không dùng làm nguồn**: đối chiếu với file th
 ### 1.3 Ràng buộc sản phẩm
 
 - **C1. Trước mắt miễn phí.** Không tài khoản, không đăng nhập, không kiểm tra giấy phép, không giới hạn số collection hay số request (Thunder 3.0.0 free: 3 collection, 30 request mỗi collection `[DOC]`). Không viết sẵn móc cho paywall; nếu sau này đổi hướng thì thêm sau.
-- **C2. Chạy hoàn toàn cục bộ.** Không mạng, không telemetry, kể cả khi lỗi.
+- **C2. Chạy hoàn toàn cục bộ.** Bộ chuyển đổi không dùng mạng và không telemetry, kể cả khi lỗi (test kiểm rằng mã của nó không import module mạng nào). Client gửi request của extension chỉ gửi những request người dùng gửi và, với OAuth 2.0, các request tới máy chủ token đã cấu hình; không telemetry, không tài khoản.
 - **C3. Chỉ chạy khi người dùng ra lệnh.** Không quét ổ đĩa lúc kích hoạt extension, không đọc thư mục của extension khác ở nền.
 - **C4. Core thuần.** Đọc → chuẩn hóa → phát ra là hàm thuần, không phụ thuộc API `vscode`, test bằng `node:test` như Git Pro. Phần VS Code chỉ có: chọn nguồn, hiện báo cáo, xác nhận, ghi file.
 

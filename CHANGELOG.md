@@ -2,6 +2,30 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased
+
+The extension is now a full API client (extension id `longtd.api-client`); the importer of 0.1.0 is part of it.
+
+### Added
+
+- **A request editor and a response pane** in VS Code: method and address, Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, binary), Scripts, Tests, Settings, Docs and Code tabs; the answer with its body (pretty, raw, pictures), headers, cookies, tests, console, the request as it was sent and a timeline of the phases.
+- **Collections, folders and environments** in native trees (drag and drop, rename, duplicate, move, filter), with what a folder or collection sets (base address, headers, authentication, variables, tests, scripts, settings) inherited by its requests, and an environment picker in the status bar.
+- **Requests as files:** one YAML file per request in a strict, versioned subset of YAML (`schema: 1`), folders, the order kept in the folder's file, secret values in `*.local.yml` files that a `.gitignore` of the client folder keeps out of Git.
+- **Variables** with the nearest scope winning, dynamic words from a fixed table (`{{$guid}}`, `{{$randomInt a b}}`...), marks and hover in the editor, secret variables hidden wherever something is shown or written down.
+- **The HTTP engine** on `node:http` and `node:https`: redirects (credentials stay with their origin, never https to http, never from the internet to this machine or network unless allowed), timeouts, gzip, deflate and Brotli with limits, large answers to a file, cookies, the proxy of VS Code and of the environment, TLS verification on by default.
+- **Authentication:** bearer, basic, API key and OAuth 2.0 (client credentials, password, authorization code with PKCE, refresh), tokens in the secret storage of VS Code, a question before credentials go to a token server for the first time.
+- **Tests and captures** in a one-line grammar; **JavaScript scripts** (a subset of the Postman `pm` API) in QuickJS compiled to WebAssembly in a worker thread, with limits, run only after the exact text was allowed.
+- **A collection runner** (passes, pause, stop at the first failure, a CSV or JSON data file, `setNextRequest`, JSON and JUnit reports).
+- **A `.http` copy** next to each request for REST Client, httpYac and the JetBrains client, generated one way, never holding a secret or anything those tools would run, never written over once you edited it.
+- **Imports** from Thunder Client data, Postman collections (v2.0, v2.1) and environments, and cURL commands; credentials typed into an imported request become secret variables.
+- **The Code tab** (cURL, PowerShell, JavaScript with fetch or axios, Python, Go, C#, PHP, Java), **cookies** and **history** (a line for each send by default; 200 entries for 30 days).
+- Security notes in `SECURITY.md` and three audits: two independent reviewers attacked the whole client, a third attacked their fixes; every finding that was fixed is covered by tests and by mutations.
+
+### Changed
+
+- Extension id, display name and description: **API Client**, `longtd.api-client`. The older commands that write `.http` files for Thunder Client data are still there under *Convert Thunder Client Data to .http Files...*, and documented in `docs/converter.md`.
+- The claim "no network" is replaced by what is true: the extension sends the requests you send (and, for OAuth 2.0, the requests to the token server you configured) and nothing else; the converter and the readers of other tools' files still have no network access.
+
 ## 0.1.0 - 2026-10-21
 
 ### Added
