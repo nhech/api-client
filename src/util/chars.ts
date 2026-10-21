@@ -5,12 +5,19 @@
  * source (see test/unit/hygiene.test.ts).
  */
 
-/** Code point ranges of characters that hide text or change its order: controls, zero-width characters, bidirectional controls, byte order mark. */
+/** Code point ranges of characters that hide text or change its order: controls, zero-width and other invisible characters, bidirectional controls, byte order mark. */
 const HIDDEN_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0x00, 0x1f], [0x7f, 0x9f], // C0 controls, DEL, C1 controls
   [0x200b, 0x200f], // zero-width characters and direction marks
+  [0x2028, 0x2029], // line separator and paragraph separator: an editor shows them as a line break that the tools do not
   [0x202a, 0x202e], [0x2066, 0x2069], // bidirectional embeddings, overrides and isolates
-  [0xfeff, 0xfeff] // byte order mark, zero-width no-break space
+  [0xfeff, 0xfeff], // byte order mark, zero-width no-break space
+  // Characters that draw nothing, so that they can hide text in a name or spell one that looks like another:
+  [0x00ad, 0x00ad], [0x034f, 0x034f], [0x061c, 0x061c], // soft hyphen, combining grapheme joiner, Arabic letter mark
+  [0x115f, 0x1160], [0x3164, 0x3164], [0xffa0, 0xffa0], // Hangul fillers
+  [0x180e, 0x180e], [0x2060, 0x2064], [0x206a, 0x206f], // Mongolian vowel separator, word joiner and invisible operators, deprecated format characters
+  [0xfff9, 0xfffb], // interlinear annotation marks
+  [0xe0000, 0xe007f] // the tag characters: a whole message can be written in them and stay invisible
 ];
 
 /** The characters Windows does not allow in a file name. */

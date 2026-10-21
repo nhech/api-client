@@ -9,6 +9,7 @@ import type { TreeRequest } from '../normalize/tree';
 import { displayLabel } from '../util/chars';
 import { convertAuth } from './auth';
 import { convertBody, token } from './body';
+import { protectBodyText, protectGraphqlQuery, protectJson } from './body-secrets';
 import type { Issue } from './body';
 import { combineHeaders, ensureContentType, readHeaders } from './headers';
 import { applyBaseUrl, collectScripts, InheritBudget, inheritedBaseUrl, inheritHeaders, inheritTests, MAX_INHERIT_LEVELS, resolveAuth, settingsLevels } from './inherit';
@@ -130,7 +131,7 @@ export function convertRequest(item: TreeRequest, state: ConvertState): ImpReque
     const prefixed = applyBaseUrl(rawUrl, base.value);
     if (prefixed !== rawUrl) { counts.inheritedBaseUrl++; rawUrl = prefixed; }
   }
-  const converted = convertUrl(vars(rawUrl), readParams(request.params, coerce).map(param => ({ ...param, name: vars(param.name), value: vars(param.value) })), (paramName, value) => protectNamed(paramName, value, 'query'));
+  const converted = convertUrl(vars(rawUrl), readParams(request.params, coerce).map(param => ({ ...param, name: vars(param.name), value: vars(param.value) })), (paramName, value, part = 'query') => protectNamed(paramName, value, part));
   if (converted.appended > 0) report('TC-PARAM-NOT-IN-URL', `${converted.appended} enabled query ${converted.appended === 1 ? 'parameter was' : 'parameters were'} missing from the URL and ${converted.appended === 1 ? 'was' : 'were'} appended.`);
   if (converted.emptyPathParams > 0) report('TC-PATHPARAM-EMPTY');
   lineBreak ||= converted.lineBreak;
@@ -175,8 +176,10 @@ export function convertRequest(item: TreeRequest, state: ConvertState): ImpReque
   });
 
   let body: ImpBody | undefined = bodyResult.body;
-  if (body?.kind === 'text') body = { ...body, text: vars(body.text) };
-  else if (body?.kind === 'graphql') body = { kind: 'graphql', query: vars(body.query), ...(body.variables === undefined ? {} : { variables: vars(body.variables) }) };
+  // A raw body is searched for secrets by the names inside it (spec 8.3): "apiKey" in JSON, <Password> in XML, client_secret= in a query string, password: in GraphQL.
+  const bodySecret = (name: string, value: string): string => protectNamed(name, value, 'body');
+  if (body?.kind === 'text') body = { ...body, text: protectBodyText(vars(body.text), bodySecret) };
+  else if (body?.kind === 'graphql') body = { kind: 'graphql', query: protectGraphqlQuery(vars(body.query), bodySecret), ...(body.variables === undefined ? {} : { variables: protectJson(vars(body.variables), bodySecret) }) };
   else if (body?.kind === 'form') body = { kind: 'form', fields: body.fields.map(field => ({ name: vars(field.name), value: protectNamed(field.name, vars(field.value), 'form'), enabled: field.enabled })) };
   else if (body?.kind === 'multipart') {
     body = { kind: 'multipart', parts: body.parts.map(part => (part.filePath !== undefined ? { name: vars(part.name), filePath: vars(part.filePath), enabled: part.enabled } : { name: vars(part.name), value: protectNamed(part.name, vars(part.value ?? ''), 'form'), enabled: part.enabled })) };

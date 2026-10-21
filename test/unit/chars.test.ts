@@ -5,9 +5,9 @@ import { compareCodePoints, isHiddenChar, isUnsafeInName, printable } from '../.
 /** Invisible and direction-changing characters are built from numbers: they must not appear in this source either. */
 const cp = (...codes: number[]) => String.fromCodePoint(...codes);
 
-test('Hidden characters are the controls, zero-width characters, direction controls and the byte order mark', () => {
-  for (const code of [0x00, 0x1f, 0x7f, 0x85, 0x9f, 0x200b, 0x200f, 0x202a, 0x202e, 0x2066, 0x2069, 0xfeff]) assert.equal(isHiddenChar(cp(code)), true, `U+${code.toString(16)}`);
-  for (const code of [0x20, 0x41, 0xa0, 0xe9, 0x2010, 0x2028, 0x1f600]) assert.equal(isHiddenChar(cp(code)), false, `U+${code.toString(16)}`);
+test('Hidden characters are the controls, zero-width characters, the line and paragraph separators, direction controls and the byte order mark', () => {
+  for (const code of [0x00, 0x1f, 0x7f, 0x85, 0x9f, 0x200b, 0x200f, 0x2028, 0x2029, 0x202a, 0x202e, 0x2066, 0x2069, 0xfeff, 0xad, 0x34f, 0x61c, 0x115f, 0x1160, 0x3164, 0xffa0, 0x180e, 0x2060, 0x2064, 0x206a, 0x206f, 0xfff9, 0xfffb, 0xe0000, 0xe0041, 0xe007f]) assert.equal(isHiddenChar(cp(code)), true, `U+${code.toString(16)}`);
+  for (const code of [0x20, 0x41, 0xa0, 0xe9, 0x2010, 0x202f, 0x1f600, 0xfe0f, 0x2764, 0x3042, 0xe0080, 0x2065]) assert.equal(isHiddenChar(cp(code)), false, `U+${code.toString(16)}`);
 });
 
 test('A name may not keep the punctuation of Windows file names or any hidden character', () => {

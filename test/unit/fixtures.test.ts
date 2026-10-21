@@ -64,7 +64,7 @@ test('P4: no canary is in a shared file or the report; they are all in the priva
     for (const canary of CANARIES) assert.ok(!f.content.includes(canary), `${canary} in ${f.path}`);
   }
   for (const finding of result.findings) for (const canary of CANARIES) assert.ok(!`${finding.where} ${finding.message}`.includes(canary));
-  for (const canary of [CANARY.bearer, CANARY.basicPassword, CANARY.authorizationHeader, CANARY.apiKeyHeader, CANARY.disabledHeader, CANARY.queryKey, CANARY.formPassword, CANARY.envVariable]) {
+  for (const canary of [CANARY.bearer, CANARY.basicPassword, CANARY.authorizationHeader, CANARY.apiKeyHeader, CANARY.disabledHeader, CANARY.queryKey, CANARY.formPassword, CANARY.envVariable, CANARY.jsonBody, CANARY.xmlBody, CANARY.graphqlArgument, CANARY.graphqlVariable, CANARY.textBody, CANARY.urlPassword, CANARY.urlToken, CANARY.pathParam, CANARY.fragment]) {
     assert.ok(priv.includes(canary), `${canary} should be in the private file`);
   }
 });

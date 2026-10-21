@@ -17,7 +17,16 @@ export const CANARY = {
   queryKey: 'CANARY-query-FFFF',
   formPassword: 'CANARY-form-GGGG',
   envVariable: 'CANARY-envvar-HHHH',
-  localVariable: 'CANARY-local-IIII'
+  localVariable: 'CANARY-local-IIII',
+  jsonBody: 'CANARY-json-body-JJJJ',
+  xmlBody: 'CANARY-xml-body-KKKK',
+  graphqlArgument: 'CANARY-graphql-arg-LLLL',
+  graphqlVariable: 'CANARY-graphql-var-MMMM',
+  textBody: 'CANARY-text-body-NNNN',
+  urlPassword: 'CANARY-url-password-OOOO',
+  urlToken: 'CANARY-url-token-PPPP',
+  pathParam: 'CANARY-path-param-QQQQ',
+  fragment: 'CANARY-fragment-RRRR'
 } as const;
 
 export const CANARIES: readonly string[] = Object.values(CANARY);
@@ -126,7 +135,16 @@ const f10 = (): TcSource => source(
     req('basic', '', { url: '{{base}}/b', auth: { type: 'basic', basic: { username: 'user', password: CANARY.basicPassword } } }),
     req('headers', '', { url: '{{base}}/c', headers: [{ name: 'Authorization', value: `Bearer ${CANARY.authorizationHeader}` }, { name: 'X-Api-Key', value: CANARY.apiKeyHeader }, { name: 'X-Old-Key', value: CANARY.disabledHeader, isDisabled: true }, { name: 'X-Trace', value: 'trace-1' }] }),
     req('query', '', { url: `{{base}}/d?api_key=${CANARY.queryKey}&page=1`, params: [{ name: 'api_key', value: CANARY.queryKey }, { name: 'page', value: '1' }] }),
-    req('form', '', { method: 'POST', url: '{{base}}/e', body: { type: 'formencoded', form: [{ name: 'user', value: 'me' }, { name: 'password', value: CANARY.formPassword }] } })
+    req('form', '', { method: 'POST', url: '{{base}}/e', body: { type: 'formencoded', form: [{ name: 'user', value: 'me' }, { name: 'password', value: CANARY.formPassword }] } }),
+    // Raw bodies and the parts of a URL that are not the query hold secrets too (spec 8.3).
+    req('json body', '', { method: 'POST', url: '{{base}}/f', body: { type: 'json', raw: `{"user":"me","apiKey":"${CANARY.jsonBody}"}` } }),
+    req('xml body', '', { method: 'POST', url: '{{base}}/g', body: { type: 'xml', raw: `<login><name>me</name><Password>${CANARY.xmlBody}</Password></login>` } }),
+    req('graphql body', '', { method: 'POST', url: '{{base}}/h', body: { type: 'graphql', graphql: { query: `mutation { login(user: "me", password: "${CANARY.graphqlArgument}") { ok } }`, variables: `{"token":"${CANARY.graphqlVariable}"}` } } }),
+    req('text body', '', { method: 'POST', url: '{{base}}/i', body: { type: 'text', raw: `grant_type=password&client_secret=${CANARY.textBody}` } }),
+    req('url userinfo', '', { url: `https://user:${CANARY.urlPassword}@example.com/j` }),
+    req('url token userinfo', '', { url: `https://${CANARY.urlToken}@example.com/j2` }),
+    req('path parameter', '', { url: '{{base}}/k/:apikey', params: [{ name: 'apikey', value: CANARY.pathParam, isPath: true }] }),
+    req('url fragment', '', { url: `{{base}}/l#access_token=${CANARY.fragment}&state=1` })
   ])),
   file('environments/tc_env_dev.json', 'v4-environment', { _id: 'e1', name: 'dev', data: [{ name: 'base', value: 'https://dev.example' }, { name: 'api_token', value: CANARY.envVariable }, { name: 'old_secret', value: '', encrypted: true }] })
 );

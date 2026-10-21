@@ -89,8 +89,60 @@ function sanitize(url: string): { text: string; lineBreak: boolean } {
   return { text, lineBreak };
 }
 
-/** Decides what stands in a file for the value of a query parameter: the value itself, or a variable that holds it. */
-export type ProtectValue = (name: string, value: string) => string;
+/** Which part of the URL a value is from: the query (the default), the password or token before the "@", a path parameter (`pathparam`) or the fragment. */
+export type UrlPart = 'query' | 'userinfo' | 'pathparam' | 'fragment';
+
+/** Decides what stands in a file for a value found in the URL under a name: the value itself, or a variable that holds it. */
+export type ProtectValue = (name: string, value: string, part?: UrlPart) => string;
+
+type Safe = (name: string, value: string, part?: UrlPart) => string;
+
+/** The index of the last `char` that is not inside a `{{variable}}`, or -1. */
+function lastIndexOutsideVariables(text: string, char: string): number {
+  let found = -1;
+  let offset = 0;
+  for (const piece of splitVariables(text)) {
+    if (!piece.variable) { const at = piece.text.lastIndexOf(char); if (at >= 0) found = offset + at; }
+    offset += piece.text.length;
+  }
+  return found;
+}
+
+/**
+ * `scheme://user:password@host`: the password goes through `safe`, and so does a userinfo with no ":" (it is a token: `https://TOKEN@host`).
+ * The user name of a `user:password` pair stays, it is not a secret.
+ */
+function protectUserinfo(base: string, safe: Safe): string {
+  const scheme = SCHEME.exec(base);
+  if (scheme === null) return base;
+  const from = scheme[0].length;
+  const slash = indexOutsideVariables(base, '/', from);
+  const authorityEnd = slash < 0 ? base.length : slash;
+  const authority = base.slice(from, authorityEnd);
+  const at = lastIndexOutsideVariables(authority, '@');
+  if (at < 1) return base;
+  const userinfo = authority.slice(0, at);
+  const colon = indexOutsideVariables(userinfo, ':');
+  const replaced = colon < 0 ? safe('token', userinfo, 'userinfo') : `${userinfo.slice(0, colon + 1)}${safe('password', userinfo.slice(colon + 1), 'userinfo')}`;
+  return replaced === userinfo ? base : base.slice(0, from) + replaced + authority.slice(at) + base.slice(authorityEnd);
+}
+
+/** `#access_token=...&state=...`: a fragment of name=value pairs (the way an OAuth redirect carries a token) is protected like a query. */
+function protectFragment(fragment: string, safe: Safe): string {
+  if (fragment.length < 2) return fragment;
+  let changed = false;
+  const mapped = splitOutsideVariables(fragment.slice(1), '&').map(raw => {
+    const eq = indexOutsideVariables(raw, '=');
+    if (eq < 0) return raw;
+    const name = raw.slice(0, eq);
+    const value = raw.slice(eq + 1);
+    const result = safe(decoded(name), value, 'fragment');
+    if (result === value) return raw;
+    changed = true;
+    return `${name}=${result}`;
+  });
+  return changed ? `#${mapped.join('&')}` : fragment;
+}
 
 export function convertUrl(rawUrl: string, params: readonly ParamInput[], protect?: ProtectValue): UrlConversion {
   let rest = rawUrl;
@@ -130,26 +182,29 @@ export function convertUrl(rawUrl: string, params: readonly ParamInput[], protec
     if (!param.enabled && !param.isPath && param.name !== '') query.push({ name: param.name, value: param.value, enabled: false });
   }
 
+  // Once per distinct part, name and value, so that a value shown twice (in the URL and in the list) counts once.
+  const cache = new Map<string, string>();
+  const safe: Safe = (name, value, part = 'query') => {
+    if (protect === undefined) return value;
+    const key = JSON.stringify([part, name, value]);
+    let result = cache.get(key);
+    if (result === undefined) { result = protect(name, value, part); cache.set(key, result); }
+    return result;
+  };
   if (protect !== undefined) {
-    // Once per distinct name and value, so that a value shown twice (in the URL and in the list) counts once.
-    const cache = new Map<string, string>();
-    const safe = (name: string, value: string): string => {
-      const key = JSON.stringify([name, value]);
-      let result = cache.get(key);
-      if (result === undefined) { result = protect(name, value); cache.set(key, result); }
-      return result;
-    };
     pairs = pairs.map(raw => {
       const pair = splitPair(raw);
       const value = safe(decoded(pair.name), pair.value);
       return value === pair.value ? raw : `${pair.name}=${value}`;
     });
     for (const entry of query) entry.value = safe(entry.name, entry.value);
+    fragment = protectFragment(fragment, safe);
+    base = protectUserinfo(base, safe);
   }
 
   const pathValues = new Map<string, string>();
   for (const param of params) {
-    if (param.enabled && param.isPath && param.name !== '' && !pathValues.has(param.name)) pathValues.set(param.name, param.value);
+    if (param.enabled && param.isPath && param.name !== '' && !pathValues.has(param.name)) pathValues.set(param.name, safe(param.name, param.value, 'pathparam'));
   }
   let emptyPathParams = 0;
   if (pathValues.size > 0) base = fillPathParams(base, pathValues, () => { emptyPathParams++; });

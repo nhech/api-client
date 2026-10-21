@@ -5,11 +5,20 @@
       "old_secret": "",
       "secret_secrets_basic_password": "CANARY-basic-BBBB",
       "secret_secrets_bearer_token": "CANARY-bearer-AAAA",
+      "secret_secrets_body_apikey": "CANARY-json-body-JJJJ",
+      "secret_secrets_body_client_secret": "CANARY-text-body-NNNN",
+      "secret_secrets_body_password": "CANARY-graphql-arg-LLLL",
+      "secret_secrets_body_password_2": "CANARY-xml-body-KKKK",
+      "secret_secrets_body_token": "CANARY-graphql-var-MMMM",
       "secret_secrets_form_password": "CANARY-form-GGGG",
+      "secret_secrets_fragment_access_token": "CANARY-fragment-RRRR",
       "secret_secrets_header_authorization": "CANARY-authz-CCCC",
       "secret_secrets_header_x_api_key": "CANARY-apikey-DDDD",
       "secret_secrets_header_x_old_key": "CANARY-disabled-EEEE",
-      "secret_secrets_query_api_key": "CANARY-query-FFFF"
+      "secret_secrets_pathparam_apikey": "CANARY-path-param-QQQQ",
+      "secret_secrets_query_api_key": "CANARY-query-FFFF",
+      "secret_secrets_userinfo_password": "CANARY-url-password-OOOO",
+      "secret_secrets_userinfo_token": "CANARY-url-token-PPPP"
     }
   }
 }

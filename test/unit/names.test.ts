@@ -110,3 +110,13 @@ test('The result depends only on the names and their order', () => {
   const names = ['B', 'a', 'A', 'b', 'con', 'CON', '..', ''];
   assert.deepEqual(uniqueSlugs(names), uniqueSlugs([...names]));
 });
+
+test('Characters that draw nothing cannot hide in a folder or file name, and an emoji with its variation selector is kept', () => {
+  for (const code of [0xad, 0x34f, 0x61c, 0x2060, 0x3164, 0x180e, 0xe0041, 0x206a]) {
+    const result = slugify('Shop' + cp(code) + 'End');
+    assert.equal(result.changed, true, `U+${code.toString(16)}`);
+    assert.ok(!Array.from(result.slug).some(char => (char.codePointAt(0) ?? 0) === code), `U+${code.toString(16)} is not in ${result.slug}`);
+  }
+  const heart = cp(0x2764, 0xfe0f) + ' Orders';
+  assert.equal(slug(heart), heart);
+});

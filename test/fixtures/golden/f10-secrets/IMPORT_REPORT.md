@@ -10,21 +10,21 @@ Written for REST Client: dynamic variables such as {{$guid}} are spelled the way
 |---|---|
 | Collections | 1 |
 | Folders | 0 |
-| Requests imported | 5 |
+| Requests imported | 13 |
 | Requests not imported | 0 |
 | Environments | 1 |
-| Secrets moved to the private file | 8 |
+| Secrets moved to the private file | 17 |
 | Values to enter again | 1 |
 
 ## Written
 
 | Folder | Requests | Folders |
 |---|---|---|
-| `Secrets/` | 5 | 0 |
+| `Secrets/` | 13 | 0 |
 
 ## Environments
 
-- dev: 1 variable, 9 in the private file
+- dev: 1 variable, 18 in the private file
 
 The private file is `http-client.private.env.json`. It is added to `.gitignore` and must not be committed.
 
@@ -52,5 +52,5 @@ Thunder Client stores these encrypted, so they cannot be carried over. They are 
 
 ### TC-SECRET-MOVED: A secret was moved to the private environment file. (2 places)
 
-- Secrets: 7 literal secrets were moved to the private environment file.
+- Secrets: 16 literal secrets were moved to the private environment file.
 - Environment dev: 1 secret-looking variable was moved to the private environment file.
