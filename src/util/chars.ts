@@ -25,14 +25,19 @@ const NAME_PUNCTUATION = '<>:"/\\|?*';
 
 export function isHiddenChar(char: string): boolean {
   const code = char.codePointAt(0) ?? 0;
+  if (code >= 0x20 && code < 0x7f) return false; // printable ASCII, by far the usual case
   return HIDDEN_RANGES.some(([from, to]) => code >= from && code <= to);
 }
+
+/** Anything but printable ASCII: the only text that can hold a hidden character. */
+const NOT_PRINTABLE_ASCII = /[^ -~]/;
 
 /** A character a file or folder name made from data must not keep (spec 6.1). */
 export const isUnsafeInName = (char: string): boolean => NAME_PUNCTUATION.includes(char) || isHiddenChar(char);
 
 /** Text safe to show in a report: hidden and direction-changing characters become "?". */
 export function printable(text: string): string {
+  if (!NOT_PRINTABLE_ASCII.test(text)) return text;
   return Array.from(text, char => (isHiddenChar(char) ? '?' : char)).join('');
 }
 
@@ -41,10 +46,14 @@ export function printable(text: string): string {
  * placeholder when there is no name. Names are shown; values never are.
  */
 export function displayLabel(name: unknown, max = 80): string {
-  const text = typeof name === 'string' ? printable(name).trim() : '';
+  if (typeof name !== 'string') return '<unnamed>';
+  // Only the start of a long name can be shown, so only the start is read (a name of a few megabytes is not walked character by character
+  // for every request that sits below it). Four units per character wanted is more than enough, an astral character being two.
+  const head = name.length > max * 4 ? name.slice(0, max * 4) : name;
+  const text = printable(head).trim();
   if (text === '') return '<unnamed>';
   const points = Array.from(text);
-  return points.length <= max ? text : `${points.slice(0, max - 3).join('')}...`;
+  return points.length <= max && head === name ? text : `${points.slice(0, max - 3).join('')}...`;
 }
 
 /** Orders strings by code point, the same on every machine and locale (UTF-16 order would put astral characters before U+FFFF). */

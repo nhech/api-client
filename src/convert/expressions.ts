@@ -13,7 +13,9 @@ import { variableSpans } from './text';
  * a `#` is not valid JavaScript at that place, so nothing runs.
  */
 const NOT_A_NAME = /[.(){}[\];=+*/\\'"`<>!|&^%~?,:$#@]/;
-const THUNDER_DYNAMIC = /^\s*#[A-Za-z]+(?:\s*,\s*[-\w. ]*)*\s*$/;
+// `#name` and then arguments after commas. Every repeat starts with a comma that the argument text cannot contain, so there is only one way to
+// match and the test takes one pass (an earlier form let spaces belong to two places at once: 36 bytes of ", , , ... !" took a minute).
+const THUNDER_DYNAMIC = /^\s*#[A-Za-z]+\s*(?:,[\s\w.-]*)*$/;
 
 /** True when the text between the braces is a plain variable name (or a Thunder dynamic variable, which is handled apart). */
 export const isPlainVariable = (inner: string): boolean => !NOT_A_NAME.test(inner) || THUNDER_DYNAMIC.test(inner);

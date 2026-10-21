@@ -101,7 +101,7 @@ export function emitHttp(model: ImportModel, options: EmitOptions = {}): EmitRes
   let externalBodies = 0;
 
   // The environment files come first in the budget: they are small and the requests need them.
-  const environments = renderEnvironments(model.environments, sink, { restClient: (options.target ?? DEFAULT_TARGET) === 'rest-client' });
+  const environments = renderEnvironments(model.environments, sink, { restClient: (options.target ?? DEFAULT_TARGET) === 'rest-client', maxBytes: options.maxOutputBytes ?? LIMITS.maxOutputBytes });
   const environmentFiles: OutputFile[] = [];
   for (const file of environments.files) {
     if (budget.take(utf8Length(file.content) + utf8Length(file.path))) environmentFiles.push(file);

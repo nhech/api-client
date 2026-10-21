@@ -34,13 +34,21 @@ export class InheritBudget {
 
 const settingsOf = (value: unknown): TcSettings | undefined => (isRecord(value) ? (value as TcSettings) : undefined);
 
+/** The label of a folder, made once: every request below it asks for it (a long chain of folders over 50,000 requests spent most of its time here). */
+const folderLabels = new WeakMap<object, string>();
+const labelOf = (folder: { name?: unknown }): string => {
+  let label = folderLabels.get(folder);
+  if (label === undefined) { label = displayLabel(folder.name); folderLabels.set(folder, label); }
+  return label;
+};
+
 /** The levels above a request, nearest first, the collection last. `truncated` when more folders than the limit were above it. */
 export function settingsLevels(ancestry: Ancestry | undefined, collection: { name: string; settings: TcSettings | undefined }, max = MAX_INHERIT_LEVELS): { levels: Level[]; truncated: boolean } {
   const levels: Level[] = [];
   let truncated = false;
   for (let link = ancestry; link !== undefined; link = link.up) {
     if (levels.length >= max) { truncated = true; break; }
-    levels.push({ kind: 'folder', name: displayLabel(link.folder.name), settings: settingsOf(link.folder.settings) });
+    levels.push({ kind: 'folder', name: labelOf(link.folder), settings: settingsOf(link.folder.settings) });
   }
   levels.push({ kind: 'collection', name: displayLabel(collection.name), settings: collection.settings });
   return { levels, truncated };
@@ -132,8 +140,19 @@ const DEDUPED_ACTIONS: ReadonlySet<string> = new Set(['equal', '<', '<=', '>', '
 
 export interface InheritedTest { test: TcTest; from: string }
 
+/** What makes two tests "the same" for the rule above, as one string; undefined for a value that is not plain data (it is never the same as another). */
+function testKey(test: TcTest): string | undefined {
+  // The tests of a request come from the data as they are: an entry may be anything, null included.
+  if (typeof test !== 'object' || test === null) return undefined;
+  const { type, custom, action } = test;
+  for (const value of [type, custom, action]) if (typeof value === 'object' && value !== null || typeof value === 'function') return undefined;
+  return JSON.stringify([typeof type, type, typeof custom, custom, typeof action, action]);
+}
+
 export function inheritTests(own: readonly TcTest[], levels: readonly Level[], budget: InheritBudget): InheritedTest[] {
-  const present: TcTest[] = [...own];
+  // One set of keys instead of a look through every test already there for each new one (that is quadratic over a long list of tests).
+  const present = new Set<string>();
+  for (const test of own) { const key = testKey(test); if (key !== undefined) present.add(key); }
   const added: InheritedTest[] = [];
   for (const level of levels) {
     const list = level.settings?.tests;
@@ -142,11 +161,11 @@ export function inheritTests(own: readonly TcTest[], levels: readonly Level[], b
       if (!isRecord(item)) continue;
       const test = item as TcTest;
       const action = test.action;
-      const exists = typeof action === 'string' && DEDUPED_ACTIONS.has(action)
-        && present.some(other => other.type === test.type && other.custom === test.custom && other.action === action);
+      const key = testKey(test);
+      const exists = typeof action === 'string' && DEDUPED_ACTIONS.has(action) && key !== undefined && present.has(key);
       if (exists) continue;
       if (!budget.take()) return added;
-      present.push(test);
+      if (key !== undefined) present.add(key);
       added.push({ test, from: level.name });
     }
   }

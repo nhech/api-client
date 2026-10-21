@@ -31,18 +31,23 @@ export interface EnvironmentFiles {
 }
 
 const byName = ([a]: [string, string], [b]: [string, string]): number => compareCodePoints(a, b);
-const toJson = (environments: Map<string, Map<string, string>>): string =>
-  `${JSON.stringify(Object.fromEntries([...environments].sort(([a], [b]) => compareCodePoints(a, b)).map(([key, variables]) => [key, Object.fromEntries([...variables].sort(byName))])), null, 2)}\n`;
+const sortedObject = (environments: Map<string, Map<string, string>>): Record<string, Record<string, string>> =>
+  Object.fromEntries([...environments].sort(([a], [b]) => compareCodePoints(a, b)).map(([key, variables]) => [key, Object.fromEntries([...variables].sort(byName))]));
+const toJson = (environments: Map<string, Map<string, string>>): string => `${JSON.stringify(sortedObject(environments), null, 2)}\n`;
 
 /** `$shared` is the key REST Client keeps for the variables of every environment; an environment of that name must not take it. */
 const restClientKey = (key: string): string => (key === '$shared' ? '$shared-2' : key);
 
 const toSettings = (environments: Map<string, Map<string, string>>): string => {
   const renamed = new Map([...environments].map(([key, variables]) => [restClientKey(key), variables] as const));
-  return `${JSON.stringify({ [REST_CLIENT_SETTING]: JSON.parse(toJson(renamed)) as unknown }, null, 2)}\n`;
+  // The same object that toJson writes, nested one level: no text is parsed back (that copied the whole content again).
+  return `${JSON.stringify({ [REST_CLIENT_SETTING]: sortedObject(renamed) }, null, 2)}\n`;
 };
 
-export function renderEnvironments(environments: readonly ImpEnvironment[], sink: FindingSink, options: { restClient?: boolean } = {}): EnvironmentFiles {
+/** About how many bytes a list of variables takes in a JSON file: name, value, quotes, colon, comma, indent. */
+const variableBytes = (variables: readonly { name: string; value: string }[]): number => variables.reduce((sum, variable) => sum + variable.name.length + variable.value.length + 10, 0);
+
+export function renderEnvironments(environments: readonly ImpEnvironment[], sink: FindingSink, options: { restClient?: boolean; maxBytes?: number } = {}): EnvironmentFiles {
   const named = environments.filter(environment => environment.kind === 'named');
   const shared = environments.filter(environment => environment.kind === 'shared');
   const privates = environments.filter(environment => environment.kind === 'private');
@@ -58,6 +63,18 @@ export function renderEnvironments(environments: readonly ImpEnvironment[], sink
       if (unique.collided) sink.add('Environments', 'TC-NAME-COLLISION', `Environment ${displayLabel(environment.name)}`, 'Two environments have the same name; this one was renamed.');
       sources.push({ key: unique.name, environment });
     });
+  }
+
+  // The shared variables are copied into every named environment, so a small input can ask for a huge output (800 environments and one list
+  // of 10,000 shared variables: 1 MB in, 160 MB out and 3 GB of memory). The size is estimated before anything is built, not after.
+  if (options.maxBytes !== undefined) {
+    const common = shared.reduce((sum, environment) => sum + variableBytes(environment.variables), 0) + privates.reduce((sum, environment) => sum + variableBytes(environment.variables), 0);
+    const own = named.reduce((sum, environment) => sum + variableBytes(environment.variables), 0);
+    const estimate = (common * sources.length + own) * (options.restClient === true ? 2 : 1);
+    if (estimate > options.maxBytes) {
+      sink.add('Output', 'TC-TOO-LARGE', 'Output', `The environment files were not written: with the shared variables copied into each of ${sources.length} environments they would go over the output limit.`);
+      return { files: [], keys: [] };
+    }
   }
 
   const publicFile = new Map<string, Map<string, string>>();

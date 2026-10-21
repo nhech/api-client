@@ -43,9 +43,10 @@ export function codeSpan(text: string): string {
 const row = (label: string, value: number | string): string => `| ${label} | ${value} |`;
 const plural = (count: number, one: string, many = `${one}s`): string => `${count} ${count === 1 ? one : many}`;
 
-function list(items: readonly string[], limit = ROWS_PER_LIST): string[] {
+/** At most `limit` lines of a list; `total` is the real length when `items` holds only the part that will be shown. */
+function list(items: readonly string[], limit = ROWS_PER_LIST, total = items.length): string[] {
   const out = items.slice(0, limit).map(item => `- ${item}`);
-  if (items.length > limit) out.push(`- ... and ${items.length - limit} more`);
+  if (total > limit) out.push(`- ... and ${total - limit} more`);
   return out;
 }
 
@@ -53,13 +54,18 @@ function findingSection(title: string, findings: readonly Finding[], severities:
   const chosen = findings.filter(item => severities.includes(item.severity));
   if (chosen.length === 0) return [];
   const byCode = new Map<string, Finding[]>();
-  for (const item of chosen) byCode.set(item.code, [...(byCode.get(item.code) ?? []), item]);
+  for (const item of chosen) {
+    const group = byCode.get(item.code);
+    if (group === undefined) byCode.set(item.code, [item]);
+    else group.push(item);
+  }
   const out: string[] = [`## ${title}`, ''];
   for (const code of [...byCode.keys()].sort()) {
     const items = byCode.get(code) ?? [];
     const catalog = FINDING_CATALOG[code as keyof typeof FINDING_CATALOG];
     out.push(`### ${code}: ${escapeMarkdown(catalog.summary)} (${plural(items.length, 'place')})`, '');
-    out.push(...list(items.map(item => `${escapeMarkdown(item.where)}${item.message === catalog.summary ? '' : `: ${escapeMarkdown(item.message)}`}`), ROWS_PER_CODE), '');
+    // Only the lines that will be shown are written out: a hundred thousand places of one kind are counted, not rendered.
+    out.push(...list(items.slice(0, ROWS_PER_CODE).map(item => `${escapeMarkdown(item.where)}${item.message === catalog.summary ? '' : `: ${escapeMarkdown(item.message)}`}`), ROWS_PER_CODE, items.length), '');
   }
   return out;
 }
@@ -82,7 +88,8 @@ export function renderReport(input: ReportInput): string {
 
   if (input.collections.length > 0) {
     out.push('## Written', '', '| Folder | Requests | Folders |', '|---|---|---|');
-    for (const collection of input.collections) out.push(`| ${codeSpan(`${collection.dir}/`)} | ${collection.requests} | ${collection.folders} |`);
+    for (const collection of input.collections.slice(0, ROWS_PER_LIST)) out.push(`| ${codeSpan(`${collection.dir}/`)} | ${collection.requests} | ${collection.folders} |`);
+    if (input.collections.length > ROWS_PER_LIST) out.push(`| ... and ${input.collections.length - ROWS_PER_LIST} more | | |`);
     out.push('');
   }
 

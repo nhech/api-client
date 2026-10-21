@@ -33,9 +33,16 @@ export function orderFieldsOf(item: Record<string, unknown>, nameKey: string): O
 
 /** A new array in N5 order; the input is left alone. `nameKey` is `name`, or `colName` for a collection. */
 export function sortBySourceOrder<T extends object>(items: readonly T[], nameKey = 'name'): T[] {
+  // The last tie-breaker is the whole item as canonical JSON. It is made once per item that needs it, not at every comparison.
+  const canonical = new Map<object, string>();
+  const keyOf = (item: Record<string, unknown>): string => {
+    let key = canonical.get(item);
+    if (key === undefined) { key = canonicalJson(item); canonical.set(item, key); }
+    return key;
+  };
   return [...items].sort((a, b) => {
     const x = a as Record<string, unknown>;
     const y = b as Record<string, unknown>;
-    return compareOrderFields(orderFieldsOf(x, nameKey), orderFieldsOf(y, nameKey)) || compareCodePoints(canonicalJson(x), canonicalJson(y));
+    return compareOrderFields(orderFieldsOf(x, nameKey), orderFieldsOf(y, nameKey)) || compareCodePoints(keyOf(x), keyOf(y));
   });
 }
