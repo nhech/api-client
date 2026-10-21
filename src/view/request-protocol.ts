@@ -37,6 +37,8 @@ export type ToHost =
   | { type: 'copyResponse'; pretty: boolean }
   /** Make this environment the active one. */
   | { type: 'activate' }
+  /** Get an access token for the request now (`get`), or forget the one that is kept (`clear`). */
+  | { type: 'oauth'; action: 'get' | 'clear' }
   /** Show the file in the text editor (when the page cannot edit it). */
   | { type: 'openAsText' };
 
@@ -71,7 +73,19 @@ export type ToView =
   | { type: 'response'; id: number; response: ResponseView }
   /** The request could not be sent or got no answer: `code` is what the engine calls it, `hint` says what to try. */
   | { type: 'failed'; id: number; code: string; message: string; hint: string; warnings: string[]; scripts?: ScriptReport }
-  | { type: 'cancelled'; id: number };
+  | { type: 'cancelled'; id: number }
+  /** Whether the request has an access token: sent whenever the request or the variables change, and after a try to get one. */
+  | { type: 'oauth'; status: OAuthStatusView };
+
+export interface OAuthStatusView {
+  /** The authentication that applies to the request (its own or the one it inherits) is OAuth 2.0. */
+  applies: boolean;
+  state: 'none' | 'valid' | 'expired' | 'busy';
+  expiresInSeconds?: number;
+  scope?: string;
+  /** Why the last try to get a token failed. */
+  message?: string;
+}
 
 export const MAX_OPS = 200;
 export const MAX_PATH_LENGTH = 8;
@@ -145,6 +159,7 @@ export function parseToHost(raw: unknown): ToHost | undefined {
   if (type === 'send' || type === 'cancel' || type === 'openAsText' || type === 'saveResponse' || type === 'openResponse' || type === 'activate') return { type };
   if (type === 'violation') { const text = own(raw, 'text'); return typeof text === 'string' ? { type, text: text.slice(0, 200) } : undefined; }
   if (type === 'copyResponse') return { type, pretty: own(raw, 'pretty') === true };
+  if (type === 'oauth') { const action = own(raw, 'action'); return action === 'get' || action === 'clear' ? { type, action } : undefined; }
   if (type === 'ready') {
     const given = own(raw, 'violations');
     const violations = Array.isArray(given) ? given.filter((item): item is string => typeof item === 'string').slice(0, MAX_VIOLATIONS).map(item => item.slice(0, 200)) : [];
