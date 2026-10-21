@@ -163,6 +163,16 @@
         "category": "API Client"
       },
       {
+        "command": "apiClient.cookies",
+        "title": "Show Cookies",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.clearCookies",
+        "title": "Delete All Cookies",
+        "category": "API Client"
+      },
+      {
         "command": "apiClient.runCollection",
         "title": "Run Collection or Folder",
         "category": "API Client"

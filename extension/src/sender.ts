@@ -23,7 +23,7 @@ const OPEN_LIMIT_BYTES = 32 * 1024 * 1024;
 
 /** What every request editor shares when it sends: the files, the cookie jar, the variables that requests have set, and where large responses are put. */
 export class SendEnvironment implements vscode.Disposable {
-  readonly jar = new CookieJar(() => Date.now());
+  readonly jar: CookieJar;
   /** What the captures of the responses saved; the editors are told when it changes. */
   readonly runtime = new RuntimeVariables();
   private readonly changed = new vscode.EventEmitter<void>();
@@ -34,7 +34,8 @@ export class SendEnvironment implements vscode.Disposable {
   readonly oauth: OAuthService;
   private readonly spillDir: string;
 
-  constructor(context: vscode.ExtensionContext, readonly workspace: ClientWorkspace) {
+  constructor(context: vscode.ExtensionContext, readonly workspace: ClientWorkspace, jar: CookieJar) {
+    this.jar = jar;
     this.scripts = new ScriptService(context);
     this.oauth = new OAuthService(context);
     this.spillDir = join(context.globalStorageUri.fsPath, 'spill');

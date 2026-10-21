@@ -10,6 +10,7 @@ import { ContainerEditorProvider, ENVIRONMENT_VIEW_TYPE, CONTAINER_VIEW_TYPE, En
 import { Organiser } from './organise';
 import { registerCommands } from './commands';
 import { RequestEditorProvider, REQUEST_VIEW_TYPE, type RequestEditorTestView } from './requestEditor';
+import { CookieManager } from './cookies';
 import { MirrorService } from './mirror';
 import { RunnerManager, type RunnerTestView } from './runner';
 import { SendEnvironment } from './sender';
@@ -37,6 +38,8 @@ export interface ImporterTestApi {
   oauth: OAuthService;
   /** The open collection runners, by the path of the collection or folder they run. */
   runner(path: string): RunnerTestView | undefined;
+  /** The cookies that requests received. */
+  cookies: CookieManager;
   panel(): { view(): ReturnType<WizardPanel['view']>; receive(raw: unknown): Promise<void>; readonly isReady: boolean } | undefined;
   /** The client's side bar: what the views show and the files behind it. */
   client(): { workspace: ClientWorkspace; collections: TreeNode[]; environments: TreeNode[]; setFilter(text: string): void; organiser: Organiser };
@@ -81,7 +84,8 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     status.show();
   };
 
-  const sending = new SendEnvironment(context, workspace);
+  const cookies = new CookieManager(context);
+  const sending = new SendEnvironment(context, workspace, cookies.jar);
   const mirror = new MirrorService(workspace, context);
   const runner = new RunnerManager(context, sending, workspace);
   const requests = new RequestEditorProvider(context, sending);
@@ -89,7 +93,9 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   const containerEditors = new ContainerEditorProvider(context, workspace);
   const editorOptions = { webviewOptions: { retainContextWhenHidden: false }, supportsMultipleEditorsPerDocument: false };
   context.subscriptions.push(
-    sending, runner,
+    sending, runner, cookies,
+    vscode.commands.registerCommand('apiClient.cookies', () => cookies.show()),
+    vscode.commands.registerCommand('apiClient.clearCookies', () => { cookies.clearAll(); }),
     vscode.window.registerCustomEditorProvider(REQUEST_VIEW_TYPE, requests, editorOptions),
     vscode.window.registerCustomEditorProvider(ENVIRONMENT_VIEW_TYPE, environmentEditors, editorOptions),
     vscode.window.registerCustomEditorProvider(CONTAINER_VIEW_TYPE, containerEditors, editorOptions),
@@ -107,7 +113,7 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
   void workspace.reload();
 
   return process.env['HTTP_FILES_IMPORTER_TEST'] === '1'
-    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
+    ? { scripts: sending.scripts, mirror, oauth: sending.oauth, runner: path => runner.open.get(path), cookies, panel: () => WizardPanel.open, client: () => ({ workspace, collections: collections.snapshot(), environments: environments.snapshot(), setFilter: text => collections.setFilter(text), organiser }), requestEditor: uri => requests.open.get(uri), environmentEditor: uri => environmentEditors.open.get(uri), containerEditor: uri => containerEditors.open.get(uri) }
     : undefined;
 }
 

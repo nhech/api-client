@@ -1277,4 +1277,76 @@ exports.run = async function run() {
   const none = empty.messages().filter(message => message.type === 'code').at(-1);
   assert.equal(none.text, '');
   assert.match(none.notes.join(' '), /The request has no address/);
+
+  // 20. Cookies: what a server sets is kept and sent back, the list shows no value, the person can delete some or all, and only the ones that outlive the
+  //     session are kept for the next one.
+  const cookieSeen = [];
+  const cookieServer = http2.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      cookieSeen.push({ url: req.url, cookie: req.headers.cookie });
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url === '/set') res.setHeader('Set-Cookie', ['sid=abc123-secret; Path=/; Max-Age=3600; HttpOnly', 'theme=dark; Path=/']);
+      res.end('{"ok":true}');
+    });
+  });
+  await new Promise(resolve => cookieServer.listen(0, '127.0.0.1', resolve));
+  const cookieBase = 'http://127.0.0.1:' + cookieServer.address().port;
+  try {
+    test.cookies.jar.clear();
+    put('api-client/collections/shop/cookie-set.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B71', 'name: Cookie set', 'url: ' + cookieBase + '/set', ''].join('\n'));
+    put('api-client/collections/shop/cookie-echo.req.yml', ['schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1B72', 'name: Cookie echo', 'url: ' + cookieBase + '/echo', ''].join('\n'));
+    await until(() => ['Cookie set', 'Cookie echo'].every(label => test.client().collections.find(node => node.label === 'Shop').children.some(child => child.label === label)), 'the cookie requests are in the tree');
+    const openCookie = async name => {
+      const uri = uriOf('api-client/collections/shop/' + name);
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'apiClient.request');
+      await until(() => test.requestEditor(uri.toString())?.isReady === true, name + ' is open');
+      return test.requestEditor(uri.toString());
+    };
+    const sendCookie = async view => {
+      const count = () => view.messages().filter(message => message.type === 'response' || message.type === 'failed').length;
+      const before = count();
+      await view.receive({ type: 'send' });
+      await until(() => count() > before, 'an answer');
+    };
+    const setter = await openCookie('cookie-set.req.yml');
+    const echo = await openCookie('cookie-echo.req.yml');
+
+    // 20a. A server sets two cookies; the next request carries them.
+    await sendCookie(setter);
+    assert.deepEqual(test.cookies.jar.list().map(cookie => cookie.name).sort(), ['sid', 'theme']);
+    await sendCookie(echo);
+    assert.equal(cookieSeen.at(-1).url, '/echo');
+    assert.match(cookieSeen.at(-1).cookie, /^sid=abc123-secret; theme=dark$|^theme=dark; sid=abc123-secret$/);
+
+    // 20b. The list shows no value; deleting the picked ones leaves the others.
+    let listed = [];
+    test.cookies.pick = async items => { listed = items.map(item => ({ label: item.label, description: item.description, detail: item.detail })); return items.filter(item => item.label === 'theme'); };
+    await vscode.commands.executeCommand('apiClient.cookies');
+    assert.deepEqual(listed.map(item => item.label), ['sid', 'theme']);
+    assert.ok(!JSON.stringify(listed).includes('abc123-secret'), 'the value of a cookie is not shown');
+    assert.match(listed[0].detail, /^\/ - until \d{4}-\d{2}-\d{2} \d{2}:\d{2} - HttpOnly$/);
+    assert.match(listed[1].detail, /^\/ - session$/);
+    assert.equal(listed[0].description, '127.0.0.1');
+    assert.deepEqual(test.cookies.jar.list().map(cookie => cookie.name), ['sid']);
+    await sendCookie(echo);
+    assert.equal(cookieSeen.at(-1).cookie, 'sid=abc123-secret');
+
+    // 20c. Only what has an end date outlives the session.
+    assert.deepEqual(test.cookies.jar.persistent().map(cookie => cookie.name), ['sid']);
+    await test.cookies.save();
+
+    // 20d. All of them can be deleted, and the list says so when there are none.
+    await vscode.commands.executeCommand('apiClient.clearCookies');
+    assert.equal(test.cookies.jar.list().length, 0);
+    await sendCookie(echo);
+    assert.equal(cookieSeen.at(-1).cookie, undefined, 'nothing is sent that was deleted');
+    listed = undefined;
+    await vscode.commands.executeCommand('apiClient.cookies');
+    assert.equal(listed, undefined, 'there is nothing to pick from');
+  } finally {
+    test.cookies.pick = undefined;
+    cookieServer.closeAllConnections();
+    cookieServer.close();
+  }
 };
