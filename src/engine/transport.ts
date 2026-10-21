@@ -8,6 +8,7 @@ import { connect as tlsConnect } from 'node:tls';
 import { pipeline } from 'node:stream/promises';
 import { Writable } from 'node:stream';
 import { prepareBody } from './body';
+import { refuseLocalAddresses } from './lookup';
 import { openTunnel, proxyAuthorization, type ResolvedProxy } from './proxy';
 import { Counter, DecodedGuard, decodersFor, type DecodeLimits } from './decode';
 import { EngineError, type HeaderList, type ResponseBody, type TlsInfo, type TlsOptions, type Timings, type WireRequest, type WireResponse } from './types';
@@ -33,6 +34,8 @@ export interface ExchangeOptions {
   createConnection?: http.RequestOptions['createConnection'];
   /** Sends the request through this proxy: an http address with its whole address as the path, an https address through a tunnel. */
   proxy?: ResolvedProxy;
+  /** The address that the name resolves to must not be on this machine or a link-local one (the request is the hop of a redirect from a public address). Without a proxy only: a proxy resolves the name itself. */
+  refuseLocalAddresses?: boolean;
 }
 
 export type ExchangeResult = Omit<WireResponse, 'redirects' | 'finalUrl' | 'sent'>;
@@ -194,7 +197,8 @@ export async function exchange(request: WireRequest, options: ExchangeOptions): 
     const proxy = options.proxy;
     const requestOptions: https.RequestOptions = {
       method, hostname, port: url.port === '' ? undefined : Number(url.port), path: `${url.pathname}${url.search}`, agent: false, headers, signal: options.signal,
-      ...(options.createConnection === undefined ? {} : { createConnection: options.createConnection })
+      ...(options.createConnection === undefined ? {} : { createConnection: options.createConnection }),
+      ...(options.refuseLocalAddresses === true && proxy === undefined ? { lookup: refuseLocalAddresses() as unknown as https.RequestOptions['lookup'] } : {})
     };
     if (proxy !== undefined && !secure) {
       // A plain request through a proxy names the whole address, and the proxy gets its own credentials.

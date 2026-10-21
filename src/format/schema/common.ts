@@ -160,6 +160,8 @@ export function decodeSettings(parent: Fields, key: string): SettingsOverride {
   if (encodeUrl !== undefined) settings.encodeUrl = encodeUrl;
   const cookies = fields.optionalBool('cookies');
   if (cookies !== undefined) settings.cookies = cookies;
+  const allowPrivateRedirects = fields.optionalBool('allowPrivateRedirects');
+  if (allowPrivateRedirects !== undefined) settings.allowPrivateRedirects = allowPrivateRedirects;
   fields.finish();
   return settings;
 }
@@ -179,6 +181,7 @@ export function encodeSettings(settings: SettingsOverride): YMap {
   out.int('responseLimitBytes', settings.responseLimitBytes);
   flag('encodeUrl', settings.encodeUrl);
   flag('cookies', settings.cookies);
+  flag('allowPrivateRedirects', settings.allowPrivateRedirects);
   return out.map;
 }
 

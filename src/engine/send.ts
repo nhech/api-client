@@ -1,7 +1,7 @@
 import type { Settings } from '../core/model';
 import { DEFAULT_DECODE_LIMITS, type DecodeLimits } from './decode';
 import { resolveProxy, type ProxyConfig } from './proxy';
-import { isRedirectStatus, nextHop, type Hop } from './redirect';
+import { isLocalHost, isRedirectStatus, nextHop, type Hop, type RedirectPolicy } from './redirect';
 import { exchange, type ExchangeOptions } from './transport';
 import { EngineError, type HeaderList, type RedirectHop, type TlsOptions, type WireRequest, type WireResponse } from './types';
 
@@ -37,9 +37,9 @@ export interface SendOptions {
 export const USER_AGENT = 'api-client/0.2';
 
 /** The options that the settings decide. */
-export function sendOptionsFrom(settings: Settings): Pick<SendOptions, 'timeoutMs' | 'followRedirects' | 'maxRedirects' | 'responseLimitBytes'> & { tls: TlsOptions } {
+export function sendOptionsFrom(settings: Settings): Pick<SendOptions, 'timeoutMs' | 'followRedirects' | 'maxRedirects' | 'responseLimitBytes' | 'allowLocalRedirect'> & { tls: TlsOptions } {
   return {
-    timeoutMs: settings.timeoutMs, followRedirects: settings.followRedirects, maxRedirects: settings.maxRedirects, responseLimitBytes: settings.responseLimitBytes,
+    timeoutMs: settings.timeoutMs, followRedirects: settings.followRedirects, maxRedirects: settings.maxRedirects, responseLimitBytes: settings.responseLimitBytes, allowLocalRedirect: settings.allowPrivateRedirects,
     tls: { rejectUnauthorized: settings.rejectUnauthorized }
   };
 }
@@ -70,6 +70,19 @@ function withCookies(request: WireRequest, jar: CookieStore | undefined): WireRe
 
 const headerValue = (headers: HeaderList, name: string): string | undefined => headers.find(([key]) => key.toLowerCase() === name)?.[1];
 
+/**
+ * After a redirect from a public address to ANOTHER name, the address that the name resolves to is checked too (see lookup.ts), unless the person allowed
+ * redirects to this machine. The same name again is the address the person already reached.
+ */
+function mustCheckAddress(redirects: readonly RedirectHop[], target: string, policy: RedirectPolicy): boolean {
+  const from = redirects.at(-1)?.url;
+  if (from === undefined || policy.allowLocal) return false;
+  try {
+    const before = new URL(from).hostname.toLowerCase();
+    return before !== new URL(target).hostname.toLowerCase() && !isLocalHost(before);
+  } catch { return false; }
+}
+
 export async function send(request: WireRequest, options: SendOptions): Promise<WireResponse> {
   const total = new AbortController();
   const timer = setTimeout(() => total.abort(new EngineError('timeout', `The request took longer than ${Math.round(options.timeoutMs / 1000)} s.`, 'Raise the timeout in the settings if the server is slow.')), options.timeoutMs);
@@ -94,6 +107,7 @@ export async function send(request: WireRequest, options: SendOptions): Promise<
         tls: options.tls, responseLimitBytes: options.responseLimitBytes, decode: options.decode ?? DEFAULT_DECODE_LIMITS,
         ...(options.spill === undefined ? {} : { spill: options.spill }), ...(options.createConnection === undefined ? {} : { createConnection: options.createConnection }),
         ...(proxy === undefined ? {} : { proxy }),
+        ...(mustCheckAddress(redirects, attempt.url, policy) ? { refuseLocalAddresses: true } : {}),
         body: (status, headers) => { decision = decide(status, headers); return decision?.follow === true ? 'discard' : 'read'; }
       });
       if (options.cookies !== undefined) {

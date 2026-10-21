@@ -167,3 +167,10 @@ test('The editor is given the variables of a request, and is told when it cannot
   assert.ok(known.vars.every(item => !item.secret || item.value === ''), 'secrets have no value');
   assert.deepEqual(variablesOf(setup.loaded, 'api-client/loose.req.yml', 'E1'), { vars: [], complete: false });
 });
+
+test('What the settings say about a redirect to a private network reaches the send', async () => {
+  const { sendOptionsFrom } = await import('../../src/engine/send');
+  const { DEFAULT_SETTINGS } = await import('../../src/core/model');
+  assert.equal(sendOptionsFrom(DEFAULT_SETTINGS).allowLocalRedirect, false);
+  assert.equal(sendOptionsFrom({ ...DEFAULT_SETTINGS, allowPrivateRedirects: true }).allowLocalRedirect, true);
+});

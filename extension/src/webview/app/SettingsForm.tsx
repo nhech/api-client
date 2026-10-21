@@ -2,11 +2,13 @@ import { DEFAULT_SETTINGS, type Settings, type SettingsOverride } from '../../..
 import { Choice } from './components';
 import { edit } from './store';
 
-type BooleanKey = 'followRedirects' | 'rejectUnauthorized' | 'encodeUrl' | 'cookies';
+type BooleanKey = 'followRedirects' | 'allowPrivateRedirects' | 'rejectUnauthorized' | 'encodeUrl' | 'cookies';
 type NumberKey = 'timeoutMs' | 'maxRedirects';
 
-const BOOLEANS: { key: BooleanKey; label: string; warning?: string }[] = [
+/** `warning` is shown when the setting has the value `warnWhen` (false unless said). */
+const BOOLEANS: { key: BooleanKey; label: string; warning?: string; warnWhen?: boolean }[] = [
   { key: 'followRedirects', label: 'Follow redirects' },
+  { key: 'allowPrivateRedirects', label: 'Follow a redirect from the internet to this machine or a private network', warning: 'A server could send the request to a service that only you can reach (a database, a router, the metadata service of a cloud machine).', warnWhen: true },
   { key: 'rejectUnauthorized', label: 'Verify the certificate of the server', warning: 'The certificate is not checked, so anyone on the network could pretend to be the server and read what is sent, passwords included.' },
   { key: 'encodeUrl', label: 'Encode the address and the query parameters' },
   { key: 'cookies', label: 'Send and keep cookies' }
@@ -51,7 +53,7 @@ export function SettingsForm(props: { settings: SettingsOverride; path: ('settin
         <>
           <Choice label={field.label} value={settings[field.key] === undefined ? 'inherit' : String(settings[field.key])} options={OPTIONS.map(option => (option.value === 'inherit' ? { value: option.value, label: `Inherit (${describe(DEFAULT_SETTINGS[field.key])})` } : option))}
             onChange={value => (value === 'inherit' ? edit({ op: 'unset', path: at(field.key) }) : edit({ op: 'set', path: at(field.key), value: value === 'true' }))} />
-          {field.warning !== undefined && settings[field.key] === false ? <p class="hint warn" role="alert">{field.warning}</p> : null}
+          {field.warning !== undefined && settings[field.key] === (field.warnWhen ?? false) ? <p class="hint warn" role="alert">{field.warning}</p> : null}
         </>
       ))}
     </div>

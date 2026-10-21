@@ -69,6 +69,7 @@ function mergeSettings(...layers: SettingsOverride[]): Settings {
     if (layer.responseLimitBytes !== undefined) settings.responseLimitBytes = layer.responseLimitBytes;
     if (layer.encodeUrl !== undefined) settings.encodeUrl = layer.encodeUrl;
     if (layer.cookies !== undefined) settings.cookies = layer.cookies;
+    if (layer.allowPrivateRedirects !== undefined) settings.allowPrivateRedirects = layer.allowPrivateRedirects;
   }
   return settings;
 }

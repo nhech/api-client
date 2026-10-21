@@ -66,17 +66,17 @@ test('A redirect from https to http is not followed unless allowed, and the reas
 });
 
 test('A public address cannot send the request to this machine or its network unless allowed', () => {
-  for (const target of ['http://localhost/x', 'https://127.0.0.1/x', 'https://127.1.2.3/x', 'https://[::1]/x', 'https://169.254.169.254/latest/meta-data', 'https://service.localhost/x', 'https://[::ffff:127.0.0.1]/x', 'https://[fe80::1]/x']) {
+  for (const target of ['http://10.0.0.5/x', 'http://192.168.1.1/admin', 'http://172.20.0.1/x', 'http://100.64.1.1/x', 'http://[fd00::1]/x', 'http://[::ffff:10.0.0.1]/x', 'http://localhost/x', 'https://127.0.0.1/x', 'https://127.1.2.3/x', 'https://[::1]/x', 'https://169.254.169.254/latest/meta-data', 'https://service.localhost/x', 'https://[::ffff:127.0.0.1]/x', 'https://[fe80::1]/x', 'http://0.0.0.0:8080/x', 'http://0.1.2.3/x', 'http://[::]/x', 'http://[::ffff:0.0.0.0]/x']) {
     const result = hop(302, target, request({ method: 'GET', noBody: true }), { ...POLICY, allowDowngrade: true });
-    assert.deepEqual(result, { follow: false, reason: 'redirected to an address on this machine or network, which is not followed' }, target);
+    assert.deepEqual(result, { follow: false, reason: 'redirected to an address on this machine or network, which is not followed unless the request allows it in its settings' }, target);
     assert.equal(hop(302, target, request({ method: 'GET', noBody: true }), { allowDowngrade: true, allowLocal: true }).follow, true, target);
   }
   assert.equal(nextHop(request({ url: 'http://localhost:3000/a' }), 302, 'http://127.0.0.1:4000/b', POLICY).follow, true, 'from a local address a local target is not new');
 });
 
 test('Where a hostname is local', () => {
-  for (const host of ['localhost', 'LOCALHOST', 'localhost.', 'a.localhost', '127.0.0.1', '127.255.255.255', '::1', '[::1]', '169.254.0.1', '::ffff:127.0.0.1', '::ffff:7f00:1', 'fe80::abcd', 'FEBF::1']) assert.equal(isLocalHost(host), true, host);
-  for (const host of ['example.com', '128.0.0.1', '126.0.0.1', '10.0.0.1', '192.168.1.1', '169.253.0.1', '8.8.8.8', '::2', 'fec0::1', 'notlocalhost', 'localhost.example.com', '2001:db8::1', '::ffff:8.8.8.8']) assert.equal(isLocalHost(host), false, host);
+  for (const host of ['localhost', 'LOCALHOST', 'localhost.', 'a.localhost', '127.0.0.1', '127.255.255.255', '::1', '[::1]', '169.254.0.1', '::ffff:127.0.0.1', '::ffff:7f00:1', 'fe80::abcd', 'FEBF::1', '0.0.0.0', '0.255.255.255', '::', '[::]', '::ffff:0.0.0.0', '::ffff:0:1', '10.0.0.1', '10.255.255.255', '172.16.0.1', '172.31.0.1', '192.168.0.1', '192.168.255.255', '100.64.0.1', '100.127.255.255', 'fc00::1', 'fd12:3456::1', 'FDFF::1', '::ffff:10.0.0.1', '::ffff:192.168.1.1', '::ffff:a00:1']) assert.equal(isLocalHost(host), true, host);
+  for (const host of ['example.com', '128.0.0.1', '126.0.0.1', '9.255.255.255', '11.0.0.1', '172.15.255.255', '172.32.0.1', '192.167.1.1', '192.169.1.1', '100.63.255.255', '100.128.0.1', '169.253.0.1', '8.8.8.8', '1.0.0.0', '::2', 'fec0::1', 'notlocalhost', 'localhost.example.com', '2001:db8::1', '::ffff:8.8.8.8', 'fe00::1', 'fb00::1', 'fe::1']) assert.equal(isLocalHost(host), false, host);
 });
 
 test('A Location that is not an address, or not http or https, is not followed', () => {

@@ -174,3 +174,13 @@ test('Identifiers are ULIDs: 26 characters, sorted by time, made from the inject
   }
   assert.equal(newId({ now: () => 0, random: () => 0.999999 }), `${'0'.repeat(10)}${'Z'.repeat(16)}`);
 });
+
+test('The setting for a redirect to a private network is read, written back, and refused when it is not true or false', () => {
+  const text = 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AAA\nname: R\nmethod: GET\nurl: https://x.test\nsettings:\n  allowPrivateRedirects: true\n';
+  const read = readRequest(text);
+  assert.ok(read.ok);
+  assert.equal(read.value.settings.allowPrivateRedirects, true);
+  assert.match(writeRequest(read.value, read.extra), /settings:\n {2}allowPrivateRedirects: true\n/);
+  const bad = readRequest(text.replace('true', 'sometimes'));
+  assert.equal(bad.ok && bad.findings.length === 0, false, 'a word that is not true or false is a finding');
+});

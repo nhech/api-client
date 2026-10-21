@@ -32,6 +32,8 @@ export interface Settings {
   responseLimitBytes: number;
   encodeUrl: boolean;
   cookies: boolean;
+  /** Follow a redirect from a public address to this machine or a private network. Off: a server could use the redirect to reach what only the person can. */
+  allowPrivateRedirects: boolean;
 }
 /** A level (workspace, collection, folder, request) sets only the fields it changes. */
 export type SettingsOverride = Partial<Settings>;
@@ -44,7 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   httpVersion: '1.1',
   responseLimitBytes: 10 * 1024 * 1024,
   encodeUrl: true,
-  cookies: true
+  cookies: true,
+  allowPrivateRedirects: false
 };
 
 export type OAuthGrant = 'authorization_code' | 'client_credentials' | 'password';

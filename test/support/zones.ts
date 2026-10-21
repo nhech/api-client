@@ -32,7 +32,7 @@ export const ZONES: Zone[] = [
   {
     name: 'net',
     paths: ['src/engine/'],
-    modules: ['node:http', 'node:https', 'node:tls', 'node:net', 'node:zlib', 'node:stream', 'node:stream/promises', 'node:fs', 'node:crypto', 'node:path'],
+    modules: ['node:dns', 'node:http', 'node:https', 'node:tls', 'node:net', 'node:zlib', 'node:stream', 'node:stream/promises', 'node:fs', 'node:crypto', 'node:path'],
     uses: ['core', 'util']
   },
   // The `.http` file written next to a request: generated from the model with the emitter of the importer, and the rules for when it and the request disagree.

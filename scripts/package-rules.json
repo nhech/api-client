@@ -23,6 +23,7 @@
       "kind": "host",
       "requires": [
         "node:crypto",
+        "node:dns",
         "node:fs",
         "node:http",
         "node:https",

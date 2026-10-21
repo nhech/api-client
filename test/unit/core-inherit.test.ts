@@ -96,3 +96,11 @@ test('Property: on random chains the result is what a plain nearest-first search
     assert.equal(result.settings.timeoutMs, expected, 'run ' + run);
   }
 });
+
+test('Following a redirect to this machine or a private network is off, and is switched on at any level', () => {
+  assert.equal(DEFAULT_SETTINGS.allowPrivateRedirects, false);
+  assert.equal(effectiveRequest(request(), []).settings.allowPrivateRedirects, false);
+  const chain = [level('collection', 'Shop', { settings: { allowPrivateRedirects: true } }), level('folder', 'Orders', { settings: {} })];
+  assert.equal(effectiveRequest(request(), chain).settings.allowPrivateRedirects, true, 'a collection can allow it for its requests');
+  assert.equal(effectiveRequest(request({ settings: { allowPrivateRedirects: false } }), chain).settings.allowPrivateRedirects, false, 'and a request can take it back');
+});
