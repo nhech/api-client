@@ -31,6 +31,8 @@ node extension/test/screenshots.cjs   # the pictures of the importer panel in do
 SHOTS_SCENARIO=request node extension/test/screenshots.cjs <folder>   # the request editor, the runner and the other pages, in four themes
 ```
 
+CI runs the tests on Node 22 on Windows, Linux and macOS. When a test fails there and not on your machine (the words of OpenSSL for a wrong passphrase of a PKCS#12 bundle are one thing that differs between versions), run the compiled tests under the Node 22 that ships with VS Code: after `npm run test:compile`, `ELECTRON_RUN_AS_NODE=1 "<path to Code.exe>" --test .test-build/test/unit/*.test.js`.
+
 The goldens are the exact bytes the converter, the YAML writer and the code generators write for each fixture. **Read the diff of a golden before you accept it**; they are not there to make a test green. When a new rule matters, add a mutation for it to `tools/mutate.cjs` and check that the tests catch it.
 
 Tests that touch the disk create disposable folders and must not operate on a contributor's own data. Fixtures are made up; secrets in them are `CANARY-…` strings that tests look for.

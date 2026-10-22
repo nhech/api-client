@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { send, type SendOptions } from '../../src/engine/send';
+import { describeNetworkError } from '../../src/engine/transport';
 import { EngineError, type HeaderList, type WireRequest, type WireResponse } from '../../src/engine/types';
 import { headerValues, startServer } from '../support/servers/http-server';
 import { p12, pem, startTlsServer, type TlsServer, type TlsServerOptions } from '../support/servers/https-server';
@@ -85,6 +86,16 @@ test('A client certificate as a PKCS#12 bundle works with its passphrase and fai
   assert.match(wrong.message, /client certificate could not be read/);
   await rejects(send(get(`${server.url}/`), { ...BASE, tls }), 'tls');
 }));
+
+test('A certificate bundle that cannot be opened is a TLS problem whatever words this version of OpenSSL uses for it', () => {
+  const url = new URL('https://api.test/');
+  for (const message of ['mac verify failure', 'error:11800071:PKCS12 routines::mac verify failure', 'bad decrypt', 'INCORRECT_PASSWORD', 'error:11800074:PKCS12 routines::incorrect password', 'Unsupported PKCS12 PFX data', 'bad password read']) {
+    const error = describeNetworkError(new Error(message), url);
+    assert.equal(error.code, 'tls', message);
+    assert.match(error.message, /client certificate could not be read/, message);
+  }
+  assert.equal(describeNetworkError(new Error('something else entirely'), url).code, 'network', 'what is not about a certificate stays a network error');
+});
 
 test('A redirect from https to http is not followed, and the redirect itself is the result with a reason', async () => {
   const plain = await startServer();

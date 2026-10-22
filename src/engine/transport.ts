@@ -79,7 +79,8 @@ export function describeNetworkError(error: unknown, url: URL, proxy?: ResolvedP
   if (code === 'ECONNREFUSED') return new EngineError('refused', `${host} refused the connection.`, 'Check that the server is running and the port is right.');
   if (code === 'ECONNRESET' || code === 'EPIPE') return new EngineError('reset', `The connection to ${host} was closed before the response was complete.`, 'Try again; if it keeps happening the server or a proxy is dropping the request.');
   if (code === 'ETIMEDOUT') return new EngineError('timeout', `${host} did not answer.`, 'Check the address and your network.');
-  if (/mac verify failure|bad decrypt|PKCS12|passphrase|bad password/i.test(message)) return new EngineError('tls', `The client certificate could not be read: ${message}`, 'Check the file of the certificate and its passphrase.');
+  // The words of OpenSSL for a certificate bundle that cannot be opened: older versions say "mac verify failure" or "bad decrypt", newer ones "INCORRECT_PASSWORD".
+  if (/mac verify failure|bad decrypt|PKCS12|passphrase|bad password|incorrect.?password/i.test(message)) return new EngineError('tls', `The client certificate could not be read: ${message}`, 'Check the file of the certificate and its passphrase.');
   if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH') return new EngineError('network', `${host} cannot be reached from this machine.`, 'Check your network, VPN and proxy.');
   if (/^(?:CERT_|DEPTH_ZERO|UNABLE_TO_|SELF_SIGNED|ERR_TLS_CERT|ERR_SSL|HOSTNAME_MISMATCH|EPROTO)/.test(code) || /certificate|self.signed|SSL|TLS/i.test(message)) {
     return new EngineError('tls', `The secure connection to ${host} failed: ${message}`, 'If the server uses its own certificate authority, add it in the settings; checking can be switched off for a request, but then nothing proves who answered.');
