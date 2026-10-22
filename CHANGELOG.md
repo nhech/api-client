@@ -2,6 +2,21 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased
+
+A fourth independent review (the OpenAPI import, the YAML reader and the route scanners, each read by a separate reviewer who tried real attacks) found 9 problems in the OpenAPI import and its writing, 14 in the route scanners and 4 low ones in the YAML reader. Every one that was real is fixed, with tests and mutations M872 to M903.
+
+### Fixed
+
+- **A description or a source file could freeze the extension host.** A reference of 256 KB was cut apart again for every operation that used it (1.3 s each); an example was written out for every operation that shared it; a list of parameters shared by thousands of operations became gigabytes of YAML. References are now followed through a cache (one longer than 2,000 characters is not followed), the body made for a schema is made once, and the work and the text of the whole import are counted: past 10 million steps or 32 MB of files no more operations are taken, and the notes say how many were. In the route scanners one Rust file of 1 MB took 2.5 minutes (a raw string that is opened and never closed), nested NestJS controllers 17 s, thousands of mounts 7 s, a Python file of 16,000 decorators 6 s, Spring mappings 4 s; each is now read once (about 0.1 s for a file of 1 MB).
+- **An imported environment took over the requests of every other collection.** The first environment of an import was made the active one whenever none was, and an active environment comes before the variables of the workspace. It is now activated only when the workspace had no other collection and none of its variables hides one of the workspace; otherwise the message says to choose it.
+- **A host in `launchSettings.json` or `appsettings.json`** is no longer taken (only its port, on localhost), and a path, a context path or a parameter name with `{{...}}` is not carried from source files into requests, where the client would have filled it in from your variables.
+- **Credentials in the examples of a description** (an API key in a parameter, a password in a body, `user:password@host` in a server address) go to secret variables of the collection, as for a Postman file. An address typed for the fetch with a user name or a password is refused, and the messages of the engine about an address that cannot be used no longer repeat the password.
+- **A folder with thousands of requests** was written slowly and read back cut at 5,000 entries; a folder with more than 1,000 entries is now split into parts (`Name (2)`...). The confirmation shows how many megabytes the files will hold. A folder called `Something.local.yml` was ignored by Git as a whole by the `.gitignore` of the client.
+- **A path parameter that is `.` or `..`** is not imported from an example (the URL standard removes it from the address), and the engine warns when one is sent.
+- The route scan does not follow a symbolic link, holds the text of the sources to 32 MB as it reads them, leaves out the same folders as the scan, and says when its search stopped at its limit.
+- The YAML reader reads a folded scalar (`>`) with a leading empty line, or empty lines around a line indented more, as YAML does, and stops at the second `---` marker of a document with an empty first one.
+
 ## 0.2.0 - 2026-10-22
 
 The extension is now a full API client (extension id `longtd.local-api-client`); the importer of 0.1.0 is part of it.
