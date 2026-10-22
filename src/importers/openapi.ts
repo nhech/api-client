@@ -1,7 +1,8 @@
 import { newAuth, type Auth, type Body, type KV, type Part, type Request, type Var } from '../core/model';
 import { parseLooseYaml } from '../format/yaml/loose';
 import { printable, printableText } from '../util/chars';
-import { blankFolder, blankRequest, IMPORT_LIMITS, Notes, type Imported, type ImportedEnvironment, type ImportedFolder } from './types';
+import { protectCollection } from './credentials';
+import { blankFolder, blankRequest, IMPORT_LIMITS, Notes, requestChars, type Imported, type ImportedEnvironment, type ImportedFolder } from './types';
 import { row } from './url';
 
 /**
@@ -12,7 +13,15 @@ import { row } from './url';
  * text is only read), and it is said in the notes. The text is data: nothing in it is run, a reference that loops is cut, and the size of what is made
  * from a schema is limited.
  */
-export const OPENAPI_LIMITS = { fileChars: 32 * 1024 * 1024, parameters: 200, servers: 10, bodyChars: 64 * 1024, sampleNodes: 2000, sampleDepth: 8, properties: 50 } as const;
+export const OPENAPI_LIMITS = {
+  fileChars: 32 * 1024 * 1024, parameters: 200, servers: 10, bodyChars: 64 * 1024, sampleNodes: 2000, sampleDepth: 8, properties: 50,
+  /** A reference longer than this is not a pointer into the file; it is not followed. */
+  refChars: 2000,
+  /** Steps of walking the description (references followed, nodes of an example, nodes of a value written out) after which no more operations are taken. */
+  work: 10_000_000,
+  /** Characters that the files of the requests may hold in all: a description can share one example or a long list of parameters between thousands of operations. */
+  outputChars: 32 * 1024 * 1024
+} as const;
 
 export type OpenApiResult = { ok: true; imported: Imported } | { ok: false; error: string };
 
@@ -46,14 +55,50 @@ function read(source: string): { ok: true; value: unknown } | { ok: false; error
 
 // ---- references ----
 
+/** References whose answer is kept, so that one that thousands of operations share is walked once. */
+const MAX_CACHED_REFS = 100_000;
+
 class Document {
   readonly unresolved = new Set<string>();
   external = 0;
+  /** References that were too long to be a pointer into the file. */
+  tooLong = 0;
+  /** Steps taken in walking the description: when they pass the limit the import takes no more operations. */
+  work = 0;
+  /** Characters of the text of the requests made so far. */
+  output = 0;
+  private readonly pointers = new Map<string, unknown>();
+  /** The text of a value that was written out as a body, by the value, so that an example that many operations share is written once. */
+  readonly texts = new WeakMap<object, string>();
+  /** The body that was made for a schema, by the schema and then by the example and the media type. */
+  readonly bodies = new WeakMap<object, Map<string, BodyMade>>();
+  private readonly ids = new WeakMap<object, number>();
+  private lastId = 0;
 
   constructor(readonly root: Json) {}
 
-  /** What a local reference (`#/components/schemas/Pet`) points at, or undefined. */
+  /** Whether the work or the text has gone past what an import is allowed: the operations that are left are not taken. */
+  stopReason(): 'steps' | 'size' | undefined {
+    return this.work >= OPENAPI_LIMITS.work ? 'steps' : this.output >= OPENAPI_LIMITS.outputChars ? 'size' : undefined;
+  }
+
+  /** A number that stands for an object, the same one every time. */
+  idOf(value: object): number {
+    let id = this.ids.get(value);
+    if (id === undefined) { id = ++this.lastId; this.ids.set(value, id); }
+    return id;
+  }
+
+  /** What a local reference (`#/components/schemas/Pet`) points at, or undefined. Answers are kept: the walk cuts the text of the reference apart. */
   private pointer(ref: string): unknown {
+    if (this.pointers.has(ref)) return this.pointers.get(ref);
+    this.work += 1 + (ref.length >> 6);
+    const found = this.walk(ref);
+    if (this.pointers.size < MAX_CACHED_REFS) this.pointers.set(ref, found);
+    return found;
+  }
+
+  private walk(ref: string): unknown {
     if (ref === '#') return this.root;
     if (!ref.startsWith('#/')) return undefined;
     let current: unknown = this.root;
@@ -78,7 +123,9 @@ class Document {
     for (let step = 0; step < 20 && isRecord(current); step++) {
       const ref = own(current, '$ref');
       if (typeof ref !== 'string') break;
+      this.work++;
       if (!ref.startsWith('#')) { this.external++; return { value: undefined, refs }; }
+      if (ref.length > OPENAPI_LIMITS.refChars) { this.tooLong++; return { value: undefined, refs }; }
       if (refs.includes(ref)) return { value: undefined, refs };
       refs.push(ref);
       const target = this.pointer(ref);
@@ -102,8 +149,9 @@ const FORMATS: Record<string, string> = {
 
 /** What the schema says a value could be: the example, the default, the first of the enum, or a value of the type. */
 function sample(doc: Document, schema: unknown, state: Sample, depth: number, path: string[], forRequest: boolean): unknown {
-  if (state.nodes >= OPENAPI_LIMITS.sampleNodes) { state.truncated = true; return null; }
+  if (state.nodes >= OPENAPI_LIMITS.sampleNodes || doc.work >= OPENAPI_LIMITS.work) { state.truncated = true; return null; }
   state.nodes++;
+  doc.work++;
   const resolved = doc.deref(schema);
   // A schema that contains itself, or that is nested deeper than an example needs, is cut with null.
   if (resolved.refs.some(ref => path.includes(ref)) || depth > OPENAPI_LIMITS.sampleDepth) return null;
@@ -166,19 +214,32 @@ function objectSample(doc: Document, schema: Json, state: Sample, depth: number,
   return result;
 }
 
-/** A small XML text for a value that was made from a schema: one element for each property, one for each item of a list. */
-function xmlOf(value: unknown, tag: string, depth: number, out: string[]): void {
+/** The deepest a value may be nested to be written out as a body: an example is not a document tree. */
+const MAX_VALUE_DEPTH = 64;
+
+/** What a value written out as XML has taken so far; `over` is set when it can no longer fit in a body, and the walk stops. */
+interface Written { lines: string[]; chars: number; nodes: number; over: boolean }
+
+/** A small XML text for a value that was made from a schema or taken from an example: one element for each property, one for each item of a list. */
+function xmlOf(value: unknown, tag: string, depth: number, out: Written): void {
+  if (out.over) return;
+  if (++out.nodes > OPENAPI_LIMITS.bodyChars / 2 || depth > MAX_VALUE_DEPTH) { out.over = true; return; }
   const safe = /^[A-Za-z_][\w.-]*$/.test(tag) ? tag : 'item';
+  const push = (line: string): void => {
+    out.lines.push(line);
+    out.chars += line.length + 1;
+    if (out.chars > OPENAPI_LIMITS.bodyChars) out.over = true;
+  };
   if (Array.isArray(value)) { for (const item of value) xmlOf(item, safe, depth, out); return; }
   const pad = '  '.repeat(depth);
   if (isRecord(value)) {
-    out.push(`${pad}<${safe}>`);
+    push(`${pad}<${safe}>`);
     for (const key of Object.keys(value)) xmlOf(value[key], key, depth + 1, out);
-    out.push(`${pad}</${safe}>`);
+    push(`${pad}</${safe}>`);
     return;
   }
   const raw = value === null || value === undefined ? '' : String(value);
-  out.push(`${pad}<${safe}>${raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</${safe}>`);
+  push(`${pad}<${safe}>${raw.slice(0, OPENAPI_LIMITS.bodyChars).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</${safe}>`);
 }
 
 // ---- parameters ----
@@ -374,11 +435,28 @@ function chooseBody(choices: BodyChoice[]): BodyChoice | undefined {
   return choices[0];
 }
 
-/** The text of an example value for a body, shortened to what a request file can hold. */
-function jsonText(value: unknown): string {
+/** Whether a value is small enough to be written out as a body: its nodes are counted up to what a body can hold, and one that is nested too deeply is refused. */
+function fits(value: unknown, depth: number, left: { nodes: number }): boolean {
+  if (--left.nodes < 0 || depth > MAX_VALUE_DEPTH) return false;
+  if (Array.isArray(value)) { for (const item of value) if (!fits(item, depth + 1, left)) return false; return true; }
+  if (isRecord(value)) { for (const key of Object.keys(value)) if (!fits(value[key], depth + 1, left)) return false; return true; }
+  return true;
+}
+
+/**
+ * The text of an example value for a body, shortened to what a request file can hold: one that cannot fit is not written out at all (it is measured
+ * first, so that a value of megabytes costs a count and not a text), and the text of a value that many operations share is made once.
+ */
+function jsonText(doc: Document, value: unknown): string {
+  const shared = typeof value === 'object' && value !== null;
+  if (shared) { const known = doc.texts.get(value); if (known !== undefined) return known; }
+  const budget = { nodes: OPENAPI_LIMITS.bodyChars / 2 };
   let out = '';
-  try { out = JSON.stringify(value, null, 2) ?? ''; } catch { out = ''; }
-  return out.length > OPENAPI_LIMITS.bodyChars ? '' : printableText(out);
+  if (fits(value, 0, budget)) { try { out = JSON.stringify(value, null, 2) ?? ''; } catch { out = ''; } }
+  doc.work += OPENAPI_LIMITS.bodyChars / 2 - Math.max(budget.nodes, 0) + 1;
+  const text = out.length > OPENAPI_LIMITS.bodyChars ? '' : printableText(out);
+  if (shared) doc.texts.set(value, text);
+  return text;
 }
 
 /** Whether a schema says what a value could be (an example, a default, a constant, a list to choose from), and not only its type. */
@@ -467,50 +545,95 @@ function bodyChoices(context: Context, operation: Json, params: unknown[]): Body
   return types.map(type => ({ mediaType: type, schema: { type: 'object', properties, required }, example: undefined, hasExample: false }));
 }
 
-function makeBody(context: Context, choices: BodyChoice[], where: string): { body: Body; header?: KV } {
-  const choice = chooseBody(choices);
-  if (choice === undefined) return { body: { kind: 'none' } };
-  const { doc, notes } = context;
+/** A body that was made, and what is to be said about it in the notes (which does not depend on the operation, so that it can be said again for another that shares it). */
+interface BodyMade { body: Body; header?: KV; messages: string[] }
+
+function buildBody(context: Context, choice: BodyChoice): BodyMade {
+  const { doc } = context;
   const type = choice.mediaType;
   const state: Sample = { nodes: 0, truncated: false };
+  const messages: string[] = [];
   const value = (): unknown => (choice.hasExample ? choice.example : sample(doc, choice.schema, state, 0, [], true));
-  const others = choices.filter(item => item !== choice).map(item => item.mediaType);
-  if (others.length > 0) notes.add(where, `The body is also described as ${others.slice(0, 4).join(', ')}; ${type} was used.`);
-  let result: { body: Body; header?: KV };
+  let result: BodyMade;
   if (PREFERENCE[0]?.(type) === true || PREFERENCE[1]?.(type) === true) {
     const made = value();
-    const body = typeof made === 'string' && choice.hasExample ? printableText(made.slice(0, OPENAPI_LIMITS.bodyChars)) : jsonText(made);
-    result = { body: { kind: 'json', text: body } };
+    const body = typeof made === 'string' && choice.hasExample ? printableText(made.slice(0, OPENAPI_LIMITS.bodyChars)) : jsonText(doc, made);
+    result = { body: { kind: 'json', text: body }, messages };
     if (type !== 'application/json') result.header = row('Content-Type', type);
   } else if (type === 'application/x-www-form-urlencoded') {
     const fields = fieldsOf(doc, choice.schema, state).map(field => row(field.name, field.value, field.on, field.description));
-    result = { body: { kind: 'form', fields } };
+    result = { body: { kind: 'form', fields }, messages };
   } else if (type === 'multipart/form-data') {
     const parts: Part[] = fieldsOf(doc, choice.schema, state).map(field => ({ name: field.name, kind: field.file ? 'file' : 'text', value: field.file ? '' : field.value, file: '', contentType: '', enabled: field.on || field.file }));
-    if (parts.some(part => part.kind === 'file')) notes.add(where, 'Choose the files of the form in the Body tab.');
-    result = { body: { kind: 'multipart', parts } };
+    if (parts.some(part => part.kind === 'file')) messages.push('Choose the files of the form in the Body tab.');
+    result = { body: { kind: 'multipart', parts }, messages };
   } else if (PREFERENCE[4]?.(type) === true) {
     const made = value();
     let xml = '';
     if (typeof made === 'string') xml = printableText(made.slice(0, OPENAPI_LIMITS.bodyChars));
     else {
-      const lines: string[] = [];
+      const out: Written = { lines: [], chars: 0, nodes: 0, over: false };
       const schemaRoot = doc.deref(choice.schema);
       const rootName = isRecord(schemaRoot.value) && isRecord(own(schemaRoot.value, 'xml')) ? oneLine(own(own(schemaRoot.value, 'xml') as Json, 'name'), 60) : (schemaRoot.refs[0]?.split('/').pop() ?? 'root');
-      xmlOf(made, rootName === '' ? 'root' : rootName, 0, lines);
-      xml = printableText(lines.join('\n'));
+      xmlOf(made, rootName === '' ? 'root' : rootName, 0, out);
+      doc.work += out.nodes;
+      xml = out.over ? '' : printableText(out.lines.join('\n'));
     }
-    result = { body: { kind: 'xml', text: xml.length > OPENAPI_LIMITS.bodyChars ? '' : xml } };
+    result = { body: { kind: 'xml', text: xml.length > OPENAPI_LIMITS.bodyChars ? '' : xml }, messages };
     if (type !== 'application/xml') result.header = row('Content-Type', type);
   } else if (type === 'text/plain' || type.startsWith('text/')) {
     const made = value();
-    result = { body: { kind: 'text', contentType: type, text: typeof made === 'string' ? printableText(made.slice(0, OPENAPI_LIMITS.bodyChars)) : jsonText(made) } };
+    result = { body: { kind: 'text', contentType: type, text: typeof made === 'string' ? printableText(made.slice(0, OPENAPI_LIMITS.bodyChars)) : jsonText(doc, made) }, messages };
   } else {
-    notes.add(where, `The body is ${type}: choose the file in the Body tab.`);
-    result = { body: { kind: 'binary', file: '' } };
+    messages.push(`The body is ${type}: choose the file in the Body tab.`);
+    result = { body: { kind: 'binary', file: '' }, messages };
   }
-  if (state.truncated) { notes.add(where, 'The example of the body was cut: the schema is large or deeply nested.'); }
-  if (result.body.kind === 'json' && result.body.text === '' && !choice.hasExample) notes.add(where, 'The body is too large to be made from its schema; write it in the Body tab.');
+  if (state.truncated) messages.push('The example of the body was cut: the schema is large or deeply nested.');
+  if ((result.body.kind === 'json' || result.body.kind === 'xml') && result.body.text === '' && !choice.hasExample) messages.push('The body is too large to be made from its schema; write it in the Body tab.');
+  return result;
+}
+
+/**
+ * Where the body of a choice is kept once it is made: operations that share a schema (and an example) share the work, and that is the rule more than
+ * the exception, because every operation has a reference of its own to the schema, and it is what the reference points at that is the same. The form of a
+ * Swagger 2.0 operation is made up from its parameters and is made again.
+ */
+function bodyKey(doc: Document, choice: BodyChoice): { holder: object; key: string } | undefined {
+  const resolved = doc.deref(choice.schema);
+  const schema = isRecord(resolved.value) ? resolved.value : undefined;
+  let example = 'none';
+  let holder: object | undefined = schema;
+  if (choice.hasExample) {
+    if (typeof choice.example === 'object' && choice.example !== null) { example = `object ${doc.idOf(choice.example)}`; holder ??= choice.example; }
+    else if (typeof choice.example === 'string' && choice.example.length <= 200) example = `string ${choice.example}`;
+    else if (typeof choice.example === 'number' || typeof choice.example === 'boolean') example = `${typeof choice.example} ${String(choice.example)}`;
+    else return undefined;
+  }
+  if (holder === undefined) return undefined;
+  // The references that were followed are part of the key: they decide where a loop is cut and the name of the root of an XML body.
+  return { holder, key: `${choice.mediaType}\n${example}\n${schema === undefined ? 'no schema' : resolved.refs.join('>')}` };
+}
+
+function makeBody(context: Context, choices: BodyChoice[], where: string): { body: Body; header?: KV } {
+  const choice = chooseBody(choices);
+  if (choice === undefined) return { body: { kind: 'none' } };
+  const { doc, notes } = context;
+  const others = choices.filter(item => item !== choice).map(item => item.mediaType);
+  if (others.length > 0) notes.add(where, `The body is also described as ${others.slice(0, 4).join(', ')}; ${choice.mediaType} was used.`);
+  const place = bodyKey(doc, choice);
+  let made = place === undefined ? undefined : doc.bodies.get(place.holder)?.get(place.key);
+  if (made === undefined) {
+    made = buildBody(context, choice);
+    if (place !== undefined) {
+      const known = doc.bodies.get(place.holder) ?? new Map<string, BodyMade>();
+      known.set(place.key, made);
+      doc.bodies.set(place.holder, known);
+    }
+  } else doc.work++;
+  for (const message of made.messages) notes.add(where, message);
+  // A copy: the request that gets it may be changed (the credentials are moved out of it) without changing the one that another operation gets.
+  const result: { body: Body; header?: KV } = { body: structuredClone(made.body) };
+  if (made.header !== undefined) result.header = { ...made.header };
   return result;
 }
 
@@ -534,7 +657,9 @@ function makeRequest(context: Context, method: string, path: string, pathItem: J
   for (const match of path.matchAll(PATH_PARAM)) { const found = match[1] as string; if (!names.includes(found)) names.push(found); }
   for (const found of names) {
     const param = declared.get(found);
-    request.pathParams.push(row(found, param !== undefined && param.value !== '' ? param.value : `{{${found.replace(/[^A-Za-z0-9_-]+/g, '_')}}}`, true, param?.description ?? ''));
+    // "." and ".." (or the same percent-encoded) are not values: the address would lose a segment, because the URL standard removes them from a path.
+    const usable = param !== undefined && param.value !== '' && !/^(?:\.|%2e){1,2}$/i.test(param.value.trim());
+    request.pathParams.push(row(found, usable ? param.value : `{{${found.replace(/[^A-Za-z0-9_-]+/g, '_')}}}`, true, param?.description ?? ''));
   }
   const choices = bodyChoices(context, operation, [...list(own(pathItem, 'parameters')), ...list(own(operation, 'parameters'))]);
   const made = makeBody(context, choices, where);
@@ -610,7 +735,10 @@ function environments(doc: Document, version: 2 | 3, notes: Notes): ImportedEnvi
     let candidate = label === '' ? `Server ${index + 1}` : label;
     for (let count = 2; used.has(candidate); count++) candidate = `${label === '' ? `Server ${index + 1}` : label} ${count}`;
     used.add(candidate);
-    result.push({ name: candidate, vars: [{ name: 'baseUrl', value, secret: false, enabled: true }] });
+    // An address with a user name or a password in it ("https://user:password@host") is a secret like any other: its value goes to the file that Git ignores.
+    const credentials = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*@/i.test(value);
+    if (credentials) notes.add('', `The server address of ${candidate} has a user name or a password in it: baseUrl is a secret variable, so its value is kept in a file that Git ignores.`);
+    result.push({ name: candidate, vars: [{ name: 'baseUrl', value, secret: credentials, enabled: true }] });
   }
   return result;
 }
@@ -665,6 +793,7 @@ function convert(source: string): OpenApiResult {
     if (tagName === '' || folders.has(tagName)) continue;
     const folder = blankFolder(tagName);
     folder.container.docs = multiline(own(tag, 'description'));
+    doc.output += folder.container.docs.length;
     folders.set(tagName, folder);
   }
   const folderOf = (tagName: string): ImportedFolder => {
@@ -676,7 +805,7 @@ function convert(source: string): OpenApiResult {
   let operations = 0;
   let several = 0;
   let trace = 0;
-  let stopped = false;
+  let stopped: 'requests' | 'steps' | 'size' | undefined;
   if (isRecord(paths)) {
     for (const path of Object.keys(paths)) {
       if (!path.startsWith('/')) continue;
@@ -686,21 +815,28 @@ function convert(source: string): OpenApiResult {
       for (const method of METHODS) {
         const operation = doc.resolve(own(pathItem, method));
         if (!isRecord(operation)) continue;
-        if (operations >= IMPORT_LIMITS.requests) { stopped = true; break; }
+        if (operations >= IMPORT_LIMITS.requests) { stopped = 'requests'; break; }
+        // A description can lead to far more work, and far more text, than its size says: one example or one list of parameters shared by thousands of operations.
+        stopped = doc.stopReason();
+        if (stopped !== undefined) break;
         operations++;
         const where = `${method.toUpperCase()} ${oneLine(path, 100)}`;
         const request = makeRequest(context, method, path, pathItem, operation, where);
+        doc.output += requestChars(request);
         const tags = list(own(operation, 'tags')).map(item => name(item, '')).filter(item => item !== '');
         if (tags.length > 1) several++;
         (tags.length === 0 ? collection : folderOf(tags[0] as string)).requests.push(request);
       }
-      if (stopped) break;
+      if (stopped !== undefined) break;
     }
   }
   collection.folders = [...folders.values()].filter(folder => folder.requests.length > 0);
   collection.container.vars = security.vars;
 
-  if (stopped) notes.add('', `Only the first ${IMPORT_LIMITS.requests} operations were imported.`);
+  if (stopped === 'requests') notes.add('', `Only the first ${IMPORT_LIMITS.requests} operations were imported.`);
+  if (stopped === 'steps') notes.add('', `Only the first ${operations} operations were imported: the references of the description lead to far more work than its size says (a reference or an example that many operations share).`);
+  if (stopped === 'size') notes.add('', `Only the first ${operations} operations were imported: their files would hold more than ${OPENAPI_LIMITS.outputChars / (1024 * 1024)} MB, because the description shares large examples or long lists of parameters between many operations.`);
+  if (doc.tooLong > 0) notes.add('', `${doc.tooLong === 1 ? 'A reference is' : `${doc.tooLong} references are`} longer than ${OPENAPI_LIMITS.refChars} characters and ${doc.tooLong === 1 ? 'was' : 'were'} not followed.`);
   if (several > 0) notes.add('', `${several} ${several === 1 ? 'operation has' : 'operations have'} more than one tag: ${several === 1 ? 'it was' : 'each was'} put in the folder of its first tag.`);
   if (trace > 0) notes.add('', `${trace} ${trace === 1 ? 'operation uses' : 'operations use'} the TRACE method, which is not imported.`);
   if (webhooks > 0) notes.add('', `${webhooks === 1 ? 'A webhook of the description was' : `${webhooks} webhooks of the description were`} left out: they are requests that the server sends.`);
@@ -708,7 +844,11 @@ function convert(source: string): OpenApiResult {
   if (doc.unresolved.size > 0) notes.add('', `${doc.unresolved.size === 1 ? '1 reference points' : `${doc.unresolved.size} references point`} at nothing in the file (${[...doc.unresolved].slice(0, 3).join(', ')}${doc.unresolved.size > 3 ? ', ...' : ''}).`);
   if (security.vars.length > 0) notes.add('', `The credentials are variables of the collection (${security.vars.map(item => item.name).slice(0, 6).join(', ')}) with no value: fill them in; the values are kept in a file that Git ignores.`);
 
-  const imported: Imported = { collections: operations === 0 && collection.folders.length === 0 ? [] : [collection], environments: environments(doc, version, notes), notes: [], skipped: 0 };
+  // What a description gives as an example can be a real key or password ("api_key=...", a password in a body, "user:password@host"): it is moved out of the files that Git tracks.
+  const empty = operations === 0 && collection.folders.length === 0;
+  const made = empty ? undefined : protectCollection(collection);
+  if (made !== undefined && made.moved > 0) notes.add(made.collection.container.name, `${made.moved} ${made.moved === 1 ? 'credential that was' : 'credentials that were'} given as ${made.moved === 1 ? 'an example' : 'examples'} in the description ${made.moved === 1 ? 'was' : 'were'} moved to secret variables of the collection: their values are in a file next to it that Git ignores.`);
+  const imported: Imported = { collections: made === undefined ? [] : [made.collection], environments: environments(doc, version, notes), notes: [], skipped: 0 };
   imported.notes = notes.done();
   return { ok: true, imported };
 }

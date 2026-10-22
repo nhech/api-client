@@ -58,8 +58,32 @@ export function countImported(imported: Imported): ImportedCounts {
   return { collections: imported.collections.length, folders, requests, environments: imported.environments.length };
 }
 
+/** About how many characters the file of a request will hold: its text, which is what a description that shares one example between many operations multiplies. */
+export function requestChars(request: Request): number {
+  const rows = (list: readonly { name: string; value: string; description: string }[]): number => list.reduce((sum, item) => sum + item.name.length + item.value.length + item.description.length + 8, 0);
+  const body = request.body;
+  let chars = request.name.length + request.url.length + request.docs.length + rows(request.query) + rows(request.headers) + rows(request.pathParams) + 64;
+  if (body.kind === 'json' || body.kind === 'xml' || body.kind === 'text') chars += body.text.length;
+  else if (body.kind === 'form') chars += rows(body.fields);
+  else if (body.kind === 'multipart') chars += body.parts.reduce((sum, part) => sum + part.name.length + part.value.length + part.file.length + 16, 0);
+  else if (body.kind === 'graphql') chars += body.query.length + body.variables.length;
+  return chars;
+}
+
+/** About how many characters the files of an import will hold, for the sentence that asks before they are written. */
+export function importedChars(imported: Imported): number {
+  let chars = 0;
+  const visit = (folder: ImportedFolder): void => {
+    chars += folder.container.name.length + folder.container.docs.length + 64;
+    for (const request of folder.requests) chars += requestChars(request);
+    for (const child of folder.folders) visit(child);
+  };
+  for (const collection of imported.collections) visit(collection);
+  return chars;
+}
+
 /** The limits of what an importer takes from one file: more than this is not a collection that somebody made. */
-export const IMPORT_LIMITS = { requests: 20_000, folderDepth: 32, nameChars: 200, variables: 5000, notes: 200 } as const;
+export const IMPORT_LIMITS = { requests: 20_000, folderDepth: 32, nameChars: 200, variables: 5000, notes: 200, chars: 256 * 1024 * 1024 } as const;
 
 /** A note list that does not grow without end: the first ones are kept and the rest are counted. */
 export class Notes {
