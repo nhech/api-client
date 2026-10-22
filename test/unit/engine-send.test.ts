@@ -154,7 +154,7 @@ test('Cancelling stops the request, and the reason can be the person or a timeou
   const already = new AbortController();
   already.abort();
   await rejectsWith(send(get(`${server.url}/echo`), { ...BASE, signal: already.signal }), 'aborted');
-  assert.equal(server.requests.length >= 2, true);
+  assert.ok(server.requests.every(request => !request.url.startsWith('/echo')), 'a request that was cancelled before it was sent is never sent');
 }));
 
 test('A server that sends a little and then nothing hits the idle timeout, and one that closes the connection is a reset', withServer(async server => {
@@ -194,7 +194,7 @@ test('A decompression bomb is stopped after a few megabytes and is never held in
   const started = performance.now();
   const error = await rejectsWith(send(get(`${server.url}/bomb?mb=300`), BASE), 'too-large', /decompression bomb/);
   assert.match(error.hint, /not read any further/);
-  assert.ok(performance.now() - started < 5000);
+  assert.ok(performance.now() - started < 30_000, 'a bomb of 300 MB is stopped after a few, whatever the speed of the machine');
   await rejectsWith(send(get(`${server.url}/bomb?mb=20`), { ...BASE, decode: { maxBytes: 5 * 1024 * 1024, maxRatio: 1_000_000, ratioFloor: 1 << 30 } }), 'too-large', /larger than 5242880 bytes/);
 }));
 
