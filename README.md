@@ -5,7 +5,7 @@
 
 A free, **local-first API client for Visual Studio Code**. Your requests are plain files in your repository: no account, no limits on collections or requests, no telemetry, no server of ours. You write a request, press Send, and read the answer next to it. The same files are what Git shows in a pull request.
 
-The extension sends the requests **you** send, and, for a request that uses OAuth 2.0, the requests to the token server and the sign-in you configured. Nothing else leaves your machine.
+The extension sends the requests **you** send and, for a request that uses OAuth 2.0, the requests to the token server and the sign-in you configured; when you ask it to import an OpenAPI description from an address, it makes that one GET request. Nothing else leaves your machine.
 
 > Not affiliated with or endorsed by Thunder Client, Postman, REST Client, httpYac or JetBrains. The names are used only to say which data formats are read or written.
 
@@ -37,7 +37,7 @@ Vietnamese: [README.vi.md](README.vi.md).
 - **Authentication:** inherit, none, bearer, basic, API key, and **OAuth 2.0** (client credentials, password, authorization code with PKCE, refresh), with the token kept in the secret storage of VS Code.
 - **Tests and captures** as one-line rules (`status == 200`, `json $.id exists`, `token = json $.access_token`) and **JavaScript scripts before and after a request** (a subset of the `pm` API of Postman), run in a sandbox and only after you allowed the exact text.
 - **A collection runner** with passes, a pause, a CSV or JSON data file, the stop at the first failure, and a JSON and a JUnit report.
-- **Imports** from Thunder Client, Postman (collections and environments) and cURL (copy a command, paste it as a request).
+- **Imports** from an **OpenAPI or Swagger** description (a file, or the address of a program that is running), from **the routes of your own controllers** (found in the source of the workspace), from Thunder Client, from Postman (collections and environments) and from cURL (copy a command, paste it as a request).
 - **The Code tab** writes the request as cURL, PowerShell, JavaScript (fetch or axios), Python, Go, C#, PHP or Java, with the secrets left out.
 - **Cookies and history**, and, for each request, folder or collection, redirects, timeouts, TLS verification and response limits. The proxy is the one of VS Code (`http.proxy`, `http.noProxy`) or of the environment (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`).
 - **You can edit the files by hand.** *Open as Text* opens the YAML of any request, and the editor follows what you type.
@@ -150,7 +150,7 @@ A script can read every variable it is given, secrets included, and send them an
 
 ## Importing, and the `.http` copy
 
-*Import...* reads what other tools made and writes nothing until you say yes: **Thunder Client** data (collections, folders with what they set, requests, environments), **Postman** collections v2.0 and v2.1 and environments, and a **cURL** command from the clipboard. A credential that is typed into an imported request becomes a secret variable of the collection. What could not be carried over is a list of notes, one command away. Nothing an importer reads is run. See [docs/client/import.md](docs/client/import.md).
+*Import...* reads what other tools made and writes nothing until you say yes: an **OpenAPI or Swagger** description (Swagger 2.0, OpenAPI 3.0 and 3.1, JSON or YAML, from a file or fetched from an address: a folder for each tag, a request for each operation with its parameters, a body made from the example or the schema, its authentication and a status test, and the servers as environments), **the routes of the controllers** in the source of your workspace, **Thunder Client** data (collections, folders with what they set, requests, environments), **Postman** collections v2.0 and v2.1 and environments, and a **cURL** command from the clipboard. A credential that is typed into an imported request becomes a secret variable of the collection. What could not be carried over is a list of notes, one command away. Nothing an importer reads is run. See [docs/client/import.md](docs/client/import.md).
 
 Each request has a generated **`.http` copy** next to it (setting `apiClient.mirror.mode`: `on`, `off` or `gitignored`). It never holds a secret or anything the other tools would run or read; a copy you edited is never overwritten, and you can take its edits into the request, show the difference, discard them or keep the file as your own. See [docs/client/mirror.md](docs/client/mirror.md).
 

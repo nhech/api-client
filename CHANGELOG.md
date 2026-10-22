@@ -17,7 +17,7 @@ The extension is now a full API client (extension id `longtd.api-client`); the i
 - **Tests and captures** in a one-line grammar; **JavaScript scripts** (a subset of the Postman `pm` API) in QuickJS compiled to WebAssembly in a worker thread, with limits, run only after the exact text was allowed.
 - **A collection runner** (passes, pause, stop at the first failure, a CSV or JSON data file, `setNextRequest`, JSON and JUnit reports).
 - **A `.http` copy** next to each request for REST Client, httpYac and the JetBrains client, generated one way, never holding a secret or anything those tools would run, never written over once you edited it.
-- **Imports** from Thunder Client data, Postman collections (v2.0, v2.1) and environments, and cURL commands; credentials typed into an imported request become secret variables.
+- **Imports** from OpenAPI and Swagger descriptions (Swagger 2.0, OpenAPI 3.0 and 3.1, JSON or YAML, from a file or from an address: a folder for each tag, a request for each operation, bodies from examples or schemas, security schemes as authentication, servers as environments), from the routes of the controllers in the source of the workspace, from Thunder Client data, Postman collections (v2.0, v2.1) and environments, and from cURL commands; credentials typed into an imported request become secret variables.
 - **The Code tab** (cURL, PowerShell, JavaScript with fetch or axios, Python, Go, C#, PHP, Java), **cookies** and **history** (a line for each send by default; 200 entries for 30 days).
 - Security notes in `SECURITY.md` and three audits: two independent reviewers attacked the whole client, a third attacked their fixes; every finding that was fixed is covered by tests and by mutations.
 

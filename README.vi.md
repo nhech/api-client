@@ -5,7 +5,7 @@
 
 Một **API client miễn phí, ưu tiên làm việc cục bộ, cho Visual Studio Code**. Request của bạn là các file thường nằm trong repository: không tài khoản, không giới hạn số collection hay số request, không telemetry, không máy chủ của chúng tôi. Bạn viết request, bấm Gửi và đọc kết quả ngay bên cạnh. Chính những file đó là thứ Git hiển thị trong pull request.
 
-Extension chỉ gửi những request **bạn** gửi và, với request dùng OAuth 2.0, các request tới máy chủ token và trang đăng nhập bạn đã cấu hình. Không có gì khác rời khỏi máy.
+Extension chỉ gửi những request **bạn** gửi và, với request dùng OAuth 2.0, các request tới máy chủ token và trang đăng nhập bạn đã cấu hình; khi bạn nhập mô tả OpenAPI từ một địa chỉ, nó gửi đúng một request GET để lấy mô tả đó. Không có gì khác rời khỏi máy.
 
 > Không liên kết với, cũng không được Thunder Client, Postman, REST Client, httpYac hay JetBrains xác nhận. Tên chỉ dùng để chỉ định dạng dữ liệu được đọc hoặc ghi.
 
@@ -20,7 +20,7 @@ English: [README.md](README.md) (bản đầy đủ nhất).
 - **Xác thực:** kế thừa, không, bearer, basic, API key và **OAuth 2.0** (client credentials, password, authorization code có PKCE, refresh); token nằm trong secret storage của VS Code.
 - **Test và biến bắt** là các dòng quy tắc (`status == 200`, `json $.id exists`, `token = json $.access_token`) và **script JavaScript trước/sau request** (tập con của API `pm` của Postman), chạy trong sandbox và chỉ sau khi bạn cho phép đúng đoạn mã đó.
 - **Runner cho collection:** số lượt, quãng nghỉ, tệp dữ liệu CSV hoặc JSON, dừng ở lỗi đầu tiên, báo cáo JSON và JUnit.
-- **Nhập** từ Thunder Client, Postman (collection và môi trường) và cURL (chép lệnh rồi dán thành request).
+- **Nhập** từ mô tả **OpenAPI hoặc Swagger** (một file, hoặc địa chỉ của chương trình đang chạy), từ **các route trong controller của chính bạn** (dò trong mã nguồn của workspace), từ Thunder Client, Postman (collection và môi trường) và cURL (chép lệnh rồi dán thành request).
 - **Tab Code** viết request thành cURL, PowerShell, JavaScript (fetch hoặc axios), Python, Go, C#, PHP hay Java, đã bỏ các bí mật.
 
 ## Bắt đầu nhanh
@@ -63,7 +63,7 @@ Một biến có thể đánh dấu **bí mật**: giá trị nằm ở file `*.
 
 - **Script** chạy trong QuickJS biên dịch ra WebAssembly, trong một worker thread, với giới hạn thời gian, bộ nhớ, đầu ra và số lệnh gọi. Một script đọc được mọi biến nó được đưa, kể cả bí mật, và gửi đi đâu cũng được, nên **không có gì chạy cho đến khi bạn đồng ý đúng đoạn mã đó**; mỗi thay đổi (pull, đổi nhánh, sửa) hỏi lại, và nhập dữ liệu không bao giờ cấp quyền. Xem [docs/client/scripts.md](docs/client/scripts.md).
 - **Runner** (*Run Collection or Folder*) chạy request theo thứ tự thanh bên, hiện từng kết quả và lưu báo cáo JSON hoặc JUnit. Xem [docs/client/runner.md](docs/client/runner.md).
-- **Nhập** (*Import...*) đọc dữ liệu của công cụ khác và không ghi gì đến khi bạn đồng ý; thông tin xác thực gõ trong request nhập vào trở thành biến bí mật của collection. Xem [docs/client/import.md](docs/client/import.md). Công cụ chuyển Thunder Client thẳng ra file `.http` (lệnh và dòng lệnh) vẫn còn: [docs/converter.md](docs/converter.md).
+- **Nhập** (*Import...*) đọc mô tả OpenAPI hoặc Swagger (một thư mục cho mỗi tag, một request cho mỗi operation, môi trường cho mỗi server), các route trong controller của bạn, và dữ liệu của công cụ khác, và không ghi gì đến khi bạn đồng ý; thông tin xác thực gõ trong request nhập vào trở thành biến bí mật của collection. Xem [docs/client/import.md](docs/client/import.md). Công cụ chuyển Thunder Client thẳng ra file `.http` (lệnh và dòng lệnh) vẫn còn: [docs/converter.md](docs/converter.md).
 
 ## An toàn
 

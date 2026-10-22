@@ -2,7 +2,7 @@
 
 A free, **local-first API client for VS Code**. Your requests are plain files in your repository: no account, no limits on collections or requests, no telemetry, no server of ours. Write a request, press Send, read the answer next to it, and review the same files in a pull request.
 
-The extension sends the requests **you** send and, for a request that uses OAuth 2.0, the requests to the token server and the sign-in you configured. Nothing else leaves your machine.
+The extension sends the requests **you** send and, for a request that uses OAuth 2.0, the requests to the token server and the sign-in you configured; when you import an OpenAPI description from an address, it makes that one GET request. Nothing else leaves your machine.
 
 ![A request and its answer side by side, with the collections, environments and history in the side bar](https://raw.githubusercontent.com/nhech/api-client/main/docs/images/request-dark.png)
 
@@ -25,7 +25,7 @@ The extension sends the requests **you** send and, for a request that uses OAuth
 - **Authentication:** inherit, none, bearer, basic, API key and **OAuth 2.0** (client credentials, password, authorization code with PKCE, refresh). Tokens live in the secret storage of VS Code.
 - **Tests and captures** in one line each (`status == 200`, `json $.id exists`, `token = json $.access_token`), and **JavaScript scripts** before and after a request (a subset of the Postman `pm` API) in a sandbox, only after you allowed the exact text.
 - **A collection runner** with passes, a pause, a CSV or JSON data file and a JSON or JUnit report.
-- **Imports** from Thunder Client, Postman (collections and environments) and cURL.
+- **Imports** from OpenAPI and Swagger (a file, or the address of a program that is running), from the routes of your own controllers, from Thunder Client, from Postman (collections and environments) and from cURL.
 - **The Code tab:** the request as cURL, PowerShell, JavaScript (fetch or axios), Python, Go, C#, PHP or Java, with the secrets left out.
 - **Cookies**, **history** (on this computer, a line for each send by default) and per-request settings for redirects, timeouts and TLS verification.
 
