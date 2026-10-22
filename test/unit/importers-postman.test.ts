@@ -45,6 +45,24 @@ test('A collection keeps its folders, its requests and their order', () => {
   assert.deepEqual(imported.notes, []);
 });
 
+test('The lines of a body, a script, a description and a GraphQL query stay lines; hidden characters in them are made visible', () => {
+  const rlo = String.fromCodePoint(0x202e);
+  const imported = parse(wrap([
+    { name: 'Docs', description: 'Line one\nLine two', item: [
+      req('Raw', { method: 'POST', url: 'https://api.test/a', description: { content: 'First\r\nSecond', type: 'text/markdown' }, body: { mode: 'raw', raw: `{\n  "a": 1,\n  "b": "x${rlo}y"\n}`, options: { raw: { language: 'json' } } } },
+        { event: [{ listen: 'prerequest', script: { exec: 'const a = 1;\nconst b = 2;' } }, { listen: 'test', script: { exec: ['pm.test("ok", () => {', '  pm.response.to.be.ok;', '});'] } }] }),
+      req('Graph', { method: 'POST', url: 'https://api.test/g', body: { mode: 'graphql', graphql: { query: '{\n  me {\n    id\n  }\n}', variables: '{\n  "a": 1\n}' } } })
+    ] }
+  ]));
+  const folder = imported.collections[0]?.folders[0];
+  assert.equal(folder?.container.docs, 'Line one\nLine two');
+  const [raw, graph] = folder?.requests ?? [];
+  assert.equal(raw?.docs, 'First\nSecond');
+  assert.deepEqual(raw?.body, { kind: 'json', text: '{\n  "a": 1,\n  "b": "x?y"\n}' });
+  assert.deepEqual(raw?.scripts, { pre: 'const a = 1;\nconst b = 2;', post: 'pm.test("ok", () => {\n  pm.response.to.be.ok;\n});' });
+  assert.deepEqual(graph?.body, { kind: 'graphql', query: '{\n  me {\n    id\n  }\n}', variables: '{\n  "a": 1\n}' });
+});
+
 test('The address is read from a string, from its raw text, or from its parts', () => {
   const imported = parse(wrap([
     req('String', 'https://api.test/s?a=1'),

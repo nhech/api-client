@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compareCodePoints, isHiddenChar, isUnsafeInName, printable } from '../../src';
+import { printableText } from '../../src/util/chars';
 
 /** Invisible and direction-changing characters are built from numbers: they must not appear in this source either. */
 const cp = (...codes: number[]) => String.fromCodePoint(...codes);
@@ -8,6 +9,16 @@ const cp = (...codes: number[]) => String.fromCodePoint(...codes);
 test('Hidden characters are the controls, zero-width characters, the line and paragraph separators, direction controls and the byte order mark', () => {
   for (const code of [0x00, 0x1f, 0x7f, 0x85, 0x9f, 0x200b, 0x200f, 0x2028, 0x2029, 0x202a, 0x202e, 0x2066, 0x2069, 0xfeff, 0xad, 0x34f, 0x61c, 0x115f, 0x1160, 0x3164, 0xffa0, 0x180e, 0x2060, 0x2064, 0x206a, 0x206f, 0xfff9, 0xfffb, 0xe0000, 0xe0041, 0xe007f]) assert.equal(isHiddenChar(cp(code)), true, `U+${code.toString(16)}`);
   for (const code of [0x20, 0x41, 0xa0, 0xe9, 0x2010, 0x202f, 0x1f600, 0xfe0f, 0x2764, 0x3042, 0xe0080, 0x2065]) assert.equal(isHiddenChar(cp(code)), false, `U+${code.toString(16)}`);
+});
+
+test('printableText() keeps the lines of a text (every kind of line break is one LF, a tab stays) and makes the other hidden characters visible', () => {
+  assert.equal(printableText('{\r\n  "a": 1\r\n}'), '{\n  "a": 1\n}');
+  assert.equal(printableText('a\rb' + cp(0x85) + 'c' + cp(0x2028) + 'd' + cp(0x2029) + 'e'), 'a\nb\nc\nd\ne');
+  assert.equal(printableText('x\ty\nz'), 'x\ty\nz');
+  assert.equal(printableText('a' + cp(0x202e) + 'b' + cp(0x07) + 'c' + cp(0xfeff) + cp(0x200b) + '\n'), 'a?b?c??\n');
+  assert.equal(printableText(cp(0xe9) + cp(0x1f600)), cp(0xe9) + cp(0x1f600), 'ordinary text that is not ASCII is left alone');
+  assert.equal(printableText(''), '');
+  assert.equal(printable('a\nb'), 'a?b', 'printable is for one line');
 });
 
 test('A name may not keep the punctuation of Windows file names or any hidden character', () => {

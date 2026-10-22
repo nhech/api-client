@@ -41,6 +41,19 @@ export function printable(text: string): string {
   return Array.from(text, char => (isHiddenChar(char) ? '?' : char)).join('');
 }
 
+/** Every kind of line break: CR LF, CR, NEL and the separators of Unicode. */
+const LINE_BREAKS = new RegExp(`\\r\\n?|[${String.fromCodePoint(0x85, 0x2028, 0x2029)}]`, 'g');
+
+/**
+ * Text that has lines (a body, a script, a description): the line breaks (every kind is one `\n`) and the tabs stay, and every other hidden or
+ * direction-changing character becomes "?". `printable` is for one line: it would turn the line breaks into "?" as well.
+ */
+export function printableText(text: string): string {
+  const lines = text.replace(LINE_BREAKS, '\n');
+  if (!NOT_PRINTABLE_ASCII.test(lines)) return lines;
+  return Array.from(lines, char => (char === '\n' || char === '\t' ? char : isHiddenChar(char) ? '?' : char)).join('');
+}
+
 /**
  * A name from the data as it may appear in a report: hidden characters made visible, cut to `max` characters, and a
  * placeholder when there is no name. Names are shown; values never are.

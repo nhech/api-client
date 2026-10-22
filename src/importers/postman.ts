@@ -2,7 +2,7 @@ import { SECRET_VARIABLE } from '../convert/secrets';
 import { hasLiteral, splitVariables } from '../convert/text';
 import { DYNAMIC_WORDS } from '../core/vars';
 import { newAuth, type Auth, type Body, type Container, type KV, type Part, type Request, type SettingsOverride, type Var } from '../core/model';
-import { printable } from '../util/chars';
+import { printable, printableText } from '../util/chars';
 import { protectCollection } from './credentials';
 import { blankFolder, blankRequest, IMPORT_LIMITS, Notes, type Imported, type ImportedEnvironment, type ImportedFolder } from './types';
 import { row, splitUrl } from './url';
@@ -24,6 +24,8 @@ type Json = Record<string, unknown>;
 const isRecord = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
 const own = (record: Json, key: string): unknown => (Object.hasOwn(record, key) ? record[key] : undefined);
 const text = (value: unknown, limit = 100_000): string => (typeof value === 'string' ? printable(value.length > limit ? value.slice(0, limit) : value) : typeof value === 'number' || typeof value === 'boolean' ? String(value) : '');
+/** Text that has lines (a body, a script, a description): the line breaks stay, which `text` would turn into question marks. */
+const lines = (value: unknown, limit = 100_000): string => (typeof value === 'string' ? printableText(value.length > limit ? value.slice(0, limit) : value) : text(value, limit));
 const flag = (value: unknown): boolean => value === true;
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const name = (value: unknown, fallback: string): string => {
@@ -31,7 +33,7 @@ const name = (value: unknown, fallback: string): string => {
   return shown === '' ? fallback : shown;
 };
 /** A description is a string or `{ content, type }`. */
-const description = (value: unknown): string => (isRecord(value) ? text(own(value, 'content')) : text(value));
+const description = (value: unknown): string => (isRecord(value) ? lines(own(value, 'content')) : lines(value));
 const baseName = (path: string): string => path.split(/[\\/]/).filter(part => part !== '').pop() ?? '';
 
 /** The variables of a text, with Postman's dynamic variables written the way the client knows them; the others are counted by name. */
@@ -112,7 +114,7 @@ function readEvents(raw: unknown, context: Context): { pre: string; post: string
     const script = own(event, 'script');
     if (!isRecord(script)) continue;
     const exec = own(script, 'exec');
-    const code = (Array.isArray(exec) ? exec.map(line => text(line, 10_000)).join('\n') : text(exec)).trim();
+    const code = (Array.isArray(exec) ? exec.map(line => lines(line, 10_000)).join('\n') : lines(exec)).trim();
     if (code === '') continue;
     const listen = text(own(event, 'listen'), 20);
     if (listen === 'prerequest') pre.push(code);
@@ -165,7 +167,7 @@ function readBody(raw: unknown, headers: readonly KV[], where: string, context: 
   const mode = text(own(raw, 'mode'), 20);
   const type = (headers.find(header => header.enabled && header.name.toLowerCase() === 'content-type')?.value ?? '').toLowerCase();
   if (mode === 'raw') {
-    const content = dyn(context, text(own(raw, 'raw')));
+    const content = dyn(context, lines(own(raw, 'raw')));
     if (content.trim() === '') return { kind: 'none' };
     const options = own(raw, 'options');
     const rawOptions = isRecord(options) ? own(options, 'raw') : undefined;
@@ -206,7 +208,7 @@ function readBody(raw: unknown, headers: readonly KV[], where: string, context: 
     const graphql = own(raw, 'graphql');
     if (!isRecord(graphql)) return { kind: 'none' };
     const variables = own(graphql, 'variables');
-    return { kind: 'graphql', query: dyn(context, text(own(graphql, 'query'))), variables: dyn(context, typeof variables === 'string' ? text(variables) : isRecord(variables) ? JSON.stringify(variables) : '') };
+    return { kind: 'graphql', query: dyn(context, lines(own(graphql, 'query'))), variables: dyn(context, typeof variables === 'string' ? lines(variables) : isRecord(variables) ? JSON.stringify(variables) : '') };
   }
   if (mode !== '') context.notes.add(where, `A body of the kind ${printable(mode)} is not supported: the request was imported without a body.`);
   return { kind: 'none' };
