@@ -3,7 +3,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <title>HTTP Files Importer social card</title>
+  <title>API Client social card</title>
   <link rel="stylesheet" href="../styles.css">
   <style>
     html,
@@ -159,33 +159,34 @@
     <div class="og-copy">
       <div class="og-brand">
         <img src="../favicon.svg" width="68" height="68" alt="">
-        <span class="og-brand-name">HTTP Files Importer</span>
+        <span class="og-brand-name">API Client</span>
       </div>
-      <h1 class="og-title">Thunder&nbsp;Client requests, as plain <code>.http</code> files.</h1>
-      <p class="og-lead">For REST Client, httpYac and JetBrains. Local only, secrets out of Git.</p>
+      <h1 class="og-title">Requests from VS&nbsp;Code, kept as <code>plain files</code>.</h1>
+      <p class="og-lead">A free API client. No account, no limits, secrets out of Git.</p>
     </div>
 
     <div class="og-foot">
       <strong>api-client.longtd.me</strong>
-      <span>MIT · Node.js 22+</span>
+      <span>MIT · VS Code</span>
     </div>
 
     <div class="og-shot">
       <div class="window-bar"><span></span><span></span><span></span></div>
-      <p class="og-file">Pet Store/Pets.http</p>
-<pre><code><span class="tk-c">### Create pet</span>
-<span class="tk-c"># @name Create_pet</span>
-<span class="tk-d"># @capture petId = json $.id</span>
-<span class="tk-d"># @assert status == 201</span>
-<span class="tk-m">POST</span> <span class="tk-v">{{baseUrl}}</span>/pets
-Accept: application/json
-Content-Type: application/json
-Authorization: Bearer <span class="tk-v">{{petstore_token}}</span>
-
-{
-  "name": "Rex",
-  "tag": "dog"
-}</code></pre>
+      <p class="og-file">api-client/collections/petstore/create-pet.req.yml</p>
+<pre><code><span class="tk-d">name:</span> Create pet
+<span class="tk-d">method:</span> <span class="tk-m">POST</span>
+<span class="tk-d">url:</span> '<span class="tk-v">{{baseUrl}}</span>/pets'
+<span class="tk-d">auth:</span>
+  <span class="tk-d">kind:</span> bearer
+  <span class="tk-d">token:</span> '<span class="tk-v">{{token}}</span>'
+<span class="tk-d">body:</span>
+  <span class="tk-d">kind:</span> json
+  <span class="tk-d">text:</span> |-
+    {
+      "name": "Rex"
+    }
+<span class="tk-d">tests:</span>
+  - <span class="tk-d">expr:</span> status == 201</code></pre>
     </div>
   </div>
 </body>

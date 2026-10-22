@@ -728,8 +728,9 @@ html:not(.js) .theme-toggle {
 }
 
 .window img {
+  display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  height: auto;
 }
 
 .hero-shot figcaption {
@@ -1617,63 +1618,7 @@ td:nth-child(2) {
   }
 }
 
-/* ---------- Before and after (the example under the hero) ---------- */
-.convert {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  background: var(--code-bg);
-}
-
-@media (min-width: 860px) {
-  .convert { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-.convert-pane {
-  min-width: 0;
-}
-
-.convert-pane + .convert-pane {
-  border-top: 1px solid var(--border);
-}
-
-@media (min-width: 860px) {
-  .convert-pane + .convert-pane {
-    border-top: 0;
-    border-left: 1px solid var(--border);
-  }
-}
-
-.convert-label {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.15rem 0.75rem;
-  margin: 0;
-  padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  font: 650 0.8125rem/1.3 var(--font-sans);
-  letter-spacing: 0;
-}
-
-.convert-file {
-  color: var(--text-subtle);
-  font: 400 0.8125rem/1.3 var(--font-mono);
-  overflow-wrap: anywhere;
-}
-
-.convert-code {
-  overflow-x: auto;
-}
-
-.convert-code pre {
-  margin: 0;
-  padding: 1rem;
-  color: var(--text);
-  font-size: 0.8125rem;
-  line-height: 1.65;
-  tab-size: 2;
-}
-
+/* ---------- Colours of the code samples ---------- */
 .tk-c { color: var(--text-subtle); }
 .tk-d { color: var(--accent); }
 .tk-m { color: var(--accent-strong); font-weight: 650; }
@@ -1688,6 +1633,19 @@ td:nth-child(2) {
   .btn-header {
     display: none;
   }
+}
+
+/* The numbered steps inside an install card. */
+.steps-mini {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+  font-size: var(--step--1);
+  line-height: 1.6;
+}
+
+.steps-mini li + li {
+  margin-top: 0.35rem;
 }
 
 /* ---------- Hero: trust badges and the preview note ---------- */

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{NAME}}: move Thunder Client requests to plain .http files</title>
-  <meta name="description" content="Convert Thunder Client collections and environments into plain .http files for REST Client, httpYac and JetBrains. Local only, with secrets kept out of Git.">
+  <title>{{NAME}}: a free API client for VS Code, with requests in plain files</title>
+  <meta name="description" content="A free API client for VS Code. Requests are plain files in your repository, with environments, OAuth 2.0, tests, scripts and a runner. No account.">
   <link rel="canonical" href="{{SITE_URL}}">
   <meta name="robots" content="index, follow">
   <meta name="author" content="longtd">
@@ -15,18 +15,18 @@
   <meta property="og:site_name" content="{{NAME}}">
   <meta property="og:locale" content="en_US">
   <meta property="og:url" content="{{SITE_URL}}">
-  <meta property="og:title" content="{{NAME}}: move Thunder Client requests to plain .http files">
-  <meta property="og:description" content="Convert Thunder Client collections and environments into plain .http files for REST Client, httpYac and JetBrains. Local only, with secrets kept out of Git.">
+  <meta property="og:title" content="{{NAME}}: a free API client for VS Code, with requests in plain files">
+  <meta property="og:description" content="A free API client for VS Code. Requests are plain files in your repository, with environments, OAuth 2.0, tests, scripts and a runner. No account.">
   <meta property="og:image" content="{{SITE_URL}}og.jpg">
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="{{NAME}}: a Thunder Client request on the left and the plain .http file the importer writes from it on the right.">
+  <meta property="og:image:alt" content="{{NAME}}: a request file of the client on the right, and the free API client for VS Code that sends it.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{{NAME}}: move Thunder Client requests to plain .http files">
-  <meta name="twitter:description" content="Convert Thunder Client collections and environments into plain .http files for REST Client, httpYac and JetBrains. Local only, with secrets kept out of Git.">
+  <meta name="twitter:title" content="{{NAME}}: a free API client for VS Code, with requests in plain files">
+  <meta name="twitter:description" content="A free API client for VS Code. Requests are plain files in your repository, with environments, OAuth 2.0, tests, scripts and a runner. No account.">
   <meta name="twitter:image" content="{{SITE_URL}}og.jpg">
-  <meta name="twitter:image:alt" content="{{NAME}}: a Thunder Client request on the left and the plain .http file the importer writes from it on the right.">
+  <meta name="twitter:image:alt" content="{{NAME}}: a request file of the client on the right, and the free API client for VS Code that sends it.">
 
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -47,18 +47,18 @@
     "@context": "https://schema.org",
     "@type": ["SoftwareApplication", "SoftwareSourceCode"],
     "name": "{{NAME}}",
-    "description": "Convert Thunder Client collections and environments into plain .http files for REST Client, httpYac and the JetBrains HTTP Client.",
+    "description": "A free, local-first API client for Visual Studio Code: requests are plain files in your repository, with environments, OAuth 2.0, tests, scripts and a collection runner.",
     "applicationCategory": "DeveloperApplication",
-    "applicationSubCategory": "Command line tool and Visual Studio Code extension",
+    "applicationSubCategory": "Visual Studio Code extension",
     "softwareVersion": "{{VERSION}}",
-    "softwareRequirements": "Node.js {{NODE_MINIMUM}} or newer for the command line; Visual Studio Code {{VSCODE_MINIMUM}} or newer for the extension",
+    "softwareRequirements": "Visual Studio Code {{VSCODE_MINIMUM}} or newer",
     "url": "{{SITE_URL}}",
     "image": "{{SITE_URL}}og.jpg",
     "screenshot": [
-      "{{SITE_URL}}img/panel-review.png",
-      "{{SITE_URL}}img/panel-source.png",
-      "{{SITE_URL}}img/panel-done.png",
-      "{{SITE_URL}}img/explorer-view.png"
+      "{{SITE_URL}}img/hero.png",
+      "{{SITE_URL}}img/tests.png",
+      "{{SITE_URL}}img/scripts.png",
+      "{{SITE_URL}}img/runner.png"
     ],
     "license": "{{REPO_URL}}/blob/main/LICENSE",
     "codeRepository": "{{REPO_URL}}",
@@ -103,9 +103,10 @@
       <nav id="site-nav" class="site-nav" aria-label="Primary">
         <ul>
           <li><a href="#features">Features</a></li>
-          <li><a href="#how-it-works">How it works</a></li>
+          <li><a href="#import">Import</a></li>
           <li><a href="#screenshots">Screenshots</a></li>
-          <li><a href="#output">Output</a></li>
+          <li><a href="#files">Files</a></li>
+          <li><a href="#trust">Safety</a></li>
           <li><a href="#get-started">Get started</a></li>
           <li><a href="#faq">FAQ</a></li>
         </ul>
@@ -131,9 +132,9 @@
         <div class="hero-copy">
           <h1 id="hero-title" class="hero-title">
             <span class="hero-name">{{NAME}}<span class="sr-only">:</span></span>
-            <span class="hero-headline">Thunder&nbsp;Client requests, as plain&nbsp;<code>.http</code> files.</span>
+            <span class="hero-headline">Send requests from VS&nbsp;Code. Keep them as plain&nbsp;files.</span>
           </h1>
-          <p class="hero-lead">Convert collections, folders and environments into files that open in REST&nbsp;Client, httpYac and the JetBrains HTTP&nbsp;Client.</p>
+          <p class="hero-lead">A free API client with the answer next to the request: collections, environments, OAuth&nbsp;2.0, tests, scripts and a runner. No account, no limits, nothing to sync.</p>
           <div class="cta-row">
             <!-- unlisted --><a class="btn btn-primary" href="#get-started">
               <svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 3.75v10.5M7.75 10 12 14.25 16.25 10M4.75 15.5v2.75a2 2 0 0 0 2 2h10.5a2 2 0 0 0 2-2V15.5"/></svg>
@@ -148,11 +149,11 @@
             </a>
           </div>
           <ul class="trust-row" role="list" aria-label="What to expect">
-            <li><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Local only: no account, no network, no telemetry</li>
-            <li><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Secrets stay out of Git</li>
+            <li><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>No account and no telemetry: only the requests you send leave your machine</li>
+            <li><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Requests are files that Git can diff</li>
             <li><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Free and MIT licensed</li>
           </ul>
-          <!-- unlisted --><p class="hero-note">Preview: not on npm or the Marketplace yet. <a href="#get-started">Build it from a clone</a>.</p><!-- /unlisted -->
+          <!-- unlisted --><p class="hero-note">Preview: not on the Marketplace yet. <a href="#get-started">Build it from a clone</a>.</p><!-- /unlisted -->
           <!-- listed --><div class="hero-install">
             <p class="hero-install-label" id="hero-install-label">Or in VS&nbsp;Code, press <span class="nowrap"><kbd>Ctrl</kbd>+<kbd>P</kbd></span> <span class="nowrap">(<kbd>⌘</kbd><kbd>P</kbd> on macOS)</span>, paste this and press Enter:</p>
             <div class="code-block" role="group" aria-labelledby="hero-install-label">
@@ -163,8 +164,7 @@
           <ul class="meta-row" role="list" aria-label="Project details">
             <li>Version {{VERSION}} (preview)</li>
             <li>MIT</li>
-            <li>Node.js {{NODE_MINIMUM}}+</li>
-            <li>VS&nbsp;Code {{VSCODE_MINIMUM}}+ for the extension</li>
+            <li>VS&nbsp;Code {{VSCODE_MINIMUM}}+</li>
             <li>Windows, macOS, Linux</li>
             <li><a href="{{REPO_URL}}/blob/main/CHANGELOG.md">Changelog</a></li>
           </ul>
@@ -173,56 +173,10 @@
         <figure class="hero-shot">
           <div class="window">
             <div class="window-bar" aria-hidden="true"><span></span><span></span><span></span></div>
-            <div class="convert">
-              <section class="convert-pane" aria-labelledby="convert-before">
-                <h2 class="convert-label" id="convert-before">Thunder Client <span class="convert-file">collections/tc_col_pet-store.json</span></h2>
-                <div class="convert-code" role="region" aria-labelledby="convert-before" tabindex="0">
-<pre><code>{
-  "colName": "Pet Store",
-  "settings": {
-    "auth": { "type": "bearer", "bearer": "{{petstore_token}}" },
-    "options": { "baseUrl": "{{baseUrl}}" }
-  },
-  "requests": [{
-    "name": "Create pet",
-    "method": "POST",
-    "url": "/pets",
-    "headers": [],
-    "body": { "type": "json",
-      "raw": ["{", "  \"name\": \"Rex\",", "  \"tag\": \"dog\"", "}"] },
-    "tests": [
-      { "type": "res-code", "action": "equal", "value": "201" },
-      { "type": "json-query", "custom": "json.id",
-        "action": "istype", "value": "number" },
-      { "type": "set-env-var", "custom": "json.id",
-        "action": "setto", "value": "{{petId}}" }
-    ]
-  }]
-}</code></pre>
-                </div>
-              </section>
-              <section class="convert-pane" aria-labelledby="convert-after">
-                <h2 class="convert-label" id="convert-after">Plain .http <span class="convert-file">Pet Store/Pets.http</span></h2>
-                <div class="convert-code" role="region" aria-labelledby="convert-after" tabindex="0">
-<pre><code><span class="tk-c">### Create pet</span>
-<span class="tk-c"># @name Create_pet</span>
-<span class="tk-d"># @capture petId = json $.id</span>
-<span class="tk-d"># @assert status == 201</span>
-<span class="tk-d"># @assert json $.id isNumber</span>
-<span class="tk-m">POST</span> <span class="tk-v">{{baseUrl}}</span>/pets
-Accept: application/json
-Content-Type: application/json
-Authorization: Bearer <span class="tk-v">{{petstore_token}}</span>
-
-{
-  "name": "Rex",
-  "tag": "dog"
-}</code></pre>
-                </div>
-              </section>
-            </div>
+            <img src="img/hero.png" width="1400" height="830" fetchpriority="high" decoding="async"
+              alt="API Client in VS Code, dark theme: the collections and environments in the side bar, a GET request for available pets on the left, and its answer on the right, 200 OK in 6 ms with all 4 tests passed and the JSON body">
           </div>
-          <figcaption>Made-up data. The request on the left, trimmed, and the file the importer wrote from it on the right, unedited. The base URL and the token come from the collection settings; the three tests became <code>@assert</code> and <code>@capture</code> comment lines.</figcaption>
+          <figcaption>Made-up data in a demo workspace. The collections and the environment in the side bar, the request in the editor, and the answer beside it with its tests. Everything on the left is a file in the repository.</figcaption>
         </figure>
       </div>
     </section>
@@ -231,123 +185,123 @@ Authorization: Bearer <span class="tk-v">{{petstore_token}}</span>
       <div class="container">
         <header class="section-head reveal">
           <p class="eyebrow">Features</p>
-          <h2 id="features-title">Your requests, in files you own</h2>
-          <p class="section-lead">The importer reads Thunder Client data from disk and writes ordinary text files. Nothing is sent anywhere and nothing is run.</p>
+          <h2 id="features-title">What you need every day, without the account</h2>
+          <p class="section-lead">An API client that lives in your editor and keeps what you write in your repository: no sign-in, no cap on collections or requests, no cloud to fall behind.</p>
         </header>
 
         <div class="feature-grid">
           <article class="card feature reveal">
+            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="3.75" y="5" width="16.5" height="14" rx="2"/><path d="M3.75 9.5h16.5M12 9.5V19"/></svg></span>
+            <h3>The answer beside the request</h3>
+            <p>One editor for the request, one pane for what came back.</p>
+            <ul class="ticks" role="list">
+              <li>Query, Headers, Auth, Body (JSON, text, XML, form, multipart, GraphQL, a file), Scripts, Tests, Settings, Docs and Code</li>
+              <li>The body pretty or raw, pictures too, headers, cookies, tests, the console of your scripts, the request as it was sent, and a timeline of the phases</li>
+              <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> sends; variables are marked known, unknown or dynamic as you type</li>
+            </ul>
+          </article>
+
+          <article class="card feature reveal" style="--i: 1">
             <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M3.75 6.75a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h7.5a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5z"/></svg></span>
-            <h3>Reads your data directly</h3>
-            <p>Read-only, from the folder Thunder Client keeps on your disk.</p>
+            <h3>Collections, folders, environments</h3>
+            <p>Native trees in the side bar, with drag and drop, rename, duplicate, move and filter.</p>
             <ul class="ticks" role="list">
-              <li>The v4 layout, the older v3 layout and exported <code>.json</code> files</li>
-              <li>No sign-in and no Thunder Client process needed</li>
-              <li>Never follows a link out of the folder; limits on file size, count, nesting and string length</li>
-            </ul>
-          </article>
-
-          <article class="card feature reveal" style="--i: 1">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M6 4.5v14M6 8h6M6 18.5h6"/><rect x="12.5" y="5.5" width="6.5" height="5" rx="1"/><rect x="12.5" y="16" width="6.5" height="5" rx="1"/></svg></span>
-            <h3>Folders, order and inheritance</h3>
-            <p>One folder per collection, one file per folder, in the order Thunder Client shows them.</p>
-            <ul class="ticks" role="list">
-              <li>Headers, authentication, base URL and tests set on a collection or folder are written into each request, as Thunder Client applies them</li>
-              <li>Disabled parameters and headers stay as comments</li>
-              <li>Path and query parameters, JSON, text, XML, form, multipart and GraphQL bodies</li>
-            </ul>
-          </article>
-
-          <article class="card feature reveal" style="--i: 2">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg></span>
-            <h3>Secrets stay out of Git</h3>
-            <p>Literal tokens, passwords and keys become <code>{{variables}}</code>.</p>
-            <ul class="ticks" role="list">
-              <li>Their values go to a private file that is added to <code>.gitignore</code> first and written with mode <code>0600</code></li>
-              <li>Encrypted variables are never decrypted: an empty entry waits for you to fill it in</li>
-              <li>Reports and logs name secrets, never show them</li>
-            </ul>
-          </article>
-
-          <article class="card feature reveal">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M4 8h13M13.5 4.5 17 8l-3.5 3.5M20 16H7M10.5 12.5 7 16l3.5 3.5"/></svg></span>
-            <h3>Written for the tool you use</h3>
-            <p>REST Client, httpYac or the JetBrains HTTP Client: pick one with <code>--target</code>.</p>
-            <ul class="ticks" role="list">
-              <li>Dynamic variables such as <code>{{#guid}}</code> are spelled the way each tool reads them</li>
-              <li>Environment files for httpYac and JetBrains</li>
-              <li>For REST Client, the VS Code command also fills in the REST Client settings for you</li>
-            </ul>
-          </article>
-
-          <article class="card feature reveal" style="--i: 1">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
-            <h3>Tests become comments</h3>
-            <p>Assertions and captured values survive, as lines every tool ignores.</p>
-            <ul class="ticks" role="list">
-              <li>Thunder Client tests become <code># @assert</code> lines and <code>set-env-var</code> becomes <code># @capture</code></li>
-              <li>Scripts are kept as comments and never run</li>
-              <li>There is no runtime for these lines in this project yet</li>
+              <li>A folder or a collection sets what its requests share: base address, headers, authentication, variables, tests, scripts, settings; the nearest wins</li>
+              <li>Environments with secret values; pick one in the status bar</li>
+              <li>Follows your theme and your keyboard: it is the same VS&nbsp;Code, not a web page inside it</li>
             </ul>
           </article>
 
           <article class="card feature reveal" style="--i: 2">
             <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M7 3.75h7.5l3.5 3.5v13H7z"/><path d="M14.5 3.75v3.5H18M9.5 12h5M9.5 15.5h5"/></svg></span>
-            <h3>A report of what happened</h3>
-            <p>Every run says what was imported, what was left out and why.</p>
+            <h3>Requests are files</h3>
+            <p>One YAML file per request, in your repository, readable in a pull request.</p>
             <ul class="ticks" role="list">
-              <li><code>IMPORT_REPORT.md</code> lists names and places only, never a value, so it is safe to commit</li>
-              <li>Every finding has a stable <code>TC-…</code> code</li>
-              <li>OAuth&nbsp;2.0, AWS, digest, NTLM and WebSocket, SSE and gRPC requests are named, not guessed</li>
+              <li>Bodies and scripts as blocks, the order of a folder in its file: a change is a few lines</li>
+              <li>Edit by hand if you like (<em>Open as Text</em>); the editor follows</li>
+              <li>A generated <code>.http</code> copy next to each request for REST Client, httpYac and the JetBrains client</li>
+            </ul>
+          </article>
+
+          <article class="card feature reveal">
+            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><circle cx="8.5" cy="12" r="3.5"/><path d="M12 12h8M17 12v3M20 12v2"/></svg></span>
+            <h3>Authentication, with OAuth 2.0</h3>
+            <p>Set it once on the collection; requests inherit it.</p>
+            <ul class="ticks" role="list">
+              <li>Bearer, basic, API key, and OAuth 2.0: client credentials, password, authorization code with PKCE, refresh</li>
+              <li>Tokens are kept in the secret storage of VS&nbsp;Code, never in a file</li>
+              <li>You are asked before credentials go to a token server for the first time</li>
+            </ul>
+          </article>
+
+          <article class="card feature reveal" style="--i: 1">
+            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+            <h3>Tests, captures and scripts</h3>
+            <p>Check the answer, keep a value for the next request, or write JavaScript.</p>
+            <ul class="ticks" role="list">
+              <li>One-line rules: <code>status == 200</code>, <code>json $.id exists</code>, <code>token = json $.access_token</code></li>
+              <li>Scripts before and after a request, in a sandbox (a subset of the Postman <code>pm</code> API), and <strong>only after you allowed the exact text</strong></li>
+              <li>Variables that scripts set stay in memory and are never written to a file</li>
+            </ul>
+          </article>
+
+          <article class="card feature reveal" style="--i: 2">
+            <span class="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10-6.5z"/></svg></span>
+            <h3>Runner, code, cookies, history</h3>
+            <p>The same send, many times, or somewhere else.</p>
+            <ul class="ticks" role="list">
+              <li>Run a collection or a folder: passes, a pause, stop at the first failure, a CSV or JSON data file, JSON and JUnit reports</li>
+              <li>The request as cURL, PowerShell, JavaScript, Python, Go, C#, PHP or Java, with the secrets left out</li>
+              <li>Cookies that survive a restart without a value in a list; a history that keeps only a line by default</li>
             </ul>
           </article>
         </div>
 
         <section class="principles reveal" aria-labelledby="principles-title">
-          <h3 id="principles-title" class="principles-title">Careful by default</h3>
+          <h3 id="principles-title" class="principles-title">Built for files that come from other people</h3>
           <ul class="principles-list" role="list">
             <li>
-              <h4>Dry run first</h4>
-              <p>Without <code>--write</code> you get the report and the list of files, and nothing is written.</p>
+              <h4>Nothing runs by itself</h4>
+              <p>A request file cannot run code, read a file of yours or reach your network. A script needs your yes, for its exact text.</p>
             </li>
             <li>
-              <h4>Nothing is overwritten</h4>
-              <p>A folder that already has files is never touched: the default writes to <code>api-2</code> instead. A failure or a cancel half way is undone.</p>
+              <h4>Secrets stay out of Git</h4>
+              <p>Secret values live in files that Git ignores, and are hidden in the history, the code you copy and the reports.</p>
             </li>
             <li>
-              <h4>Hostile data is expected</h4>
-              <p>A collection can come from anyone. Its data cannot add a request, read a file of yours or run code when you press Send.</p>
+              <h4>Audited, then fixed</h4>
+              <p>Three security reviews attacked the built extension; what they found is fixed, tested and written down.</p>
             </li>
           </ul>
         </section>
       </div>
     </section>
 
-    <section id="how-it-works" class="section section-alt" aria-labelledby="how-title">
+    <section id="import" class="section section-alt" aria-labelledby="import-title">
       <div class="container">
         <header class="section-head reveal">
-          <p class="eyebrow">How it works</p>
-          <h2 id="how-title">Three steps from Thunder Client to a commit</h2>
-          <p class="section-lead">The same steps on the command line and in VS&nbsp;Code, where the command is <strong>HTTP Files Importer: Import from Thunder Client...</strong></p>
+          <p class="eyebrow">Import</p>
+          <h2 id="import-title">Start from what you already have</h2>
+          <p class="section-lead">Each way reads a file or a text, tells you what it found as a count, and writes nothing until you say yes. What could not be carried over is a list of notes, one command away.</p>
         </header>
 
-        <ol class="steps" role="list">
-          <li class="step reveal">
-            <span class="step-num" aria-hidden="true">1</span>
-            <h3>Point it at your data</h3>
-            <p>Give it the Thunder Client data folder, exported <code>.json</code> files or your <code>thunder-tests</code> folder if you use Git sync. In VS&nbsp;Code it suggests the folder it finds.</p>
-          </li>
-          <li class="step reveal" style="--i: 1">
-            <span class="step-num" aria-hidden="true">2</span>
-            <h3>Read the report</h3>
-            <p>A dry run shows what would be written, what is left out and why. Cancelling at any step writes nothing.</p>
-          </li>
-          <li class="step reveal" style="--i: 2">
-            <span class="step-num" aria-hidden="true">3</span>
-            <h3>Write, then open the files</h3>
-            <p>Choose the tool, add <code>--write</code> (or confirm in VS&nbsp;Code) and open the <code>.http</code> files. Commit them; the secrets are already ignored.</p>
-          </li>
-        </ol>
+        <div class="settings reveal">
+          <div class="table-wrap" role="region" aria-labelledby="import-title" tabindex="0">
+            <table role="table">
+              <thead role="rowgroup">
+                <tr role="row"><th scope="col" role="columnheader">From</th><th scope="col" role="columnheader">What comes across</th></tr>
+              </thead>
+              <tbody role="rowgroup">
+                <tr role="row"><th scope="row" role="rowheader">OpenAPI or Swagger</th><td role="cell">A JSON or YAML file, or the address of a program that is running (<code>/v3/api-docs</code>, <code>/swagger.json</code>): a folder for each tag, a request for each operation with its parameters, a body made from the example or the schema, the authentication, a status test, and the servers as environments.</td></tr>
+                <tr role="row"><th scope="row" role="rowheader">The controllers of your code</th><td role="cell">The routes found in the source of the workspace (NestJS, Express, Fastify, Spring, ASP.NET Core, FastAPI, Flask, Django, Laravel, Go and more), with the folders named after the controllers. Read from the text of the code, not by running it.</td></tr>
+                <tr role="row"><th scope="row" role="rowheader">Postman</th><td role="cell">Collections v2.0 and v2.1 with folders and their order, requests, authentication, scripts and variables; environments and globals files.</td></tr>
+                <tr role="row"><th scope="row" role="rowheader">Thunder Client</th><td role="cell">Collections, folders with what they set, requests and environments, from the data folder or exported files.</td></tr>
+                <tr role="row"><th scope="row" role="rowheader">cURL</th><td role="cell">One request from a command you copied from a browser, a document or a terminal.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>A credential typed into an imported request becomes a secret variable of the collection, with its value in a file that Git ignores. Nothing an importer reads is run, and the address of a description is fetched like any request you send, through the same engine. The older converter that writes plain <code>.http</code> files from Thunder Client data is still in the repository.</p>
+        </div>
       </div>
     </section>
 
@@ -356,189 +310,178 @@ Authorization: Bearer <span class="tk-v">{{petstore_token}}</span>
         <header class="section-head reveal">
           <p class="eyebrow">Screenshots</p>
           <h2 id="screenshots-title">See it in VS&nbsp;Code</h2>
-          <p class="section-lead">The importer opens as a panel that follows your VS&nbsp;Code theme. The screenshots use made-up data in a demo workspace.</p>
+          <p class="section-lead">The screenshots use made-up data in a demo workspace, taken with the real extension in a real VS&nbsp;Code.</p>
         </header>
 
         <div class="shots">
           <figure class="shot shot-wide reveal">
-            <a class="shot-link" href="img/panel-review.png">
-              <img src="img/panel-review.png" width="1280" height="1010" loading="lazy" decoding="async"
-                alt="The HTTP Files Importer panel in VS Code, dark theme: the Thunder Client data it found, counts of collections, requests, environments and secrets, the findings that need attention, the choice of REST Client, httpYac or JetBrains, and an Import 16 files button at the bottom">
+            <a class="shot-link" href="img/tests.png">
+              <img src="img/tests.png" width="1400" height="830" loading="lazy" decoding="async"
+                alt="The Tests tab of an answer in API Client: 5 of 7 tests passed, each rule with its result and the reason for a failure, and the variables that were saved from the answer">
             </a>
-            <figcaption><strong>Read, review, then import.</strong> The panel shows what was found and what needs your attention, lets you choose the tool, the folder and what to do if it already has files, and keeps the Import button in view. <span class="shot-theme">Dark theme</span></figcaption>
+            <figcaption><strong>A test that fails says why.</strong> The rules are lines of a small grammar, each shown with its result; a rule that cannot run says what the grammar knows. Values saved for the next request are listed, and a secret is not shown. <span class="shot-theme">Dark theme</span></figcaption>
           </figure>
 
           <figure class="shot reveal">
-            <a class="shot-link" href="img/panel-source.png">
-              <img src="img/panel-source.png" width="1280" height="730" loading="lazy" decoding="async"
-                alt="The first step of the importer panel: the Thunder Client data found on this computer, with its numbers of collections and environments, and buttons to choose a folder or export files">
+            <a class="shot-link" href="img/scripts.png">
+              <img src="img/scripts.png" width="1400" height="830" loading="lazy" decoding="async"
+                alt="The Scripts tab of a request: a script that runs before the request is sent and one that runs after the answer, in code editors">
             </a>
-            <figcaption><strong>Start from your data.</strong> It offers the Thunder Client data it finds, or you choose a folder or exported files. The data is only read. <span class="shot-theme">Dark theme</span></figcaption>
+            <figcaption><strong>Scripts, with your consent.</strong> One before the request, one after the answer, in JavaScript. They run in a sandbox, and only after you allowed the exact text. <span class="shot-theme">Dark theme</span></figcaption>
           </figure>
 
           <figure class="shot reveal">
-            <a class="shot-link" href="img/panel-done.png">
-              <img src="img/panel-done.png" width="1280" height="730" loading="lazy" decoding="async"
-                alt="The importer panel after the import: Imported 47 requests, the folder the files are in, and buttons to open the folder, open the report or import another">
+            <a class="shot-link" href="img/runner.png">
+              <img src="img/runner.png" width="1200" height="770" loading="lazy" decoding="async"
+                alt="The collection runner: passes, a pause, stop at the first failure, a data file, the Run button, the totals, and a table with the result of every request">
             </a>
-            <figcaption><strong>Done, and nothing hidden.</strong> It says where the files are and what to do next, with buttons to open the folder or the report. <span class="shot-theme">Dark theme</span></figcaption>
+            <figcaption><strong>Run a whole collection.</strong> Passes, a data file, a pause, and a report in JSON or JUnit; each result shows its tests. <span class="shot-theme">Dark theme</span></figcaption>
           </figure>
 
           <figure class="shot reveal">
-            <a class="shot-link" href="img/explorer-view.png">
-              <img src="img/explorer-view.png" width="1280" height="690" loading="lazy" decoding="async"
-                alt="The VS Code Explorer with a collapsed-by-default HTTP Files Importer section that has an Open the importer button">
+            <a class="shot-link" href="img/oauth.png">
+              <img src="img/oauth.png" width="1400" height="830" loading="lazy" decoding="async"
+                alt="The Auth tab of a request with OAuth 2.0: the grant type, the token address, the client ID, a hidden client secret, the scope, and a Get a token button">
             </a>
-            <figcaption><strong>Easy to find.</strong> A section in the Explorer opens the importer; it stays collapsed until you open it. <span class="shot-theme">Dark theme</span></figcaption>
+            <figcaption><strong>OAuth 2.0 without a detour.</strong> Pick the grant, get a token, and the request uses it. The token stays in the secret storage of VS&nbsp;Code. <span class="shot-theme">Dark theme</span></figcaption>
           </figure>
 
           <figure class="shot reveal">
-            <a class="shot-link" href="img/panel-review-light.png">
-              <img src="img/panel-review-light.png" width="1280" height="1010" loading="lazy" decoding="async"
-                alt="The importer panel in the light theme of VS Code, with the same cards and the Import 16 files button">
+            <a class="shot-link" href="img/environment.png">
+              <img src="img/environment.png" width="1000" height="490" loading="lazy" decoding="async"
+                alt="The editor of an environment: variables with names and values, a Secret box that hides the value of the token, and a line that says where secret values are kept">
             </a>
-            <figcaption><strong>It follows your theme.</strong> The same panel with a light theme. <span class="shot-theme">Light theme</span></figcaption>
+            <figcaption><strong>Secrets have a place.</strong> A variable marked secret keeps its value in a file that Git ignores, so nobody gets it from the repository. <span class="shot-theme">Dark theme</span></figcaption>
+          </figure>
+
+          <figure class="shot reveal">
+            <a class="shot-link" href="img/hero-light.png">
+              <img src="img/hero-light.png" width="1400" height="830" loading="lazy" decoding="async"
+                alt="The same request and answer in the light theme of VS Code, with the collections tree opened in the side bar">
+            </a>
+            <figcaption><strong>It follows your theme.</strong> The same screen with a light theme; high contrast themes work too. <span class="shot-theme">Light theme</span></figcaption>
           </figure>
         </div>
       </div>
     </section>
 
-    <section id="output" class="section" aria-labelledby="output-title">
+    <section id="files" class="section section-alt" aria-labelledby="files-title">
       <div class="container">
         <header class="section-head reveal">
-          <p class="eyebrow">Output</p>
-          <h2 id="output-title">What it writes</h2>
-          <p class="section-lead">Plain files you can read, diff and commit. The three tools read the same requests but differ in two places, so each import is written for one of them; import again to write for another.</p>
+          <p class="eyebrow">Files</p>
+          <h2 id="files-title">Plain files you can read, diff and review</h2>
+          <p class="section-lead">The files are the product: there is no database behind them and no export step. A folder of the workspace holds everything, and Git sees it as it sees code.</p>
         </header>
 
         <div class="gs-grid">
           <div class="gs-install reveal">
             <h3>Layout</h3>
             <div class="code-block">
-              <pre><code>api/
-  &lt;Collection&gt;/
-    index.http              requests at the top
-    &lt;Folder&gt;.http           requests of a folder
-    _bodies/body-0001.txt   a body that cannot stay inline
-  http-client.env.json              shared variables
-  http-client.private.env.json      secrets (not for Git)
-  rest-client.settings.json         REST Client target only
-  rest-client.private.settings.json REST Client target only
-  IMPORT_REPORT.md                  what was done</code></pre>
+              <pre><code>api-client/
+  workspace.yml                 variables and settings of the workspace
+  .gitignore                    keeps the *.local.yml files out of Git
+  collections/petstore/
+    collection.yml              base address, headers, auth, variables, tests
+    collection.local.yml        secret values (not for Git, mode 0600)
+    pets/
+      folder.yml                what the folder sets, and the order of its requests
+      list-pets.req.yml         one request
+      list-pets.http            the generated .http copy
+  environments/
+    dev.env.yml                 the variables of an environment
+    dev.env.local.yml           its secrets (not for Git)</code></pre>
               <button class="copy-btn" type="button" data-copy hidden><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11.5" height="11.5" rx="2"/><path d="M15.75 8.25v-2.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h2.5"/></svg><span class="copy-label">Copy</span><span class="sr-only"> file layout</span></button>
             </div>
           </div>
 
           <div class="gs-side reveal" style="--i: 1">
             <div class="panel">
-              <h3>REST Client keeps variables in a setting</h3>
-              <p class="note">REST Client does not read <code>http-client.env.json</code>. For that target the importer also writes the variables as a VS Code setting, and the VS Code command fills it in: shared variables to the workspace settings, secrets to your user settings, never synced. Nothing you already have is replaced.</p>
+              <h3>A request, as it is on disk</h3>
+              <div class="code-block">
+                <pre><code>name: Create pet
+method: POST
+url: '{{baseUrl}}/pets'
+auth:
+  kind: bearer
+  token: '{{token}}'
+body:
+  kind: json
+  text: |-
+    {
+      "name": "Rex"
+    }
+tests:
+  - expr: status == 201
+captures:
+  - expr: petId = json $.id</code></pre>
+                <button class="copy-btn" type="button" data-copy hidden><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11.5" height="11.5" rx="2"/><path d="M15.75 8.25v-2.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h2.5"/></svg><span class="copy-label">Copy</span><span class="sr-only"> request file</span></button>
+              </div>
+              <p class="note">Trimmed: the file also has an id and the schema version. The reader is a strict subset of YAML, so a file from a stranger is data and nothing else.</p>
             </div>
           </div>
         </div>
 
         <div class="settings reveal">
-          <h3 id="targets-title">Choosing the tool you write for</h3>
-          <p>Set it with <code>--target</code> or the "Written for" step in VS&nbsp;Code. The default is <code>rest-client</code>.</p>
-          <div class="table-wrap" role="region" aria-labelledby="targets-title" tabindex="0">
-            <table role="table">
-              <thead role="rowgroup">
-                <tr role="row"><th scope="col" role="columnheader"></th><th scope="col" role="columnheader">REST Client</th><th scope="col" role="columnheader">httpYac</th><th scope="col" role="columnheader">JetBrains</th></tr>
-              </thead>
-              <tbody role="rowgroup">
-                <tr role="row"><th scope="row" role="rowheader">Reads <code>http-client.env.json</code></th><td role="cell">no (a setting)</td><td role="cell">yes</td><td role="cell">yes</td></tr>
-                <tr role="row"><th scope="row" role="rowheader"><code>{{#guid}}</code></th><td role="cell"><code>{{$guid}}</code></td><td role="cell"><code>{{$guid}}</code></td><td role="cell"><code>{{$uuid}}</code></td></tr>
-                <tr role="row"><th scope="row" role="rowheader"><code>{{#number, a, b}}</code> (both ends included)</th><td role="cell"><code>{{$randomInt a b+1}}</code></td><td role="cell"><code>{{$randomInt a b+1}}</code></td><td role="cell"><code>{{$random.integer(a, b+1)}}</code></td></tr>
-                <tr role="row"><th scope="row" role="rowheader"><code>{{#dateISO}}</code></th><td role="cell"><code>{{$datetime iso8601}}</code></td><td role="cell"><code>{{$datetime iso8601}}</code></td><td role="cell"><code>{{$isoTimestamp}}</code></td></tr>
-                <tr role="row"><th scope="row" role="rowheader"><code>{{#date}}</code> (milliseconds)</th><td role="cell">left as is</td><td role="cell"><code>{{$timestamp}}</code></td><td role="cell">left as is</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <p>The other Thunder Client dynamic variables have no exact equivalent: they are left as they are and listed in the report. The <code>b+1</code> is deliberate: all three tools stop before the upper bound and Thunder Client does not.</p>
-        </div>
-
-        <div class="settings reveal">
-          <h3 id="conversion-title">What is converted, and what is not</h3>
-          <div class="table-wrap" role="region" aria-labelledby="conversion-title" tabindex="0">
-            <table role="table">
-              <thead role="rowgroup">
-                <tr role="row"><th scope="col" role="columnheader">Thunder Client</th><th scope="col" role="columnheader">Result</th></tr>
-              </thead>
-              <tbody role="rowgroup">
-                <tr role="row"><td role="cell">Collections, folders, request order</td><td role="cell">Folders and files, in the order Thunder Client shows them</td></tr>
-                <tr role="row"><td role="cell">Method, URL, query and path parameters</td><td role="cell">The request line; disabled parameters become <code># [disabled query]</code> comments</td></tr>
-                <tr role="row"><td role="cell">Headers</td><td role="cell">Headers; Thunder Client's own default <code>Accept</code> and <code>User-Agent</code> are dropped; disabled ones are comments</td></tr>
-                <tr role="row"><td role="cell">Bodies: JSON, text, XML, form, multipart (with files), GraphQL</td><td role="cell">Bodies; a GraphQL body is a JSON envelope</td></tr>
-                <tr role="row"><td role="cell">Authentication: bearer, basic</td><td role="cell">An <code>Authorization</code> header</td></tr>
-                <tr role="row"><td role="cell">Tests</td><td role="cell"><code># @assert</code> lines; <code>set-env-var</code> becomes <code># @capture</code></td></tr>
-                <tr role="row"><td role="cell">Inheritance from folder and collection</td><td role="cell">Written into each request</td></tr>
-                <tr role="row"><td role="cell">Environments (shared, named, local, default)</td><td role="cell">Environment files; <code>global</code> and <code>local</code> variables go to the private file</td></tr>
-                <tr role="row"><td role="cell">Encrypted variables</td><td role="cell">An empty entry in the private file to fill in again; never decrypted</td></tr>
-                <tr role="row"><td role="cell">Scripts</td><td role="cell">Kept as comments, never run</td></tr>
-                <tr role="row"><td role="cell">OAuth 2.0, AWS, digest, NTLM</td><td role="cell">Not converted; a note names the setting keys, never their values</td></tr>
-                <tr role="row"><td role="cell">WebSocket, SSE, gRPC requests</td><td role="cell">Skipped and listed in the report</td></tr>
-                <tr role="row"><td role="cell">History, responses, cookies, request settings</td><td role="cell">Skipped</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <h3 id="mirror-title">The <code>.http</code> copy</h3>
+          <p>Next to each request the extension writes <code>list-pets.http</code> for people who use REST Client, httpYac or the JetBrains HTTP Client, or who only read the files in a pull request. The request is the source and the copy is generated from it, one way. It never holds a secret or anything those tools would run or read, and a copy you edited is never overwritten: you can take its edits into the request, see the difference, discard them or keep the file as your own. Turn it off with <code>apiClient.mirror.mode</code>.</p>
         </div>
       </div>
     </section>
 
-    <section id="trust" class="section section-alt" aria-labelledby="trust-title">
+    <section id="trust" class="section" aria-labelledby="trust-title">
       <div class="container">
         <header class="section-head reveal">
           <p class="eyebrow">Safety</p>
           <h2 id="trust-title">Collections can come from anyone</h2>
-          <p class="section-lead">People share Thunder Client collections, so the importer treats every value in one as hostile. These are the cases it is built and tested for.</p>
+          <p class="section-lead">A cloned repository, the answers of servers and the files of other tools are all other people's data. These are the cases the client is built and tested for.</p>
         </header>
 
         <div class="feature-grid trust-grid">
           <article class="card trust reveal">
-            <h3>Data is never executed</h3>
-            <p>Files are parsed as plain JSON. The core has no network access and starts no process; a test checks that its source and the built extension import neither.</p>
+            <h3>Files are data</h3>
+            <p>The YAML reader has no anchors, aliases or tags, and limits on size and depth. Paths cannot leave the collection, links are never followed, and what a request sets while it runs belongs to its own collection.</p>
           </article>
           <article class="card trust reveal" style="--i: 1">
-            <h3>Nothing can add a line</h3>
-            <p>Values on one line cannot carry a line break, free text in comments can never start a directive, and a body is written inline only if no tool would read one of its lines as something else.</p>
+            <h3>Scripts need your yes</h3>
+            <p>Nothing runs until you have allowed the exact text, kept on your machine and never in the repository. A pull, a branch switch or an import asks again. The sandbox has no files, no network and no Node.</p>
           </article>
           <article class="card trust reveal" style="--i: 2">
-            <h3>Risky body lines move out</h3>
-            <p>A body line that starts with <code>#</code>, <code>//</code>, <code>&lt;</code> or <code>&gt;</code> is read by the tools as a comment, a file include or a response handler. Such a body is saved in <code>_bodies/</code> and read from there as it is.</p>
+            <h3>Redirects keep your credentials</h3>
+            <p>A redirect never takes <code>Authorization</code> or a cookie to another origin, never goes from https to http, and never goes from the internet to your machine or network unless you allow it.</p>
           </article>
           <article class="card trust reveal">
-            <h3>Expressions are defused</h3>
-            <p>Text between <code>{{ }}</code> that is not a plain variable name is made harmless. httpYac would run it as JavaScript, and all three tools can read environment variables from it.</p>
+            <h3>Secrets are covered by name and value</h3>
+            <p>Wherever something is written down (history, code, reports, console, the <code>.http</code> copy) a secret is covered by what it is and by what it is called, in the forms it takes in an address or a form.</p>
           </article>
           <article class="card trust reveal" style="--i: 1">
-            <h3>Careful writing</h3>
-            <p>Files go through a staging folder and are undone on failure or cancel. Paths cannot leave the target folder, links are never followed and <code>.gitignore</code> is updated before a private file appears.</p>
+            <h3>Git is asked</h3>
+            <p>If a <code>.gitignore</code> of the repository would let Git commit a file with secret values, or one was committed before, the extension asks Git and tells you.</p>
           </article>
           <article class="card trust reveal" style="--i: 2">
-            <h3>Tried in the real tools</h3>
-            <p>The output was run against a local server that records what arrives, in REST Client 0.25.1, httpYac 6.16.7 and the JetBrains HTTP Client command line (<code>ijhttp</code> 263.7031), and checked by tests and a mutation check that breaks the rules on purpose.</p>
+            <h3>Tested, then attacked</h3>
+            <p>Unit tests, a mutation check that breaks the rules on purpose, real VS&nbsp;Code runs, and three independent security reviews of the built extension. The notes list what they found and what is left.</p>
           </article>
         </div>
-        <p class="trust-foot reveal">MIT licensed. Read the <a href="{{REPO_URL}}">source</a> to check any of the above, and the <a href="{{REPO_URL}}/blob/main/SECURITY.md">security policy</a> for what is and is not defended against, and how to report a problem.</p>
+        <p class="trust-foot reveal">MIT licensed. Read the <a href="{{REPO_URL}}">source</a> to check any of the above, and the <a href="{{REPO_URL}}/blob/main/SECURITY.md">security policy</a> for what is and is not defended against (a script you allowed can read the variables it is given), and how to report a problem.</p>
       </div>
     </section>
 
-    <section id="get-started" class="section" aria-labelledby="get-started-title">
+    <section id="get-started" class="section section-alt" aria-labelledby="get-started-title">
       <div class="container">
         <header class="section-head reveal">
           <p class="eyebrow">Get started</p>
-          <h2 id="get-started-title">Build it and import your collections</h2>
-          <!-- unlisted --><p class="section-lead">{{NAME}} {{VERSION}} is a preview. It is not on npm or the VS&nbsp;Code Marketplace yet, so you build it from a clone. It needs Node.js {{NODE_MINIMUM}} or newer.</p><!-- /unlisted -->
-          <!-- listed --><p class="section-lead">{{NAME}} {{VERSION}} is a preview. Install the extension from the VS&nbsp;Code Marketplace, or build the command line from a clone: it needs Node.js {{NODE_MINIMUM}} or newer.</p><!-- /listed -->
+          <h2 id="get-started-title">Five minutes to the first request</h2>
+          <!-- unlisted --><p class="section-lead">{{NAME}} {{VERSION}} is a preview. It is not on the VS&nbsp;Code Marketplace yet, so you build the extension from a clone; it needs Node.js {{NODE_MINIMUM}} or newer.</p><!-- /unlisted -->
+          <!-- listed --><p class="section-lead">{{NAME}} {{VERSION}} is a preview. Install the extension from the VS&nbsp;Code Marketplace, or build it from a clone, which needs Node.js {{NODE_MINIMUM}} or newer.</p><!-- /listed -->
         </header>
 
         <div class="gs-grid">
           <div class="gs-install reveal">
-            <h3>Run it</h3>
+            <h3>Install</h3>
             <div class="install-list">
               <!-- listed --><article class="install">
                 <h4>VS&nbsp;Code Marketplace</h4>
-                <p>Search for <strong>{{NAME}}</strong> in the Extensions view, or paste this into Quick Open and press Enter. Then run <strong>HTTP Files Importer: Import from Thunder Client...</strong> from the Command Palette.</p>
+                <p>Search for <strong>{{NAME}}</strong> in the Extensions view, or paste this into Quick Open and press Enter.</p>
                 <div class="code-block">
                   <pre><code>ext install {{EXTENSION_ID}}</code></pre>
                   <button class="copy-btn" type="button" data-copy hidden><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11.5" height="11.5" rx="2"/><path d="M15.75 8.25v-2.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h2.5"/></svg><span class="copy-label">Copy</span><span class="sr-only"> Quick Open command</span></button>
@@ -547,41 +490,28 @@ Authorization: Bearer <span class="tk-v">{{petstore_token}}</span>
               </article>
 
               <!-- /listed --><article class="install">
-                <h4>Command line</h4>
-                <p>Build once, then run the importer. Without <code>--write</code> nothing is written.</p>
+                <h4>From a clone</h4>
+                <p>Build the package and install it into VS&nbsp;Code.</p>
                 <div class="code-block">
                   <pre><code>git clone {{REPO_URL}}.git
 cd api-client
 npm ci --ignore-scripts
-npm run build
-
-# dry run: the report and the list of files
-node dist/cli.js "&lt;Thunder Client data folder&gt;"
-
-# write the files into ./api, for REST Client (the default)
-node dist/cli.js "&lt;Thunder Client data folder&gt;" --write</code></pre>
-                  <button class="copy-btn" type="button" data-copy hidden><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11.5" height="11.5" rx="2"/><path d="M15.75 8.25v-2.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h2.5"/></svg><span class="copy-label">Copy</span><span class="sr-only"> command line steps</span></button>
-                </div>
-              </article>
-
-              <article class="install">
-                <h4>Another tool, another folder</h4>
-                <p>Write for httpYac or JetBrains, into a project folder of your choice.</p>
-                <div class="code-block">
-                  <pre><code>node dist/cli.js export.json --target jetbrains --workspace ~/my-project --out requests --write</code></pre>
-                  <button class="copy-btn" type="button" data-copy hidden><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11.5" height="11.5" rx="2"/><path d="M15.75 8.25v-2.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h2.5"/></svg><span class="copy-label">Copy</span><span class="sr-only"> command</span></button>
-                </div>
-              </article>
-
-              <article class="install">
-                <h4>VS&nbsp;Code extension from source</h4>
-                <p>Build the package from the same clone and install it. Then run <strong>HTTP Files Importer: Import from Thunder Client...</strong> from the Command Palette.</p>
-                <div class="code-block">
-                  <pre><code>npm run ext:build
+npm run ext:build
 cd extension &amp;&amp; npm run package
-code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
-                  <button class="copy-btn" type="button" data-copy hidden><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11.5" height="11.5" rx="2"/><path d="M15.75 8.25v-2.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h2.5"/></svg><span class="copy-label">Copy</span><span class="sr-only"> extension steps</span></button>
+code --install-extension ../.artifacts/api-client.vsix</code></pre>
+                  <button class="copy-btn" type="button" data-copy hidden><svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11.5" height="11.5" rx="2"/><path d="M15.75 8.25v-2.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h2.5"/></svg><span class="copy-label">Copy</span><span class="sr-only"> build steps</span></button>
                 </div>
+              </article>
+
+              <article class="install">
+                <h4>First request</h4>
+                <p>Open a folder and the <strong>API Client</strong> icon in the Activity Bar.</p>
+                <ol class="steps-mini">
+                  <li><em>New Collection...</em>, then <em>New Request...</em> on it, or <em>Import...</em> a description, a collection or a cURL command.</li>
+                  <li>Type an address and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>, or Send.</li>
+                  <li><em>New Environment...</em> for <code>baseUrl</code> and the like, and use <code>{{baseUrl}}/pets</code> in your requests.</li>
+                  <li>Commit the <code>api-client/</code> folder.</li>
+                </ol>
               </article>
             </div>
           </div>
@@ -590,58 +520,40 @@ code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
             <div class="panel">
               <h3>Requirements</h3>
               <ul class="ticks" role="list">
-                <li>Node.js {{NODE_MINIMUM}} or newer</li>
-                <li>Thunder Client data on this machine: the v4 or v3 layout, or exported <code>.json</code> files</li>
-                <li>For the extension: VS&nbsp;Code {{VSCODE_MINIMUM}} or newer and a trusted local workspace</li>
+                <li>VS&nbsp;Code {{VSCODE_MINIMUM}} or newer, and a trusted local workspace</li>
+                <li>Windows, macOS or Linux (Remote SSH, WSL and containers have not been tried by hand)</li>
+                <li>Node.js {{NODE_MINIMUM}} or newer, only to build from a clone</li>
               </ul>
-              <p class="note">Browser and virtual workspaces, such as vscode.dev and github.dev, are unsupported.</p>
+              <p class="note">Restricted Mode, the browser and virtual workspaces such as vscode.dev are unsupported: the extension writes files and runs on your machine.</p>
             </div>
 
             <div class="panel">
-              <h3>Where Thunder Client keeps its data</h3>
-              <p class="note">In VS&nbsp;Code, under the extension <code>rangav.vscode-thunder-client</code>. For Cursor, VSCodium and others, change <code>Code</code>.</p>
+              <h3>Settings</h3>
               <ul class="ticks" role="list">
-                <li>Windows: <code>%APPDATA%\Code\User\globalStorage\</code></li>
-                <li>macOS: <code>~/Library/Application Support/Code/User/globalStorage/</code></li>
-                <li>Linux: <code>~/.config/Code/User/globalStorage/</code></li>
+                <li><code>apiClient.root</code>: the folder that holds the files (<code>api-client</code>)</li>
+                <li><code>apiClient.mirror.mode</code>: the <code>.http</code> copies: <code>on</code>, <code>off</code> or <code>gitignored</code></li>
+                <li><code>apiClient.history.mode</code>: <code>metadata</code>, <code>full</code> or <code>off</code></li>
+                <li><code>apiClient.scripts.enabled</code>: run scripts after you allowed them</li>
               </ul>
+              <p class="note">Timeouts, redirects, TLS checking and response limits are set on a request, a folder or a collection, and inherited.</p>
             </div>
           </div>
-        </div>
-
-        <div class="settings reveal">
-          <h3 id="options-title">Command line options</h3>
-          <div class="table-wrap" role="region" aria-labelledby="options-title" tabindex="0">
-            <table role="table">
-              <thead role="rowgroup">
-                <tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Meaning</th></tr>
-              </thead>
-              <tbody role="rowgroup">
-                <tr role="row"><td role="cell"><code>--write</code></td><td role="cell">Write the files. Default: a dry run.</td></tr>
-                <tr role="row"><td role="cell"><code>--workspace &lt;folder&gt;</code></td><td role="cell">Folder the files are written in. Default: the current folder.</td></tr>
-                <tr role="row"><td role="cell"><code>--out &lt;folder&gt;</code></td><td role="cell">Folder inside the workspace that receives the files. Default: <code>api</code>.</td></tr>
-                <tr role="row"><td role="cell"><code>--policy &lt;p&gt;</code></td><td role="cell"><code>new-folder</code> (default: a folder that has files is never touched, <code>api-2</code> is used), <code>skip-existing</code> or <code>overwrite</code>.</td></tr>
-                <tr role="row"><td role="cell"><code>--target &lt;tool&gt;</code></td><td role="cell"><code>rest-client</code> (default), <code>httpyac</code> or <code>jetbrains</code>.</td></tr>
-                <tr role="row"><td role="cell"><code>--no-move-secrets</code></td><td role="cell">Keep literal secrets in the shared files. They are reported.</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <p>Exit code <code>0</code> means done, <code>1</code> the import failed and <code>2</code> wrong usage. If you use Thunder Client's Git sync, point the command at your <code>thunder-tests</code> folder.</p>
         </div>
 
         <div class="guides reveal">
           <h3>Documentation</h3>
           <ul class="guide-list" role="list">
-            <li><a class="guide" href="{{REPO_URL}}/blob/main/README.md"><span class="guide-title">README</span><span class="guide-desc">Quick start, output, targets and limits.</span></a></li>
-            <li><a class="guide" href="{{REPO_URL}}/blob/main/docs/SPEC.vi.md"><span class="guide-title">Specification</span><span class="guide-desc">Every rule and the safety model, in Vietnamese.</span></a></li>
-            <li><a class="guide" href="{{REPO_URL}}/blob/main/tools/README.md"><span class="guide-title">Describe your data</span><span class="guide-desc">Print the shape of your Thunder Client data without sharing it.</span></a></li>
-            <li><a class="guide" href="{{REPO_URL}}/blob/main/CONTRIBUTING.md"><span class="guide-title">Contributing</span><span class="guide-desc">Development setup, tests and the mutation check.</span></a></li>
+            <li><a class="guide" href="{{REPO_URL}}/blob/main/README.md"><span class="guide-title">README</span><span class="guide-desc">Quick start, the files, variables, authentication, tests, scripts, the runner.</span></a></li>
+            <li><a class="guide" href="{{REPO_URL}}/blob/main/docs/client/import.md"><span class="guide-title">Importing</span><span class="guide-desc">OpenAPI, controllers, Postman, Thunder Client and cURL.</span></a></li>
+            <li><a class="guide" href="{{REPO_URL}}/blob/main/docs/client/scripts.md"><span class="guide-title">Scripts</span><span class="guide-desc">What runs, what it is given, and who allowed it.</span></a></li>
+            <li><a class="guide" href="{{REPO_URL}}/blob/main/SECURITY.md"><span class="guide-title">Security</span><span class="guide-desc">What it defends against, what it does not, and the audits.</span></a></li>
+            <li><a class="guide" href="{{REPO_URL}}/blob/main/CONTRIBUTING.md"><span class="guide-title">Contributing</span><span class="guide-desc">Development setup, the zones, tests and the mutation check.</span></a></li>
           </ul>
         </div>
       </div>
     </section>
 
-    <section id="faq" class="section section-alt" aria-labelledby="faq-title">
+    <section id="faq" class="section" aria-labelledby="faq-title">
       <div class="container container-narrow">
         <header class="section-head reveal">
           <p class="eyebrow">FAQ</p>
@@ -650,16 +562,44 @@ code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
 
         <div class="faq-list reveal">
           <details>
-            <summary>Is this made by Thunder Client?</summary>
+            <summary>Is it really free? Is there an account?</summary>
             <div class="faq-body">
-              <p>No. It is not affiliated with or endorsed by Thunder Client. The name is used only to say which data format is read.</p>
+              <p>It is free under the MIT license, and there is no account, no sign-in, no limit on collections or requests, and no server of ours. The extension sends the requests you send and, for OAuth 2.0, the requests to the token server you configured. It has no telemetry and no update check of its own.</p>
             </div>
           </details>
 
           <details>
-            <summary>Do I need Thunder Client installed or signed in?</summary>
+            <summary>Is this made by Thunder Client, Postman or Bruno?</summary>
             <div class="faq-body">
-              <p>No. The importer only reads files on disk, so it works on a copy of the data folder or on exported <code>.json</code> files. It never writes into the folder it reads.</p>
+              <p>No. It is not affiliated with or endorsed by any of them. Their names are used only to say which data formats it reads. You can bring Thunder Client data and Postman collections in, and nothing is written into the folders they keep.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Where do my requests and secrets live?</summary>
+            <div class="faq-body">
+              <p>Requests are YAML files in the <code>api-client</code> folder of your workspace. Values of secret variables are in <code>*.local.yml</code> files next to them, which the folder's own <code>.gitignore</code> keeps out of Git; the extension asks Git and tells you if a repository's own rules would commit one. Tokens and persistent cookies are in the secret storage of VS&nbsp;Code.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Can I import an OpenAPI or Swagger file, or find the routes of my code?</summary>
+            <div class="faq-body">
+              <p>Yes, both. <em>Import an OpenAPI or Swagger Description...</em> reads a JSON or YAML file, or fetches the description from the address of a program that is running, and makes a folder for each tag, a request for each operation and an environment for each server. The routes of your controllers are read from the text of the source files of the workspace; since the code is not run, a prefix that a proxy or another file adds may be missing, and the notes say so.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Is it safe to run a script from a collection I did not write?</summary>
+            <div class="faq-body">
+              <p>Only if you read it. A script can read every variable it is given, secrets included, and send them anywhere, so nothing runs until you have allowed the exact text, and any change asks again. The sandbox itself (QuickJS compiled to WebAssembly, in a worker thread, with limits) has no files, no network and no Node, but consent is the only barrier against what the script does with what it is given.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>What is missing?</summary>
+            <div class="faq-body">
+              <p>HTTP/1.1 only for now, no WebSocket, server-sent events or gRPC, no digest, AWS or NTLM authentication, no client certificates, no SOCKS or PAC proxy. Collections of ten thousand requests re-read every file when one changes. Remote SSH, WSL and containers have not been tried by hand. The <a href="#status">status</a> section lists them.</p>
             </div>
           </details>
 
@@ -667,35 +607,6 @@ code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
             <summary>How is it licensed?</summary>
             <div class="faq-body">
               <p>Under the MIT license, copyright 2026 longtd. The license text is in the <a href="{{REPO_URL}}">GitHub repository</a>.</p>
-            </div>
-          </details>
-
-          <details>
-            <summary>Which tool should I choose?</summary>
-            <div class="faq-body">
-              <p>The one you will open the files in. All three read the same requests. REST Client keeps its variables in a VS&nbsp;Code setting, which the VS&nbsp;Code command fills in for you; httpYac and the JetBrains HTTP Client read <code>http-client.env.json</code>. If you change your mind, import again with another target.</p>
-            </div>
-          </details>
-
-          <details>
-            <summary>Are my secrets safe?</summary>
-            <div class="faq-body">
-              <p>Literal tokens, passwords and keys are replaced by variables and their values go to private files that are added to <code>.gitignore</code> before they appear. They are found by name: in headers, query and form fields, path parameters, the password or token in a URL, and inside JSON, XML, query-string and GraphQL bodies. A token with no name next to it, such as free text in a body, cannot be recognised and stays, so read the bodies of a collection you did not write before you commit them. The report and the logs name secrets and never show them. With the REST Client target, the secrets go to your user settings, which the importer also excludes from Settings Sync.</p>
-              <p>Your original Thunder Client data is not changed, so delete it yourself when you are done with it.</p>
-            </div>
-          </details>
-
-          <details>
-            <summary>Do the <code># @assert</code> lines run?</summary>
-            <div class="faq-body">
-              <p>Not by anything in this project. They are comment lines that all three tools ignore, so the request still runs. A runtime that understands them could check responses and chain values; the grammar is in the specification.</p>
-            </div>
-          </details>
-
-          <details>
-            <summary>Has it been tried on real Thunder Client data?</summary>
-            <div class="faq-body">
-              <p>Not yet on a real v4 folder. It was built from public information and a reading of the extension's code, and tested with data made up to match it. Fields it does not know are skipped silently. If your data imports wrongly, open an issue with the output of <code>tools/thunder-structure.cjs</code>, which prints the structure of your data and no values.</p>
             </div>
           </details>
 
@@ -717,7 +628,7 @@ code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
       </div>
     </section>
 
-    <section id="status" class="section" aria-labelledby="status-title">
+    <section id="status" class="section section-alt" aria-labelledby="status-title">
       <div class="container">
         <header class="section-head reveal">
           <p class="eyebrow">Status</p>
@@ -729,21 +640,25 @@ code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
           <article class="card roadmap-card reveal">
             <h3>Working today</h3>
             <ul class="ticks" role="list">
-              <li>Reader for the v4 and v3 layouts and for exports</li>
-              <li>Conversion with inheritance, bodies, authentication, secrets, environments and dynamic variables</li>
-              <li>Output for REST Client, httpYac and the JetBrains HTTP Client</li>
-              <li>A command line, a VS&nbsp;Code command and a library</li>
+              <li>Request editor and answer pane, collections, folders and environments</li>
+              <li>Requests as YAML files, with a generated <code>.http</code> copy</li>
+              <li>Bearer, basic, API key and OAuth 2.0 authentication</li>
+              <li>Tests, captures and sandboxed scripts with consent</li>
+              <li>The collection runner with JSON and JUnit reports</li>
+              <li>Imports from OpenAPI and Swagger, controllers, Postman, Thunder Client and cURL</li>
+              <li>The Code tab, cookies and history</li>
             </ul>
             <p class="note"><a href="{{REPO_URL}}/blob/main/CHANGELOG.md">Full changelog</a></p>
           </article>
           <article class="card roadmap-card reveal" style="--i: 1">
             <h3>Known limits</h3>
             <ul class="ticks" role="list">
-              <li>No real Thunder Client v4 data folder has been tried</li>
-              <li>No runtime for <code># @assert</code> and <code># @capture</code></li>
-              <li>OAuth&nbsp;2.0, AWS, digest and NTLM authentication are not converted</li>
-              <!-- unlisted --><li>The extension is not on the Marketplace yet, and the package is not on npm</li><!-- /unlisted -->
-              <!-- listed --><li>The package is not on npm, and the extension is still a preview</li><!-- /listed -->
+              <li>HTTP/1.1 only: no HTTP/2, WebSocket, server-sent events or gRPC</li>
+              <li>No digest, AWS or NTLM authentication and no client certificates</li>
+              <li>Reading every file again when one changes costs seconds at ten thousand requests</li>
+              <li>Remote SSH, WSL and containers have not been tried by hand</li>
+              <!-- unlisted --><li>The extension is not on the Marketplace yet</li><!-- /unlisted -->
+              <!-- listed --><li>The extension is still a preview: file formats can change between versions, and are migrated</li><!-- /listed -->
             </ul>
             <p class="note">Found something else? <a href="{{REPO_URL}}/issues/new">Open an issue</a>.</p>
           </article>
@@ -756,7 +671,7 @@ code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
         <div class="cta-card reveal">
           <img src="favicon.svg" width="56" height="56" alt="" class="cta-mark">
           <h2 id="cta-title">Keep your requests in files you own</h2>
-          <p>Import once, then read, diff and commit them like the rest of your code.</p>
+          <p>Send them from VS&nbsp;Code, review them in a pull request, and take them with you.</p>
           <div class="cta-row">
             <!-- unlisted --><a class="btn btn-primary" href="#get-started">Get started</a><!-- /unlisted --><!-- listed --><a class="btn btn-primary" href="{{MARKETPLACE_URL}}">Install from VS&nbsp;Code Marketplace</a><!-- /listed -->
             <a class="btn btn-secondary" href="{{REPO_URL}}">View on GitHub</a>
@@ -774,15 +689,15 @@ code --install-extension ../.artifacts/http-files-importer.vsix</code></pre>
             <img class="brand-mark" src="favicon.svg" width="28" height="28" alt="">
             <span class="brand-name">{{NAME}}</span>
           </a>
-          <p>Move Thunder&nbsp;Client requests to plain <code>.http</code> files.</p>
+          <p>A free API client for VS&nbsp;Code, with requests in plain files.</p>
           <p class="footer-meta">Version {{VERSION}} (preview) · MIT license</p>
-          <p class="footer-meta">Not affiliated with or endorsed by Thunder Client.</p>
+          <p class="footer-meta">Not affiliated with or endorsed by Thunder Client, Postman or the other tools it can import from.</p>
         </div>
         <nav class="footer-col" aria-labelledby="footer-docs">
           <h2 id="footer-docs" class="footer-heading">Docs</h2>
           <ul>
             <li><a href="{{REPO_URL}}/blob/main/README.md">README</a></li>
-            <li><a href="{{REPO_URL}}/blob/main/docs/SPEC.vi.md">Specification</a></li>
+            <li><a href="{{REPO_URL}}/blob/main/docs/client/import.md">Importing</a></li>
             <li><a href="{{REPO_URL}}/blob/main/SECURITY.md">Security policy</a></li>
             <li><a href="{{REPO_URL}}/blob/main/CONTRIBUTING.md">Contributing</a></li>
           </ul>

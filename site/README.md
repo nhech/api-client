@@ -13,7 +13,7 @@ Static source for <https://api-client.longtd.me>. No framework, no npm dependenc
 | `site/robots.txt`, `site/sitemap.xml`, `site/site.webmanifest` | Crawling and install metadata. |
 | `site/deploy/` | The production origin: `Dockerfile`, `nginx.conf` and `compose.yml` for an nginx container behind the Cloudflare Tunnel. |
 
-The example under the hero is real: the request on the left is a made-up Thunder Client request, and the file on the right is the output of the importer for it (`node samples/make-sample.cjs`, then the command line), copied without edits. If the output format changes, copy it again.
+The pictures in `site/img/` are screenshots of the real extension in a real VS Code with made-up data: `SHOTS_SCENARIO=request node extension/test/screenshots.cjs <folder>` takes them in four themes (the page uses `hero`, `hero-light`, `response-tests`, `request-scripts`, `runner`, `request-oauth` and `environment`, renamed). Take them again after a change of the screens and copy them; the width and height in the page have to match the picture (the build checks it). The file layout and the request shown under "Files" are copied from the documentation: change them together.
 
 ## Names and address
 

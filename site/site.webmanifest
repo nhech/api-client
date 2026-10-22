@@ -1,7 +1,7 @@
 {
   "name": "{{NAME}}",
-  "short_name": "HTTP Files Importer",
-  "description": "Move Thunder Client requests to plain .http files.",
+  "short_name": "API Client",
+  "description": "A free API client for VS Code, with requests in plain files.",
   "start_url": "./",
   "scope": "./",
   "display": "browser",

@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 
 // The product name, the address of the page and the repository. Change them here only: pages use the {{NAME}}, {{SITE_URL}} and
 // {{REPO_URL}} placeholders (and scripts/deploy-site.cjs reads the address from here).
-const NAME = 'HTTP Files Importer';
+const NAME = 'API Client';
 const SITE_URL = 'https://api-client.longtd.me/';
 const REPO_URL = 'https://github.com/nhech/api-client';
 const OG_IMAGE = { file: 'og.jpg', type: 'image/jpeg', width: 1200, height: 630 };
@@ -26,10 +26,10 @@ if (!nodeFloor || !vscodeFloor) throw new Error('The Node.js or VS Code minimum 
 // (check that MARKETPLACE_URL opens it first): the build then drops every <!-- unlisted -->...<!-- /unlisted --> block (the "not on the
 // Marketplace yet" notes) and keeps every <!-- listed -->...<!-- /listed --> block (the install buttons, the one-line install command and the
 // structured data that point at the listing). While false, only the markers of the first kind are removed and the second kind is dropped.
-// The listed importer, until the full client is published under its own id (milestone M15 of docs/client/): the manifest now names the new extension.
-const EXTENSION_ID = 'longtd.http-files-importer';
+// The id of the extension in the manifest. Until its listing is live (MARKETPLACE_LISTED below) the page says to build it from a clone.
+const EXTENSION_ID = `${extensionManifest.publisher}.${extensionManifest.name}`;
 const MARKETPLACE_URL = `https://marketplace.visualstudio.com/items?itemName=${EXTENSION_ID}`;
-const MARKETPLACE_LISTED = true;
+const MARKETPLACE_LISTED = false;
 const UNLISTED_BLOCK = /<!-- unlisted -->([\s\S]*?)<!-- \/unlisted -->/g;
 const LISTED_BLOCK = /<!-- listed -->([\s\S]*?)<!-- \/listed -->/g;
 const placeholders = {

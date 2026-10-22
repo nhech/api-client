@@ -169,6 +169,29 @@ exports.run = async function run() {
     for (let waited = 0; !runner.messages().some(message => message.type === 'done') && waited < 60000; waited += 100) await sleep(100);
     await sleep(500);
     await shot('runner', 1200, 800, 1200, "d => { const row = d.querySelector('table.data tr.clickable button'); if (row) { row.click(); return 'clicked'; } return 'none'; }");
+    // The picture at the top of the landing page: a request whose tests all pass, its answer beside it, and the tree of the collection opened.
+    fs.rmSync(path.join(workspace, 'api-client', 'collections', 'pet-store', 'pets', 'broken.req.yml'), { force: true });
+    put('api-client/collections/pet-store/pets/available.req.yml', [
+      'schema: 1', 'id: 01J9Z4V0N2XK7Q3M8T5R6Y1ABK', 'name: Available pets', 'url: /pets',
+      'query:', '  - name: status', '    value: available', '  - name: limit', '    value: 10',
+      'headers:', '  - name: Accept', '    value: application/json',
+      'tests:', '  - expr: status == 200', '  - expr: json $.total == 4', '  - expr: header content-type includes json', '  - expr: duration < 1000', ''
+    ].join('\n'));
+    for (let waited = 0; waited < 10000; waited += 100) {
+      const pets = test.client().collections[0]?.children.find(node => node.label === 'Pets');
+      if (pets && pets.children.some(node => node.label === 'Available pets') && !pets.children.some(node => node.label === 'Script that fails')) break;
+      await sleep(100);
+    }
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await sleep(500);
+    const hero = await open('pets/available.req.yml');
+    await sleep(800);
+    await hero.receive({ type: 'send' });
+    await answer(hero, 'response');
+    await vscode.commands.executeCommand('workbench.view.extension.apiClient');
+    await vscode.commands.executeCommand('apiClient.collections.focus');
+    for (const command of ['list.focusFirst', 'list.expand', 'list.focusDown', 'list.expand']) { await vscode.commands.executeCommand(command); await sleep(500); }
+    await shot('hero', 1400, 860, 1200);
   } finally {
     server.closeAllConnections();
     server.close();
