@@ -29,7 +29,7 @@ if (!nodeFloor || !vscodeFloor) throw new Error('The Node.js or VS Code minimum 
 // The id of the extension in the manifest. Until its listing is live (MARKETPLACE_LISTED below) the page says to build it from a clone.
 const EXTENSION_ID = `${extensionManifest.publisher}.${extensionManifest.name}`;
 const MARKETPLACE_URL = `https://marketplace.visualstudio.com/items?itemName=${EXTENSION_ID}`;
-const MARKETPLACE_LISTED = false;
+const MARKETPLACE_LISTED = true;
 const UNLISTED_BLOCK = /<!-- unlisted -->([\s\S]*?)<!-- \/unlisted -->/g;
 const LISTED_BLOCK = /<!-- listed -->([\s\S]*?)<!-- \/listed -->/g;
 const placeholders = {
