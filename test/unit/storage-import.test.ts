@@ -82,6 +82,7 @@ test('An environment is written with its secret values in the file that Git igno
   assert.match(fs.files.get('api-client/environments/staging.env.local.yml') ?? '', /api_token: tok-value-9/);
   const loaded = await store.load();
   assert.deepEqual(loaded.environments[0]?.environment.vars.map(variable => [variable.name, variable.value, variable.secret]), [['host', 'https://s.test', false], ['api_token', 'tok-value-9', true]]);
+  assert.deepEqual(written.environments, [{ name: 'Staging', id: loaded.environments[0]?.environment.id }], 'the identifier of what was written is given back, so that the first environment can be made the active one');
 });
 
 test('Two imports of the same collection do not overwrite each other', async () => {

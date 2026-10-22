@@ -12,6 +12,8 @@ export interface ImportWritten {
   counts: ImportedCounts;
   /** The folder of each collection that was written, relative to the workspace folder. */
   collections: { name: string; path: string }[];
+  /** The environments that were written, by the name the store gave them and their identifier. */
+  environments: { name: string; id: string }[];
 }
 
 /** The settings of a collection or a folder as they are saved: the name and the order are the ones the store gave. */
@@ -36,7 +38,7 @@ async function writeFolder(store: Store, node: ContainerNode, folder: ImportedFo
 }
 
 export async function writeImported(store: Store, imported: Imported, signal?: AbortSignal): Promise<ImportWritten> {
-  const written: ImportWritten = { counts: countImported(imported), collections: [] };
+  const written: ImportWritten = { counts: countImported(imported), collections: [], environments: [] };
   for (const collection of imported.collections) {
     signal?.throwIfAborted();
     const node = await store.createCollection(collection.container.name);
@@ -47,6 +49,7 @@ export async function writeImported(store: Store, imported: Imported, signal?: A
     signal?.throwIfAborted();
     const node = await store.createEnvironment(environment.name);
     await store.saveEnvironment(node, { ...node.environment, vars: environment.vars });
+    written.environments.push({ name: node.environment.name, id: node.environment.id });
   }
   return written;
 }

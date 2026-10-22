@@ -28,7 +28,6 @@
     "graphql",
     "postman",
     "thunder client",
-    "import",
     "curl",
     "http",
     ".http",
@@ -37,7 +36,12 @@
     "environments",
     "tests",
     "local-first",
-    "git"
+    "git",
+    "openapi",
+    "swagger",
+    "import",
+    "routes",
+    "controllers"
   ],
   "main": "./dist/extension.js",
   "extensionKind": [
@@ -135,6 +139,16 @@
       {
         "command": "apiClient.importPostman",
         "title": "Import a Postman Collection or Environment...",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.importOpenApi",
+        "title": "Import an OpenAPI or Swagger Description...",
+        "category": "API Client"
+      },
+      {
+        "command": "apiClient.importRoutes",
+        "title": "Find the Routes of the Controllers in This Workspace...",
         "category": "API Client"
       },
       {
@@ -468,14 +482,24 @@
           "group": "1_import@2"
         },
         {
-          "command": "apiClient.importThunderData",
+          "command": "apiClient.importOpenApi",
           "when": "view == apiClient.collections",
           "group": "1_import@3"
         },
         {
-          "command": "apiClient.importThunder",
+          "command": "apiClient.importRoutes",
           "when": "view == apiClient.collections",
           "group": "1_import@4"
+        },
+        {
+          "command": "apiClient.importThunderData",
+          "when": "view == apiClient.collections",
+          "group": "1_import@5"
+        },
+        {
+          "command": "apiClient.importThunder",
+          "when": "view == apiClient.collections",
+          "group": "1_import@6"
         },
         {
           "command": "apiClient.newEnvironment",

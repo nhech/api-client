@@ -85,12 +85,16 @@ export function registerCommands(context: vscode.ExtensionContext, { runner, wor
     const picked = await vscode.window.showQuickPick([
       { label: '$(cloud-download) Thunder Client data', description: 'collections and environments, from the data folder or exported files', command: 'apiClient.importThunderData' },
       { label: '$(package) Postman collection or environment', description: 'a file exported as JSON (v2.0 or v2.1)', command: 'apiClient.importPostman' },
+      { label: '$(symbol-interface) OpenAPI or Swagger description', description: 'a JSON or YAML file, or the address of a program that is running', command: 'apiClient.importOpenApi' },
+      { label: '$(search) Routes of the controllers in this workspace', description: 'found in the source files: NestJS, Express, Spring, ASP.NET Core, FastAPI, Flask, Laravel, Go...', command: 'apiClient.importRoutes' },
       { label: '$(terminal) cURL command', description: 'one request, from the clipboard', command: 'apiClient.importCurl' }
     ], { title: 'Import into API Client', placeHolder: 'What do you want to bring in? Nothing is written before you confirm.' });
     if (picked !== undefined) await vscode.commands.executeCommand(picked.command);
   });
   register('apiClient.importThunderData', async () => { await importer.thunder(); });
   register('apiClient.importPostman', async () => { await importer.postman(); });
+  register('apiClient.importOpenApi', async () => { await importer.openApi(); });
+  register('apiClient.importRoutes', async () => { await importer.routes(); });
   register('apiClient.importNotes', async () => { await importer.showNotes(); });
   register('apiClient.importCurl', async (node?: TreeNode, given?: string) => {
     const parent = await target(node, 'request');

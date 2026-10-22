@@ -2,6 +2,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { candidatePaths, inspectCandidates } from '../../src/discover';
+import { send } from '../../src/engine/send';
 import { runImportFlow } from '../../src/host';
 import type { FlowResult } from '../../src/host';
 import type { HistoryNode } from '../../src/history/tree';
@@ -122,7 +123,15 @@ export function activate(context: vscode.ExtensionContext): ImporterTestApi | un
     // The Explorer view has no items: it exists to show its welcome text, with the button that opens the panel.
     vscode.window.registerTreeDataProvider<never>(START_VIEW, { getTreeItem: item => item, getChildren: () => [] })
   );
-  const importer = new ImportService(workspace, host, async () => candidates());
+  const importer = new ImportService(workspace, host, async () => candidates(), async (url, signal) => {
+    // The address was typed by the person, so this is a request like any other: the same engine, redirect rules, certificate check and proxy.
+    const response = await send({ method: 'GET', url, headers: [['Accept', 'application/json, application/yaml;q=0.9, text/yaml;q=0.9, */*;q=0.5']] }, {
+      timeoutMs: 30_000, followRedirects: true, maxRedirects: 5, tls: { rejectUnauthorized: true }, responseLimitBytes: 10 * 1024 * 1024, proxy: sending.proxy(), signal
+    });
+    if (response.status < 200 || response.status >= 300) throw new Error(`the server answered ${response.status} ${response.statusText}`.trim());
+    if (response.body.kind !== 'memory' || response.truncated) throw new Error('the answer is too large to be a description');
+    return new TextDecoder('utf-8').decode(response.body.bytes);
+  });
   context.subscriptions.push(importer, vscode.workspace.registerTextDocumentContentProvider(NOTES_SCHEME, importer.notes));
   registerCommands(context, { runner, workspace, collections, environments, organiser, importer });
   registerHistory(context, history, workspace);

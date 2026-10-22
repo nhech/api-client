@@ -1600,6 +1600,74 @@ exports.run = async function run() {
     await vscode.commands.executeCommand('apiClient.importCurl', nodeByLabel('Thunder Orders'), 'echo hello');
     await sleep(300);
     assert.equal(nodeByLabel('Thunder Orders').children.length, countBefore);
+
+    // 22g. An OpenAPI description, from a file and from an address: a collection with a folder for each tag, an environment with the server (the active
+    //      one when there was none), and a description that is not one writes nothing.
+    put('imports-src/petstore.yaml', [
+      'openapi: 3.0.3', 'info:', '  title: Swagger Pets', '  version: 1.0.0', 'servers:', '  - url: https://pets.openapi.test/v1', 'tags:', '  - name: pets', 'paths:', '  /pets/{petId}:',
+      '    get:', '      tags: [pets]', '      summary: Get a pet', '      parameters:', '        - {name: petId, in: path, required: true, schema: {type: integer, example: 7}}',
+      '      responses:', "        '200': {description: ok}", '    post:', '      tags: [pets]', '      summary: Update a pet', '      requestBody:', '        content:', '          application/json:',
+      '            schema: {type: object, properties: {name: {type: string, example: Rex}}}', ''
+    ].join('\n'));
+    await test.client().workspace.setActiveEnvironment(undefined);
+    importService.answers.openApi = async () => ({ kind: 'file', path: path.join(workspace, 'imports-src', 'petstore.yaml') });
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importOpenApi');
+    assert.deepEqual(importAsked, ['1 collection, 1 folder, 2 requests, 1 environment']);
+    await until(() => nodeByLabel('Swagger Pets') !== undefined, 'the collection of the description is in the tree');
+    const swagger = nodeByLabel('Swagger Pets');
+    assert.deepEqual(swagger.children.map(child => [child.kind, child.label]), [['folder', 'pets']]);
+    assert.deepEqual(swagger.children[0].children.map(child => child.label), ['Get a pet', 'Update a pet']);
+    const getPetText = fs.readFileSync(onDisk(swagger.children[0].children[0].path), 'utf8');
+    assert.match(getPetText, /url: \/pets\/\{petId\}/);
+    assert.match(getPetText, /name: petId\n\s+value: 7/);
+    assert.match(getPetText, /status == 200/);
+    const updateText = fs.readFileSync(onDisk(swagger.children[0].children[1].path), 'utf8');
+    assert.match(updateText, /kind: json/);
+    assert.match(updateText, /"name": "Rex"/);
+    assert.match(fs.readFileSync(path.join(onDisk(swagger.path), 'collection.yml'), 'utf8'), /baseUrl: '\{\{baseUrl\}\}'|baseUrl: "\{\{baseUrl\}\}"|baseUrl: \{\{baseUrl\}\}/);
+    await until(() => test.client().workspace.loaded.environments.some(item => item.environment.name === 'pets.openapi.test'), 'the environment of the server is there');
+    const serverEnvironment = test.client().workspace.loaded.environments.find(item => item.environment.name === 'pets.openapi.test');
+    assert.equal(test.client().workspace.activeEnvironmentId, serverEnvironment.environment.id, 'with no active environment the new one becomes active');
+    assert.equal(serverEnvironment.environment.vars[0].value, 'https://pets.openapi.test/v1');
+    // From an address: the text comes through the engine (here a stand-in), and an error is told, not written.
+    const originalFetch = importService.fetchText;
+    const fetched = [];
+    importService.fetchText = async address => { fetched.push(address); return JSON.stringify({ swagger: '2.0', info: { title: 'Old Pets', version: '1' }, host: 'old.openapi.test', paths: { '/ping': { get: { summary: 'Ping', responses: { 200: { description: 'ok' } } } } } }); };
+    importService.answers.openApi = async () => ({ kind: 'url', url: 'http://127.0.0.1:1/swagger.json' });
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importOpenApi');
+    assert.deepEqual(fetched, ['http://127.0.0.1:1/swagger.json']);
+    assert.deepEqual(importAsked, ['1 collection, 1 request, 1 environment']);
+    await until(() => nodeByLabel('Old Pets') !== undefined, 'the collection fetched from the address is in the tree');
+    const collectionsBefore = test.client().collections.length;
+    importService.fetchText = async () => { throw new Error('the server answered 404 Not Found'); };
+    await vscode.commands.executeCommand('apiClient.importOpenApi');
+    importService.fetchText = async () => 'this is not a description: [';
+    await vscode.commands.executeCommand('apiClient.importOpenApi');
+    importService.fetchText = originalFetch;
+    await sleep(300);
+    assert.equal(test.client().collections.length, collectionsBefore, 'a failed fetch and a text that is not a description write nothing');
+    assert.equal(importAsked.length, 1, 'and ask nothing');
+
+    // 22h. The routes of the controllers: read from the source files of the workspace (never run), with a folder for each controller; what is under
+    //      node_modules and the files of tests are not read; the port in the code is the address of the environment.
+    put('src/users.controller.ts', "import { Controller, Get, Post, Param, Body } from '@nestjs/common';\n@Controller('users')\nexport class UsersController {\n  @Get()\n  list() { return []; }\n  @Get(':id')\n  one(@Param('id') id: string) { return {}; }\n  @Post()\n  create(@Body() body: object) { return body; }\n}\n");
+    put('server/app.js', "const express = require('express');\nconst app = express();\napp.get('/health', (req, res) => res.send('ok'));\napp.listen(4000);\n");
+    put('node_modules/pkg/router.js', "const express = require('express');\nconst app = express();\napp.get('/ignored', () => {});\n");
+    put('src/users.controller.spec.ts', "import { Controller, Get } from '@nestjs/common';\n@Controller('tests')\nclass T {\n  @Get('ignored-too')\n  x() {}\n}\n");
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importRoutes');
+    assert.equal(importAsked.length, 1);
+    assert.match(importAsked[0], /^1 collection, \d+ folders?, 4 requests, 1 environment$/, importAsked[0]);
+    await until(() => nodeByLabel('workspace routes') !== undefined, 'the collection of the routes is in the tree');
+    const routes = nodeByLabel('workspace routes');
+    const labels = [];
+    const walk = node => { for (const child of node.children ?? []) { labels.push(child.label); walk(child); } };
+    walk(routes);
+    for (const expected of ['GET /users', 'GET /users/{id}', 'POST /users', 'GET /health']) assert.ok(labels.includes(expected), `${expected} is among ${labels.join(', ')}`);
+    assert.ok(!labels.some(label => /ignored/.test(label)), 'a file under node_modules and a test file are not read');
+    await until(() => test.client().workspace.loaded.environments.some(item => item.environment.vars.some(variable => variable.name === 'baseUrl' && variable.value === 'http://localhost:4000')), 'the environment has the port that the code listens on');
   } finally {
     importService.answers = {};
   }
