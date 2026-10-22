@@ -157,6 +157,14 @@ test('Cancelling stops the request, and the reason can be the person or a timeou
   assert.ok(server.requests.every(request => !request.url.startsWith('/echo')), 'a request that was cancelled before it was sent is never sent');
 }));
 
+test('The message about an address that cannot be used never repeats the password in it', async () => {
+  const bad = await rejectsWith(send(get('https://ann:s3cr3t-pw@'), BASE), 'invalid-url', /not a valid address/);
+  assert.ok(!bad.message.includes('s3cr3t-pw') && !JSON.stringify(bad).includes('s3cr3t-pw'), bad.message);
+  const empty = await rejectsWith(send(get('http://ann:s3cr3t-pw@:8080/x'), BASE), 'invalid-url');
+  assert.ok(!empty.message.includes('s3cr3t-pw'), empty.message);
+  assert.match(empty.message, /\*\*\*@/);
+});
+
 test('A server that sends a little and then nothing hits the idle timeout, and one that closes the connection is a reset', withServer(async server => {
   await rejectsWith(send(get(`${server.url}/stall`), { ...BASE, idleTimeoutMs: 150, timeoutMs: 5000 }), 'timeout', /sent nothing/);
   await rejectsWith(send(get(`${server.url}/reset`), BASE), 'reset');

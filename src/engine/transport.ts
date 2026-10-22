@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { connect as tlsConnect } from 'node:tls';
 import { pipeline } from 'node:stream/promises';
 import { Writable } from 'node:stream';
+import { withoutUserinfo } from '../util/address';
 import { prepareBody } from './body';
 import { refuseLocalAddresses } from './lookup';
 import { openTunnel, proxyAuthorization, type ResolvedProxy } from './proxy';
@@ -183,9 +184,9 @@ class Collector extends Writable {
 
 export async function exchange(request: WireRequest, options: ExchangeOptions): Promise<ExchangeResult> {
   let url: URL;
-  try { url = new URL(request.url); } catch { throw new EngineError('invalid-url', `${request.url} is not a valid address.`, 'An address starts with http:// or https://.'); }
+  try { url = new URL(request.url); } catch { throw new EngineError('invalid-url', `${withoutUserinfo(request.url)} is not a valid address.`, 'An address starts with http:// or https://.'); }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new EngineError('invalid-url', `Only http and https addresses can be requested, not ${url.protocol}`);
-  if (url.hostname === '') throw new EngineError('invalid-url', `${request.url} has no host.`);
+  if (url.hostname === '') throw new EngineError('invalid-url', `${withoutUserinfo(request.url)} has no host.`);
   const secure = url.protocol === 'https:';
   const prepared = await prepareBody(request.body);
   const method = request.method.toUpperCase();

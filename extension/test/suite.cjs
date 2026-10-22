@@ -1601,8 +1601,8 @@ exports.run = async function run() {
     await sleep(300);
     assert.equal(nodeByLabel('Thunder Orders').children.length, countBefore);
 
-    // 22g. An OpenAPI description, from a file and from an address: a collection with a folder for each tag, an environment with the server (the active
-    //      one when there was none), and a description that is not one writes nothing.
+    // 22g. An OpenAPI description, from a file and from an address: a collection with a folder for each tag, an environment with the server (not the active
+    //      one while the workspace has other collections that it would take over), and a description that is not one writes nothing.
     put('imports-src/petstore.yaml', [
       'openapi: 3.0.3', 'info:', '  title: Swagger Pets', '  version: 1.0.0', 'servers:', '  - url: https://pets.openapi.test/v1', 'tags:', '  - name: pets', 'paths:', '  /pets/{petId}:',
       '    get:', '      tags: [pets]', '      summary: Get a pet', '      parameters:', '        - {name: petId, in: path, required: true, schema: {type: integer, example: 7}}',
@@ -1628,7 +1628,8 @@ exports.run = async function run() {
     assert.match(fs.readFileSync(path.join(onDisk(swagger.path), 'collection.yml'), 'utf8'), /baseUrl: '\{\{baseUrl\}\}'|baseUrl: "\{\{baseUrl\}\}"|baseUrl: \{\{baseUrl\}\}/);
     await until(() => test.client().workspace.loaded.environments.some(item => item.environment.name === 'pets.openapi.test'), 'the environment of the server is there');
     const serverEnvironment = test.client().workspace.loaded.environments.find(item => item.environment.name === 'pets.openapi.test');
-    assert.equal(test.client().workspace.activeEnvironmentId, serverEnvironment.environment.id, 'with no active environment the new one becomes active');
+    assert.equal(test.client().workspace.activeEnvironmentId, undefined, 'the workspace has other collections, so the environment of the description does not take over their {{baseUrl}}');
+    await test.client().workspace.setActiveEnvironment(serverEnvironment.environment.id);
     assert.equal(serverEnvironment.environment.vars[0].value, 'https://pets.openapi.test/v1');
     // From an address: the text comes through the engine (here a stand-in), and an error is told, not written.
     const originalFetch = importService.fetchText;
@@ -1645,6 +1646,12 @@ exports.run = async function run() {
     await vscode.commands.executeCommand('apiClient.importOpenApi');
     importService.fetchText = async () => 'this is not a description: [';
     await vscode.commands.executeCommand('apiClient.importOpenApi');
+    // An address with a user name and a password in it is not fetched at all (the engine would drop them and the server would answer 401).
+    importService.fetchText = async address => { fetched.push(address); return ''; };
+    const fetchedBefore = fetched.length;
+    importService.answers.openApi = async () => ({ kind: 'url', url: 'http://ann:pw-secret@127.0.0.1:1/swagger.json' });
+    await vscode.commands.executeCommand('apiClient.importOpenApi');
+    assert.equal(fetched.length, fetchedBefore, 'an address with a user name and a password in it is not fetched');
     importService.fetchText = originalFetch;
     await sleep(300);
     assert.equal(test.client().collections.length, collectionsBefore, 'a failed fetch and a text that is not a description write nothing');

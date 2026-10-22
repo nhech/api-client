@@ -6,9 +6,12 @@ import { parsePostman, POSTMAN_LIMITS } from '../../src/importers/postman';
 import { importSummary, renderNotes } from '../../src/importers/report';
 import { detectRoutes, isRouteSource, ROUTE_CONFIG_FILES, ROUTE_EXTENSIONS, ROUTE_LIMITS, routesToImported, type SourceFile } from '../../src/importers/routes';
 import { findingNotes, thunderToImported } from '../../src/importers/thunder';
-import { countImported, type Imported } from '../../src/importers/types';
+import { mayActivateEnvironment } from '../../src/importers/activation';
+import { splitLargeFolders } from '../../src/importers/split';
+import { countImported, IMPORT_LIMITS, importedChars, type Imported } from '../../src/importers/types';
 import { buildTree } from '../../src/normalize/build';
 import { readSource, SourceError } from '../../src/reader/fs-reader';
+import { hasUserinfo } from '../../src/util/address';
 import { printable } from '../../src/util/chars';
 import { writeImported, writeRequestInto } from '../../src/storage/import';
 import type { ContainerNode } from '../../src/storage/store';
@@ -22,6 +25,8 @@ import type { VscodeHost } from './vscodeHost';
  * the notes (what could not be carried over) are one command away as a document. Nothing is written before the person has said yes.
  */
 export const NOTES_SCHEME = 'apiclient-import';
+
+const NO_USERINFO = 'An address with a user name or a password in it is not fetched. Download the description and import the file, or send the request from the client with the credentials in its authentication.';
 
 export class ImportNotes implements vscode.TextDocumentContentProvider {
   readonly uri = vscode.Uri.from({ scheme: NOTES_SCHEME, path: '/IMPORT_NOTES.md' });
@@ -82,12 +87,20 @@ export class ImportService implements vscode.Disposable {
   }
 
   /** Asks, writes, tells. Returns whether anything was written. */
-  private async finish(source: string, imported: Imported): Promise<boolean> {
+  private async finish(source: string, found: Imported): Promise<boolean> {
     const store = this.store();
     if (store === undefined) return false;
+    // A folder with more entries than the client can write and read back is split before anything is written.
+    const imported = splitLargeFolders(found);
+    const before = this.workspace.loaded;
     const counts = countImported(imported);
     this.notes.set(renderNotes(source, imported));
-    const summary = importSummary(counts);
+    const chars = importedChars(imported);
+    if (chars > IMPORT_LIMITS.chars) {
+      void vscode.window.showErrorMessage(`API Client: this import would write about ${Math.round(chars / 1_000_000)} MB of files, more than the ${Math.round(IMPORT_LIMITS.chars / 1_000_000)} MB that an import may write. Nothing was written.`);
+      return false;
+    }
+    const summary = `${importSummary(counts)}${chars >= 1_000_000 ? ` (about ${Math.round(chars / 1_000_000)} MB of files)` : ''}`;
     if (counts.requests === 0 && counts.environments === 0) {
       void vscode.window.showWarningMessage(`Nothing to import from ${source}: ${imported.notes.length > 0 ? 'the notes say what was found.' : 'no requests and no environments were found.'}`, ...(imported.notes.length > 0 ? ['Show Notes'] : [])).then(choice => { if (choice === 'Show Notes') void this.showNotes(); });
       return false;
@@ -102,14 +115,20 @@ export class ImportService implements vscode.Disposable {
       return writeImported(store, imported, controller.signal);
     });
     await this.workspace.reload();
-    // Requests that use {{baseUrl}} send nothing useful until an environment is the active one: when there is none, the first that came is.
-    const loaded = this.workspace.loaded;
-    const activeStays = loaded?.environments.some(item => item.environment.id === this.workspace.activeEnvironmentId) === true;
+    // Requests that use {{baseUrl}} send nothing useful until an environment is the active one. The first that came is made the active one only when it
+    // cannot send the requests of anything else to its address: see mayActivateEnvironment.
+    const hasActive = before?.environments.some(item => item.environment.id === this.workspace.activeEnvironmentId) === true;
     const first = written.environments[0];
     let activated = '';
-    if (first !== undefined && !activeStays) {
-      await this.workspace.setActiveEnvironment(first.id);
-      activated = ` The environment ${first.name} is now the active one.`;
+    if (first !== undefined && !hasActive) {
+      const may = mayActivateEnvironment({
+        hasActive, collectionsBefore: before?.collections.length ?? 0, workspaceVariables: before?.workspace.file.vars.map(variable => variable.name) ?? [],
+        environmentVariables: imported.environments[0]?.vars.map(variable => variable.name) ?? []
+      });
+      if (may) {
+        await this.workspace.setActiveEnvironment(first.id);
+        activated = ` The environment ${first.name} is now the active one.`;
+      } else activated = ` The environment ${first.name} is not the active one, because the workspace has other collections that it would send to its address: choose it in the status bar when you want it.`;
     }
     void vscode.window.showInformationMessage(`Imported ${importSummary(written.counts)} from ${source}.${activated}`, ...(imported.notes.length > 0 ? ['Show Notes'] : [])).then(choice => { if (choice === 'Show Notes') void this.showNotes(); });
     return true;
@@ -187,12 +206,13 @@ export class ImportService implements vscode.Disposable {
       } else {
         const url = await vscode.window.showInputBox({
           title: 'Import an OpenAPI or Swagger description', prompt: 'The address of the description (it is fetched with a GET request)', placeHolder: 'http://localhost:8080/v3/api-docs', ignoreFocusOut: true,
-          validateInput: value => (/^https?:\/\/[^\s/]+/i.test(value.trim()) ? undefined : 'Start with http:// or https://')
+          validateInput: value => (!/^https?:\/\/[^\s/]+/i.test(value.trim()) ? 'Start with http:// or https://' : hasUserinfo(value) ? NO_USERINFO : undefined)
         });
         where = url === undefined || url.trim() === '' ? undefined : { kind: 'url', url: url.trim() };
       }
     }
     if (where === undefined) return;
+    if (where.kind === 'url' && hasUserinfo(where.url)) { void vscode.window.showErrorMessage(`API Client: ${NO_USERINFO}`); return; }
     let source: string;
     let content: string;
     try {

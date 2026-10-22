@@ -30,6 +30,12 @@ const ENVIRONMENT_SUFFIX = '.env.yml';
 const LOCAL_FILE_MODE = 0o600;
 const GITIGNORE_LINES = ['*.local.yml', '.runs/'];
 
+/**
+ * A slug that the line `*.local.yml` of the `.gitignore` of the client (the files of secret values) does not match: a folder called `Billing.local.yml`
+ * would be ignored by Git as a whole, with every request in it.
+ */
+const trackable = (slug: string): string => slug.replace(/\.local\.ya?ml$/i, match => match.replace(/\./g, '-'));
+
 export interface RequestNode {
   kind: 'request';
   /** The file, relative to the workspace folder. */
@@ -325,7 +331,7 @@ export class Store {
     const taken = (await this.fs.list(dir)).map(entry => entry.name);
     const mine = own === undefined ? [] : [own, `${own}${REQUEST_SUFFIX}`].map(item => item.toLowerCase());
     const reserved = taken.filter(entry => !mine.includes(entry.toLowerCase()));
-    const result = uniqueSlugs([kebab(name)], LIMITS.maxSlugChars, reserved, slug => [slug, `${slug}${REQUEST_SUFFIX}`]);
+    const result = uniqueSlugs([trackable(kebab(name))], LIMITS.maxSlugChars, reserved, slug => [slug, `${slug}${REQUEST_SUFFIX}`]);
     return (result[0] as { slug: string }).slug;
   }
 
