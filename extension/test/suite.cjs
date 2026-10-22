@@ -98,7 +98,7 @@ exports.run = async function run() {
 
   // 6. The importer panel: the main command opens it, it loads under its Content-Security-Policy and says so, and the messages the page
   //    sends (here sent as the page would) read the data, plan, and write. Nothing is written until "import".
-  const extension = vscode.extensions.getExtension('longtd.api-client');
+  const extension = vscode.extensions.getExtension('longtd.local-api-client');
   assert.ok(extension && extension.isActive, 'the extension is active');
   const test = extension.exports;
   assert.ok(test && typeof test.panel === 'function', 'the test interface is there when the runner asks for it');

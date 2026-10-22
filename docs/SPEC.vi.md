@@ -1,7 +1,7 @@
 # Đặc tả importer: Thunder Client → API client mới
 
 Trạng thái: 0.1, 2026-10-21 (xem [CHANGELOG](../CHANGELOG.md)).
-Phạm vi: chỉ phần **nhập dữ liệu từ Thunder Client** (bộ chuyển đổi ra file `.http`). Runtime gửi request nay nằm trong cùng extension (mã định danh `longtd.api-client`) và có tài liệu riêng ở [docs/client/](client/) và [SECURITY.md](../SECURITY.md); các ràng buộc dưới đây (C1 đến C4) là của **bộ chuyển đổi**, trừ khi ghi khác.
+Phạm vi: chỉ phần **nhập dữ liệu từ Thunder Client** (bộ chuyển đổi ra file `.http`). Runtime gửi request nay nằm trong cùng extension (mã định danh `longtd.local-api-client`) và có tài liệu riêng ở [docs/client/](client/) và [SECURITY.md](../SECURITY.md); các ràng buộc dưới đây (C1 đến C4) là của **bộ chuyển đổi**, trừ khi ghi khác.
 
 Tên extension: **HTTP Files Importer** (chốt 2026-10-21; mã định danh `longtd.http-files-importer`). Tên và icon không chứa chữ "Thunder Client"; mô tả và từ khóa chỉ dùng tên đó để chỉ định dạng nguồn ("nhập collection của Thunder Client"), kèm lời nói rõ là không liên kết với Thunder Client (README). Phần còn lại của tài liệu gọi sản phẩm tương lai là "API client".
 

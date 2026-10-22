@@ -25,7 +25,7 @@ English: [README.md](README.md) (bản đầy đủ nhất).
 
 ## Bắt đầu nhanh
 
-Cài **API Client** từ [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.api-client) (tìm trong Extensions, hoặc `ext install longtd.api-client`) hoặc từ Open VSX. Cần VS Code 1.100 trở lên và workspace cục bộ **đã tin cậy** (tắt trong Restricted Mode, trên trình duyệt và trong workspace ảo). Remote SSH, WSL và container chưa được thử bằng tay.
+Cài **API Client** từ [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.local-api-client) (tìm trong Extensions, hoặc `ext install longtd.local-api-client`) hoặc từ Open VSX. Cần VS Code 1.100 trở lên và workspace cục bộ **đã tin cậy** (tắt trong Restricted Mode, trên trình duyệt và trong workspace ảo). Remote SSH, WSL và container chưa được thử bằng tay.
 
 1. Mở một thư mục và biểu tượng **API Client** ở Activity Bar. *New Collection...* tạo `api-client/collections/<tên>/`.
 2. *New Request...* trên collection. Gõ địa chỉ rồi bấm **Ctrl+Enter** (**Cmd+Enter** trên Mac) hoặc nút Send.

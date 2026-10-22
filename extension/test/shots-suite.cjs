@@ -22,7 +22,7 @@ async function shot(name, width, height, settle) {
 
 exports.run = async function run() {
   await sleep(3000);
-  const extension = vscode.extensions.getExtension('longtd.api-client');
+  const extension = vscode.extensions.getExtension('longtd.local-api-client');
   // The Explorer view: its welcome text, with the button that opens the panel.
   if (theme === 'dark') {
     await vscode.commands.executeCommand('workbench.view.explorer');

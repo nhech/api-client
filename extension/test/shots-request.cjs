@@ -31,7 +31,7 @@ const PETS = [
 exports.run = async function run() {
   const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
   await sleep(2500);
-  const extension = vscode.extensions.getExtension('longtd.api-client');
+  const extension = vscode.extensions.getExtension('longtd.local-api-client');
   const test = await extension.activate();
 
   const server = http.createServer((req, res) => {

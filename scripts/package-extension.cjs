@@ -55,7 +55,7 @@ function verify(file) {
 
   const packed = JSON.parse(text('extension/package.json') || '{}');
   if (packed.publisher !== 'longtd') fail(`publisher is "${packed.publisher}", not longtd`);
-  if (packed.name !== 'api-client') fail(`name is "${packed.name}"`);
+  if (packed.name !== 'local-api-client') fail(`name is "${packed.name}"`);
   if (packed.private !== undefined) fail('the manifest is marked private');
   if (packed.preview !== true) fail('the manifest is not marked as a preview');
   if (packed.dependencies !== undefined || packed.devDependencies !== undefined) fail('the manifest lists dependencies');
