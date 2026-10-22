@@ -16,7 +16,7 @@ const timed = <T>(run: () => T): { value: T; ms: number } => {
 test('The module names what it reads: the extensions and the configuration files', () => {
   assert.ok(ROUTE_EXTENSIONS.includes('.ts') && ROUTE_EXTENSIONS.includes('.java') && ROUTE_EXTENSIONS.includes('.rs') && ROUTE_EXTENSIONS.includes('.cs'));
   assert.deepEqual([...ROUTE_CONFIG_FILES].sort(), ['.env', 'application.properties', 'application.yaml', 'application.yml', 'appsettings.json', 'launchSettings.json']);
-  assert.deepEqual(ROUTE_LIMITS, { files: 5000, fileChars: 1_000_000, lineChars: 2000, routes: 20_000, notes: 100 });
+  assert.deepEqual(ROUTE_LIMITS, { files: 5000, fileChars: 1_000_000, lineChars: 2000, routes: 20_000, notes: 100, edges: 2000, totalChars: 32 * 1024 * 1024 });
 });
 
 test('A project with no route says so and has no address', () => {

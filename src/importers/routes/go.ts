@@ -23,6 +23,8 @@ const PATTERN = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(?:[^\s/]*)(\/.*)$/
 const MEMBER = /^[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*){0,3}$/;
 const CLIENT_NAMES = new Set(['client', 'resp', 'req', 'res', 'ctx', 'c', 'cache', 'm', 'cfg', 'config', 'viper', 'os', 'env', 'strings']);
 
+const MAX_SCOPES = 200;
+
 interface Scope {
   start: number;
   end: number;
@@ -53,6 +55,7 @@ export function scanGo(file: SourceFile): FileResult {
   const group = groupFromFile(file.path);
   const groups = new Map<string, string>();
   const scopes: Scope[] = [];
+  let cappedScopes = false;
   const prefixFor = (receiver: string, at: number): string => {
     let inner: Scope | undefined;
     for (const scope of scopes) if (scope.param === receiver && scope.start < at && at < scope.end && (inner === undefined || scope.start > inner.start)) inner = scope;
@@ -90,8 +93,11 @@ export function scanGo(file: SourceFile): FileResult {
     const end = brace < 0 ? -1 : (prepared.close[brace] ?? -1);
     if (param === '' || end < 0) continue;
     if (match[2] === 'Route' && path === undefined) continue;
+    // The groups that are looked at are limited: every route is placed among them, and a hostile file could make that a square.
+    if (scopes.length >= MAX_SCOPES) { cappedScopes = true; break; }
     scopes.push({ start: brace, end, param, prefix: joinPaths(prefixFor(match[1] as string, at), path ?? '') });
   }
+  if (cappedScopes) result.notes.push(`More than ${MAX_SCOPES} groups of routes (Route, Group) in a file: the later ones were not followed, so their routes can lack a prefix.`);
 
   for (const match of masked.matchAll(CALL)) {
     if (result.routes.length > ROUTE_LIMITS.routes) break;

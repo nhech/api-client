@@ -1,6 +1,6 @@
 import { makeRoute, methodOf, unique, type FileResult } from './internal';
 import { colonParams, joinPaths } from './paths';
-import { argRanges, identAt, lineOf, skipSpace, stringArg, type Prepared } from './scan';
+import { argRanges, identAt, indexWithin, lineOf, skipSpace, stringArg, type Prepared } from './scan';
 import { ROUTE_LIMITS, type SourceFile } from './types';
 
 /**
@@ -80,7 +80,11 @@ export function scanNest(file: SourceFile, prepared: Prepared, result: FileResul
   const clean = prepared.clean;
   const prefix = /\bsetGlobalPrefix\s*\(\s*(['"`])([^'"`\n]{0,200})\1/.exec(clean);
   if (prefix !== null) result.globalPrefix = prefix[2] as string;
+  // The end of the class that was read last: a controller inside it is part of it, so that no text is read more than once.
+  let readTo = 0;
+  let nested = 0;
   for (const controller of masked.matchAll(/@Controller\s*\(/g)) {
+    if ((controller.index ?? 0) < readTo) { nested++; continue; }
     const decorator = (controller.index ?? 0) + controller[0].length - 1;
     const closeAt = prepared.close[decorator] ?? -1;
     if (closeAt < 0) continue;
@@ -90,10 +94,11 @@ export function scanNest(file: SourceFile, prepared: Prepared, result: FileResul
     const named = /\bclass\s+([A-Za-z_$][\w$]*)/.exec(masked.slice(closeAt + 1, closeAt + 700));
     if (named === null) continue;
     const nameEnd = closeAt + 1 + (named.index ?? 0) + named[0].length;
-    const brace = masked.indexOf('{', nameEnd);
-    if (brace < 0 || brace - nameEnd > 500) continue;
+    const brace = indexWithin(masked, '{', nameEnd, nameEnd + 500);
+    if (brace < 0) continue;
     const end = prepared.close[brace] ?? -1;
     if (end < 0) continue;
+    readTo = end;
     // Only the body of the class is looked at, so that a file of many classes is read once.
     for (const match of masked.slice(brace, end).matchAll(METHOD)) {
       if (result.routes.length > ROUTE_LIMITS.routes) return;
@@ -113,4 +118,5 @@ export function scanNest(file: SourceFile, prepared: Prepared, result: FileResul
       }));
     }
   }
+  if (nested > 0) result.notes.push(`${nested === 1 ? 'A NestJS controller declared' : `${nested} NestJS controllers declared`} inside another class ${nested === 1 ? 'was' : 'were'} read as part of it.`);
 }

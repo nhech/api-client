@@ -12,13 +12,13 @@ import { compareCodePoints } from '../../util/chars';
 import { ROUTE_CONFIG_FILES, ROUTE_EXTENSIONS, ROUTE_LIMITS, ROUTE_METHODS, type DetectedRoute, type RoutesResult, type SourceFile } from './types';
 
 /** The folders that hold what is built, installed or tested, not what the person wrote: the routes in them are not the routes of the project. */
-const SKIPPED_FOLDERS = new Set([
+const SKIPPED_FOLDERS = new Set<string>([
   'node_modules', 'dist', 'build', 'out', 'target', 'bin', 'obj', 'vendor', 'venv', '.venv', 'env', '__pycache__', '.git', 'coverage', 'test', 'tests', '__tests__', 'e2e', 'spec', 'specs',
   '.next', '.nuxt', 'site-packages', '.gradle', '.mvn', '.idea', '.vs'
 ]);
+/** The names of those folders, for whoever searches the files of a project: the search can leave them out and not list their files. */
+export const ROUTE_SKIPPED_FOLDERS: readonly string[] = [...SKIPPED_FOLDERS];
 const TEST_FILE = /(?:\.(?:test|spec)\.[A-Za-z]+$|_test\.(?:go|py)$|(?:^|\/)test_[^/]*\.py$|Tests?\.(?:java|kt)$|Tests\.cs$|\.d\.ts$|\.min\.js$)/;
-/** The most characters of all the sources that are read: the rest is not looked at. */
-const TOTAL_CHARS = 64 * 1024 * 1024;
 /** A path longer than this is not a route of a program: it is what nested groups of a hostile file add up to. */
 const MAX_PATH_CHARS = 2000;
 
@@ -103,21 +103,35 @@ class Mounts {
   }
 
   /** The prefix that the router `receiver` of `file` is mounted below, all the way up. */
-  prefixOf(file: string, receiver: string, depth = 0, visiting: ReadonlySet<string> = new Set()): string {
+  prefixOf(file: string, receiver: string): string {
+    return this.resolve(file, receiver, 0, new Set()).prefix;
+  }
+
+  /**
+   * `cut` is set when a loop or the depth limit was met below: such an answer depends on the way it was reached and is not kept, any other answer is, at
+   * every depth, so that a router that many routers are mounted below is worked out once.
+   */
+  private resolve(file: string, receiver: string, depth: number, visiting: Set<string>): { prefix: string; cut: boolean } {
     const key = `${file}\u0000${receiver}`;
     const known = this.memo.get(key);
-    if (known !== undefined) return known;
-    if (depth > 8 || visiting.has(key)) return '';
-    const candidates = [...(this.local.get(key) ?? []), ...(this.imported.get(file) ?? [])].sort((a, b) => a.order - b.order);
-    const edge = candidates.find(candidate => this.matches(candidate.edge, file, receiver))?.edge;
+    if (known !== undefined) return { prefix: known, cut: false };
+    if (depth > 8 || visiting.has(key)) return { prefix: '', cut: true };
+    // Both lists are in the order of the mounts: the first that matches in each, and the one of the two that came first.
+    const local = this.local.get(key)?.find(candidate => this.matches(candidate.edge, file, receiver));
+    const imported = this.imported.get(file)?.find(candidate => this.matches(candidate.edge, file, receiver));
+    const chosen = local === undefined ? imported : imported === undefined ? local : local.order <= imported.order ? local : imported;
     let prefix = '';
-    if (edge !== undefined) {
-      const parent = this.prefixOf(edge.file, edge.parent, depth + 1, new Set([...visiting, key]));
-      prefix = joinPaths(parent, edge.prefix);
+    let cut = false;
+    if (chosen !== undefined) {
+      visiting.add(key);
+      const parent = this.resolve(chosen.edge.file, chosen.edge.parent, depth + 1, visiting);
+      visiting.delete(key);
+      prefix = joinPaths(parent.prefix, chosen.edge.prefix);
       if (prefix === '/') prefix = '';
+      cut = parent.cut;
     }
-    if (depth === 0) this.memo.set(key, prefix);
-    return prefix;
+    if (!cut) this.memo.set(key, prefix);
+    return { prefix, cut };
   }
 
   private matches(edge: Edge, file: string, receiver: string): boolean {
@@ -131,27 +145,50 @@ class Mounts {
 
 // ---- the whole project ----
 
+/** The words that a source file of each language has when it can hold a route: a file without them is not looked at. */
+const MARKERS: Record<string, RegExp> = {
+  js: /express|fastify|koa|hono|elysia|restify|@nestjs/,
+  jvm: /@(?:Rest)?Controller\b/,
+  cs: /Controller|Map(?:Get|Post|Put|Delete|Patch)/,
+  py: /fastapi|flask|urlpatterns/i,
+  php: /Route\s*::/,
+  go: /net\/http|gin-gonic|labstack|gofiber|go-chi|gorilla|httprouter/,
+  rs: /actix|rocket/
+};
+
+function languageOf(path: string): keyof typeof MARKERS | undefined {
+  switch (path.slice(path.lastIndexOf('.')).toLowerCase()) {
+    case '.js': case '.jsx': case '.mjs': case '.cjs': case '.ts': case '.tsx': case '.mts': case '.cts': return 'js';
+    case '.java': case '.kt': return 'jvm';
+    case '.cs': return 'cs';
+    case '.py': return 'py';
+    case '.php': return 'php';
+    case '.go': return 'go';
+    case '.rs': return 'rs';
+    default: return undefined;
+  }
+}
+
+/**
+ * Whether a source file has the words of a framework that has routes, as the scan decides it. Whoever reads the files of a project can drop the text of the
+ * others at once (their names are still needed, to resolve what a file imports) and keep what it holds small.
+ */
+export function mayHaveRoutes(path: string, text: string): boolean {
+  const language = languageOf(path);
+  return language !== undefined && (MARKERS[language] as RegExp).test(text);
+}
+
 function scan(file: SourceFile, paths: ReadonlySet<string>, list: readonly string[]): FileResult {
-  const dot = file.path.lastIndexOf('.');
-  const extension = file.path.slice(dot).toLowerCase();
-  const text = file.text;
-  switch (extension) {
-    case '.js': case '.jsx': case '.mjs': case '.cjs': case '.ts': case '.tsx': case '.mts': case '.cts':
-      return /express|fastify|koa|hono|elysia|restify|@nestjs/.test(text) ? scanJs(file, (from, spec) => resolveJs(paths, from, spec)) : emptyResult();
-    case '.java': case '.kt':
-      return /@(?:Rest)?Controller\b/.test(text) ? scanJvm(file) : emptyResult();
-    case '.cs':
-      return /Controller|Map(?:Get|Post|Put|Delete|Patch)/.test(text) ? scanDotnet(file) : emptyResult();
-    case '.py':
-      return /fastapi|flask|urlpatterns/i.test(text) ? scanPython(file, (from, dotted) => resolvePython(list, paths, from, dotted)) : emptyResult();
-    case '.php':
-      return /Route\s*::/.test(text) ? scanPhp(file) : emptyResult();
-    case '.go':
-      return /net\/http|gin-gonic|labstack|gofiber|go-chi|gorilla|httprouter/.test(text) ? scanGo(file) : emptyResult();
-    case '.rs':
-      return /actix|rocket/.test(text) ? scanRust(file) : emptyResult();
-    default:
-      return emptyResult();
+  const language = languageOf(file.path);
+  if (language === undefined || !(MARKERS[language] as RegExp).test(file.text)) return emptyResult();
+  switch (language) {
+    case 'js': return scanJs(file, (from, spec) => resolveJs(paths, from, spec));
+    case 'jvm': return scanJvm(file);
+    case 'cs': return scanDotnet(file);
+    case 'py': return scanPython(file, (from, dotted) => resolvePython(list, paths, from, dotted));
+    case 'php': return scanPhp(file);
+    case 'go': return scanGo(file);
+    default: return scanRust(file);
   }
 }
 
@@ -172,14 +209,26 @@ export function detectRoutes(files: readonly SourceFile[]): RoutesResult {
   let total = 0;
   let tooLarge = 0;
   let overBudget = 0;
+  let kept = 0;
+  let edgeCount = 0;
+  let edgesCut = false;
   for (const file of sources) {
     if (file.text.length > ROUTE_LIMITS.fileChars) { tooLarge++; continue; }
-    if (total + file.text.length > TOTAL_CHARS) { overBudget++; continue; }
+    if (total + file.text.length > ROUTE_LIMITS.totalChars) { overBudget++; continue; }
     total += file.text.length;
     filesRead++;
     const result = scan(file, paths, list);
-    if (result.routes.length > 0 || result.edges.length > 0 || result.port !== undefined || result.globalPrefix !== undefined || result.notes.length > 0 || result.longLines > 0) results.set(file.path, result);
+    const worthKeeping = result.routes.length > 0 || result.edges.length > 0 || result.port !== undefined || result.globalPrefix !== undefined || result.notes.length > 0 || result.longLines > 0;
+    // What is kept of all the files together is limited as it is found, not when they are put together: a file gives up to 20000 routes and 1600 of them would hold gigabytes.
+    const room = Math.max(0, ROUTE_LIMITS.routes * 2 - kept);
+    if (result.routes.length > room) result.routes.length = room;
+    kept += result.routes.length;
+    const edgeRoom = Math.max(0, ROUTE_LIMITS.edges - edgeCount);
+    if (result.edges.length > edgeRoom) { result.edges.length = edgeRoom; edgesCut = true; }
+    edgeCount += result.edges.length;
+    if (worthKeeping) results.set(file.path, result);
   }
+  if (edgesCut) note(`More than ${ROUTE_LIMITS.edges} routers are mounted below others: the later ones were not followed, so their routes can lack a prefix.`);
 
   const raw: RawRoute[] = [];
   const edges: Edge[] = [];
@@ -192,8 +241,8 @@ export function detectRoutes(files: readonly SourceFile[]): RoutesResult {
   for (const path of [...results.keys()].sort(compareCodePoints)) {
     const result = results.get(path) as FileResult;
     // Files that together give more routes than can be kept are not all held in memory.
-    if (raw.length < ROUTE_LIMITS.routes * 2) raw.push(...result.routes.slice(0, ROUTE_LIMITS.routes * 2 - raw.length));
-    edges.push(...result.edges);
+    for (const route of result.routes) raw.push(route);
+    for (const edge of result.edges) edges.push(edge);
     computed += result.computed;
     anyRoutes += result.anyRoutes;
     longLines += result.longLines;
@@ -212,6 +261,8 @@ export function detectRoutes(files: readonly SourceFile[]): RoutesResult {
       if (prefix !== '') path = joinPaths(prefix, path);
     }
     if (route.framework === 'NestJS' && globalPrefix !== undefined) path = joinPaths(globalPrefix, path);
+    // The client puts the value of {{name}} into an address: a path that has the braces of a variable is not a path the program has, and is not imported.
+    if (path.includes('{{') || path.includes('}}')) { computed++; continue; }
     if (path.length > MAX_PATH_CHARS) { longPaths++; continue; }
     const key = `${route.file}\u0000${route.method}\u0000${path}`;
     if (seen.has(key)) continue;
@@ -237,15 +288,14 @@ export function detectRoutes(files: readonly SourceFile[]): RoutesResult {
   if (tooLarge > 0) messages.push(`${tooLarge} ${tooLarge === 1 ? 'file was' : 'files were'} not read because ${tooLarge === 1 ? 'it has' : 'they have'} more than ${ROUTE_LIMITS.fileChars} characters.`);
   if (overBudget > 0) messages.push(`${overBudget} ${overBudget === 1 ? 'file was' : 'files were'} not read because the sources together are too large.`);
   if (longLines > 0) messages.push(`${longLines} ${longLines === 1 ? 'line' : 'lines'} with more than ${ROUTE_LIMITS.lineChars} characters ${longLines === 1 ? 'was' : 'were'} skipped (a minified file?).`);
-  const merged = [...messages, ...notes].slice(0, ROUTE_LIMITS.notes);
-
   let baseUrl: string | undefined;
   if (routes.length > 0) {
     const counts = new Map<string, number>();
     for (const route of routes) counts.set(route.framework, (counts.get(route.framework) ?? 0) + 1);
     const primary = [...counts.entries()].sort((a, b) => b[1] - a[1] || compareCodePoints(a[0], b[0]))[0]?.[0] ?? 'Express';
-    baseUrl = guessBaseUrl(primary, configs, codePort);
+    baseUrl = guessBaseUrl(primary, configs, codePort, messages);
   }
+  const merged = [...messages, ...notes].slice(0, ROUTE_LIMITS.notes);
   return { routes, frameworks, filesRead, notes: unique(merged), baseUrl };
 }
 

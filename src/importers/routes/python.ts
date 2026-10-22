@@ -140,6 +140,8 @@ function defAfter(prepared: Prepared, from: number): { name: string; openAt: num
 
 function decoratorRoutes(file: SourceFile, prepared: Prepared, result: FileResult, receivers: Map<string, Receiver>): void {
   const group = groupFromFile(file.path);
+  /** Whether the file is Flask and not FastAPI, decided once: it reads the whole text. */
+  let flaskOnly: boolean | undefined;
   const DECORATOR = /^[ \t]*@([A-Za-z_]\w{0,60})\s*\.\s*(get|post|put|patch|delete|head|options|route|api_route)\s*\(/gm;
   for (const match of prepared.masked.matchAll(DECORATOR)) {
     if (result.routes.length > ROUTE_LIMITS.routes) return;
@@ -153,7 +155,7 @@ function decoratorRoutes(file: SourceFile, prepared: Prepared, result: FileResul
     if (closeAt < 0) continue;
     const { path, ranges } = pathArg(prepared, openAt);
     if (path === undefined) { if (ranges.length > 0) result.computed++; continue; }
-    const framework = receivers.has(name) ? receiver.framework : /\bflask\b/i.test(prepared.clean) && !/\bfastapi\b/i.test(prepared.clean) ? 'Flask' : receiver.framework;
+    const framework = receivers.has(name) ? receiver.framework : (flaskOnly ??= /\bflask\b/i.test(prepared.clean) && !/\bfastapi\b/i.test(prepared.clean)) ? 'Flask' : receiver.framework;
     let methods: RouteMethod[];
     if (verb === 'route' || verb === 'api_route') {
       const listed = keyword(prepared, ranges, 'methods');

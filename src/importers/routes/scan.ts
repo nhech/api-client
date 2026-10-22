@@ -57,6 +57,8 @@ function scan(text: string, lang: Lang): { comments: number[]; all: number[] } {
   const hash = lang === 'python' || lang === 'php';
   let blockMissing = false;
   const tripleMissing = new Set<string>();
+  /** The closers of a raw string of Rust (a quote and some hashes) that the rest of the text does not have: once it is known, it is not searched for again. */
+  const rawMissing = new Set<number>();
   /** The depth of the braces of each open `${` of a template literal. */
   const holes: number[] = [];
 
@@ -114,8 +116,11 @@ function scan(text: string, lang: Lang): { comments: number[]; all: number[] } {
       let hashes = 0;
       while (back >= 0 && text.charCodeAt(back) === 35) { hashes++; back--; }
       if (back >= 0 && text.charCodeAt(back) === 114 && (back === 0 || !/\w/.test(text[back - 1] ?? ''))) {
-        const end = text.indexOf(`"${'#'.repeat(hashes)}`, start + 1);
-        if (end >= 0) { text_(start + 1, end); return end + 1 + hashes; }
+        if (!rawMissing.has(hashes)) {
+          const end = text.indexOf(`"${'#'.repeat(hashes)}`, start + 1);
+          if (end >= 0) { text_(start + 1, end); return end + 1 + hashes; }
+          rawMissing.add(hashes);
+        }
       }
     }
     if (lang === 'rust' && quote === 39) {

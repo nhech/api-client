@@ -118,6 +118,7 @@ export function scanPhp(file: SourceFile): FileResult {
       const end = brace < 0 ? -1 : (prepared.close[brace] ?? -1);
       // The groups that are looked at are limited: every route is placed among them, and a hostile file could make that a square.
       if (end >= 0 && scopes.length < MAX_SCOPES) scopes.push({ start: brace, end, prefix: joinPaths(...own), controller });
+      else if (end >= 0 && !result.notes.some(note => note.startsWith('More than'))) result.notes.push(`More than ${MAX_SCOPES} groups of routes (Route::group) in a file: the later ones were not followed, so their routes can lack a prefix.`);
       continue;
     }
     // What `prefix` and `controller` said before the verb belongs to this route only.

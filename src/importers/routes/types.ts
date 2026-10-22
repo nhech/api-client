@@ -44,7 +44,7 @@ export interface RoutesResult {
 }
 
 /** The limits of what is read from a project: more than this is not a controller somebody wrote by hand. */
-export const ROUTE_LIMITS = { files: 5000, fileChars: 1_000_000, lineChars: 2000, routes: 20_000, notes: 100 } as const;
+export const ROUTE_LIMITS = { files: 5000, fileChars: 1_000_000, lineChars: 2000, routes: 20_000, notes: 100, edges: 2000, totalChars: 32 * 1024 * 1024 } as const;
 
 /** The source files that can hold a route. */
 export const ROUTE_EXTENSIONS: readonly string[] = ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts', '.java', '.kt', '.cs', '.py', '.php', '.go', '.rs'];

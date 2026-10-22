@@ -41,24 +41,29 @@ function mappingOf(prepared: Prepared, at: number): Mapping {
 
 /** The text without annotations, to read the name of a parameter. */
 function declarationName(text: string): string {
-  let rest = text;
+  // One pass: the pieces between the annotations are kept, so that a parameter with thousands of annotations is not copied once for each.
+  const pieces: string[] = [];
+  let last = 0;
   for (;;) {
-    const at = rest.indexOf('@');
+    const at = text.indexOf('@', last);
     if (at < 0) break;
-    const ident = identAt(rest, at + 1);
+    const ident = identAt(text, at + 1);
     let end = at + 1 + ident.length;
-    const after = skipSpace(rest, end);
-    if (rest[after] === '(') {
+    const after = skipSpace(text, end);
+    if (text[after] === '(') {
       let depth = 0;
       let index = after;
-      for (; index < rest.length; index++) {
-        if (rest[index] === '(') depth++;
-        else if (rest[index] === ')' && --depth === 0) break;
+      for (; index < text.length; index++) {
+        if (text[index] === '(') depth++;
+        else if (text[index] === ')' && --depth === 0) break;
       }
       end = index + 1;
     }
-    rest = `${rest.slice(0, at)} ${rest.slice(end)}`;
+    pieces.push(text.slice(last, at), ' ');
+    last = end;
   }
+  pieces.push(text.slice(last));
+  let rest = pieces.join('');
   const equals = rest.indexOf('=');
   if (equals >= 0) rest = rest.slice(0, equals);
   const colon = rest.indexOf(':');
@@ -131,6 +136,8 @@ export function scanJvm(file: SourceFile): FileResult {
   result.longLines = prepared.longLines;
   const { masked } = prepared;
   let lastEnd = 0;
+  /** The parameters of a method, by where they start: a method with many mappings on it is read once. */
+  const parameters = new Map<number, ReturnType<typeof parametersOf>>();
   CONTROLLER.lastIndex = 0;
   for (let controller = CONTROLLER.exec(masked); controller !== null; controller = CONTROLLER.exec(masked)) {
     const at = controller.index;
@@ -166,7 +173,8 @@ export function scanJvm(file: SourceFile): FileResult {
       const afterName = skipSpace(masked, mappingAt + mapping[0].length);
       const signature = methodAfter(prepared, masked[afterName] === '(' ? (prepared.close[afterName] ?? afterName) + 1 : afterName);
       if (signature === undefined) continue;
-      const params = parametersOf(prepared, signature.openAt);
+      let params = parameters.get(signature.openAt);
+      if (params === undefined) { params = parametersOf(prepared, signature.openAt); parameters.set(signature.openAt, params); }
       let methods: RouteMethod[];
       let any = false;
       if (kind === 'Request') {

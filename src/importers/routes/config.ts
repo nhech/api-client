@@ -44,6 +44,9 @@ function yamlKeys(text: string): Map<string, string> {
   return found;
 }
 
+/** A context path is a path: letters, digits and a few marks. It goes into the address of every request, so braces, a host or anything that changes the address are not taken. */
+const plainContext = (context: string): string => (/^[\w./~-]{1,200}$/.test(context) && !context.includes('..') ? context : '');
+
 function springBase(files: readonly SourceFile[]): string | undefined {
   const properties = pick(files, 'application.properties');
   const yaml = pick(files, 'application.yml') ?? pick(files, 'application.yaml');
@@ -51,19 +54,19 @@ function springBase(files: readonly SourceFile[]): string | undefined {
   let context = '';
   if (properties !== undefined) {
     port = portOf(/^\s*server\.port\s*[=:]\s*(\d{2,5})\s*$/m.exec(properties.text)?.[1]);
-    context = /^\s*server\.(?:servlet\.)?context-path\s*[=:]\s*(\S{1,200})\s*$/m.exec(properties.text)?.[1] ?? '';
+    context = plainContext(/^\s*server\.(?:servlet\.)?context-path\s*[=:]\s*(\S{1,200})\s*$/m.exec(properties.text)?.[1] ?? '');
   }
   if (yaml !== undefined && (port === undefined || context === '')) {
     const keys = yamlKeys(yaml.text);
     port ??= portOf(keys.get('server.port'));
-    if (context === '') context = keys.get('server.servlet.context-path') ?? keys.get('server.context-path') ?? '';
+    if (context === '') context = plainContext(keys.get('server.servlet.context-path') ?? keys.get('server.context-path') ?? '');
   }
   if (port === undefined && context === '') return undefined;
   const path = context === '' || context === '/' ? '' : `/${context.replace(/^\/+|\/+$/g, '')}`;
   return `http://localhost:${port ?? 8080}${path}`;
 }
 
-function dotnetBase(files: readonly SourceFile[]): string | undefined {
+function dotnetBase(files: readonly SourceFile[], notes: string[]): string | undefined {
   const launch = pick(files, 'launchSettings.json');
   const urls: string[] = [];
   const collect = (value: unknown): void => {
@@ -87,14 +90,25 @@ function dotnetBase(files: readonly SourceFile[]): string | undefined {
   }
   const valid = urls.map(url => url.trim()).filter(url => /^https?:\/\/[A-Za-z0-9.*+_[\]:-]{1,100}(?::\d{2,5})?\/?$/.test(url));
   const chosen = valid.find(url => url.startsWith('http://')) ?? valid[0];
-  return chosen === undefined ? undefined : chosen.replace(/\/$/, '').replace(/\/\/(?:\*|\+|0\.0\.0\.0|\[::\])/, '//localhost');
+  if (chosen === undefined) return undefined;
+  // The address is the one the program listens on, on this machine: a host that is not this machine (a file in a repository can say anything) is not taken,
+  // because every request would be sent to it. Only the scheme and the port are.
+  const parts = /^(https?):\/\/([^:/[]+|\[[^\]]+\])(?::(\d{2,5}))?\/?$/.exec(chosen);
+  if (parts === null) return undefined;
+  const host = (parts[2] as string).toLowerCase();
+  if (!LOOPBACK.has(host) && !WILDCARD.has(host)) notes.push(`The configuration of the program names the host ${host.slice(0, 60)}: only its port is used, on localhost.`);
+  return `${parts[1]}://${LOOPBACK.has(host) ? host : 'localhost'}${parts[3] === undefined ? '' : `:${parts[3]}`}`;
 }
 
+/** The hosts that mean this machine, and the ones a server listens on to be reached by any address (they mean this machine to whoever starts it). */
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+const WILDCARD = new Set(['*', '+', '0.0.0.0', '[::]']);
+
 /** `http://localhost:<port>`, from the configuration of the project, from the code or from the default of the framework. */
-export function guessBaseUrl(primary: string, files: readonly SourceFile[], codePort: number | undefined): string {
+export function guessBaseUrl(primary: string, files: readonly SourceFile[], codePort: number | undefined, notes: string[] = []): string {
   let fromConfig: string | undefined;
   if (primary === 'Spring') fromConfig = springBase(files);
-  else if (primary === 'ASP.NET Core') fromConfig = dotnetBase(files);
+  else if (primary === 'ASP.NET Core') fromConfig = dotnetBase(files, notes);
   else {
     const env = pick(files, '.env');
     const port = env === undefined ? undefined : portOf(/^\s*(?:export\s+)?PORT\s*=\s*["']?(\d{2,5})["']?\s*(?:#.*)?$/m.exec(env.text)?.[1]);

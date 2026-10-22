@@ -4,7 +4,7 @@ import { looksLikeCurl, parseCurl } from '../../src/importers/curl';
 import { OPENAPI_LIMITS, parseOpenApi } from '../../src/importers/openapi';
 import { parsePostman, POSTMAN_LIMITS } from '../../src/importers/postman';
 import { importSummary, renderNotes } from '../../src/importers/report';
-import { detectRoutes, isRouteSource, ROUTE_CONFIG_FILES, ROUTE_EXTENSIONS, ROUTE_LIMITS, routesToImported, type SourceFile } from '../../src/importers/routes';
+import { detectRoutes, isRouteSource, mayHaveRoutes, ROUTE_CONFIG_FILES, ROUTE_EXTENSIONS, ROUTE_LIMITS, ROUTE_SKIPPED_FOLDERS, routesToImported, type SourceFile } from '../../src/importers/routes';
 import { findingNotes, thunderToImported } from '../../src/importers/thunder';
 import { mayActivateEnvironment } from '../../src/importers/activation';
 import { splitLargeFolders } from '../../src/importers/split';
@@ -12,7 +12,7 @@ import { countImported, IMPORT_LIMITS, importedChars, type Imported } from '../.
 import { buildTree } from '../../src/normalize/build';
 import { readSource, SourceError } from '../../src/reader/fs-reader';
 import { hasUserinfo } from '../../src/util/address';
-import { printable } from '../../src/util/chars';
+import { compareCodePoints, printable } from '../../src/util/chars';
 import { writeImported, writeRequestInto } from '../../src/storage/import';
 import type { ContainerNode } from '../../src/storage/store';
 import type { ClientWorkspace } from './clientWorkspace';
@@ -134,39 +134,63 @@ export class ImportService implements vscode.Disposable {
     return true;
   }
 
-  /** The source files of the workspace that can hold routes, and the files that say on which port a program listens, read as text (nothing is run). */
-  private async readSources(signal: AbortSignal): Promise<{ files: SourceFile[]; tooLarge: number }> {
+  /**
+   * The source files of the workspace that can hold routes, and the files that say on which port a program listens, read as text (nothing is run). What is
+   * kept is limited as the files are read: the text of a file that has no words of a framework is dropped at once (its name stays, because what a file imports
+   * is looked up by name), and the text of all the others together is held to the limit of the scan. A symbolic link is not followed: it can point out of the
+   * folder of the workspace.
+   */
+  private async readSources(signal: AbortSignal): Promise<{ files: SourceFile[]; notes: string[] }> {
     const folder = this.workspace.folder();
-    if (folder === undefined) return { files: [], tooLarge: 0 };
-    const skipped = `**/{node_modules,dist,build,out,target,bin,obj,vendor,venv,.venv,__pycache__,.git,.next,.nuxt,.gradle,.idea,coverage,${this.workspace.root()}}/**`;
-    const sources = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, `**/*.{${ROUTE_EXTENSIONS.map(extension => extension.slice(1)).join(',')}}`), skipped, ROUTE_LIMITS.files * 2);
+    if (folder === undefined) return { files: [], notes: [] };
+    const notes: string[] = [];
+    const skipped = `**/{${[...ROUTE_SKIPPED_FOLDERS, this.workspace.root()].join(',')}}/**`;
+    const searchLimit = ROUTE_LIMITS.files * 2;
+    const sources = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, `**/*.{${ROUTE_EXTENSIONS.map(extension => extension.slice(1)).join(',')}}`), skipped, searchLimit);
+    if (sources.length >= searchLimit) notes.push(`The search for source files stopped at ${searchLimit} files: the others were not looked at.`);
     const configs = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, `**/{${ROUTE_CONFIG_FILES.join(',')}}`), skipped, 200);
-    const wanted = [...sources.filter(uri => isRouteSource(vscode.workspace.asRelativePath(uri, false))).slice(0, ROUTE_LIMITS.files + 1), ...configs];
+    const relative = (uri: vscode.Uri): string => vscode.workspace.asRelativePath(uri, false);
+    // By name, so that which files are read does not depend on the order in which the search found them.
+    const chosen = sources.filter(uri => isRouteSource(relative(uri))).sort((a, b) => compareCodePoints(relative(a), relative(b))).slice(0, ROUTE_LIMITS.files + 1);
+    const wanted = [...chosen, ...configs];
     const files: SourceFile[] = [];
     let tooLarge = 0;
+    let linked = 0;
+    let overBudget = 0;
+    let retained = 0;
     const decoder = new TextDecoder('utf-8');
     for (let from = 0; from < wanted.length; from += 16) {
       signal.throwIfAborted();
       const batch = await Promise.all(wanted.slice(from, from + 16).map(async uri => {
         try {
-          if ((await vscode.workspace.fs.stat(uri)).size > ROUTE_LIMITS.fileChars) return { large: true as const };
-          return { path: vscode.workspace.asRelativePath(uri, false), text: decoder.decode(await vscode.workspace.fs.readFile(uri)), large: false as const };
+          const stats = await vscode.workspace.fs.stat(uri);
+          if ((stats.type & vscode.FileType.SymbolicLink) !== 0) return { kind: 'linked' as const };
+          if (stats.size > ROUTE_LIMITS.fileChars) return { kind: 'large' as const };
+          return { kind: 'read' as const, path: relative(uri), text: decoder.decode(await vscode.workspace.fs.readFile(uri)) };
         } catch { return undefined; }
       }));
       for (const item of batch) {
         if (item === undefined) continue;
-        if (item.large) tooLarge++;
-        else files.push({ path: item.path, text: item.text });
+        if (item.kind === 'linked') { linked++; continue; }
+        if (item.kind === 'large') { tooLarge++; continue; }
+        const config = ROUTE_CONFIG_FILES.includes(item.path.split('/').pop() ?? '');
+        if (!config && !mayHaveRoutes(item.path, item.text)) { files.push({ path: item.path, text: '' }); continue; }
+        if (retained + item.text.length > ROUTE_LIMITS.totalChars) { overBudget++; files.push({ path: item.path, text: '' }); continue; }
+        retained += item.text.length;
+        files.push({ path: item.path, text: item.text });
       }
     }
-    return { files, tooLarge };
+    if (tooLarge > 0) notes.push(`${tooLarge} source ${tooLarge === 1 ? 'file is' : 'files are'} larger than ${ROUTE_LIMITS.fileChars / 1_000_000} MB and ${tooLarge === 1 ? 'was' : 'were'} not read.`);
+    if (linked > 0) notes.push(`${linked} symbolic ${linked === 1 ? 'link was' : 'links were'} not followed.`);
+    if (overBudget > 0) notes.push(`${overBudget} ${overBudget === 1 ? 'file was' : 'files were'} not read because the sources together are too large.`);
+    return { files, notes };
   }
 
   /** The routes of the controllers in the source of the workspace (the code is read as text, never run), as a collection with a folder for each controller. */
   async routes(): Promise<void> {
     const folder = this.workspace.folder();
     if (this.store() === undefined || folder === undefined) return;
-    let read: { files: SourceFile[]; tooLarge: number };
+    let read: { files: SourceFile[]; notes: string[] };
     try {
       read = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Looking for the routes of the controllers', cancellable: true }, (_progress, token) => {
         const controller = new AbortController();
@@ -178,7 +202,7 @@ export class ImportService implements vscode.Disposable {
       return;
     }
     const result = detectRoutes(read.files);
-    const largeNote = read.tooLarge === 0 ? [] : [{ where: '', message: `${read.tooLarge} source ${read.tooLarge === 1 ? 'file is' : 'files are'} larger than ${ROUTE_LIMITS.fileChars / 1_000_000} MB and ${read.tooLarge === 1 ? 'was' : 'were'} not read.` }];
+    const largeNote = read.notes.map(message => ({ where: '', message }));
     if (result.routes.length === 0) {
       void vscode.window.showInformationMessage(`No routes were found in ${result.filesRead} source files. NestJS, Express, Fastify, Koa, Hono, Spring, ASP.NET Core, FastAPI, Flask, Django, Laravel, Go and Actix are looked for; a program that is running can be imported from its OpenAPI description instead.`, 'Show Notes').then(choice => { if (choice === 'Show Notes') void this.showNotes(); });
       const none = routesToImported(result, folder.name);

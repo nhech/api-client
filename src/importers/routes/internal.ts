@@ -61,11 +61,14 @@ export interface RouteInit {
   body?: 'json' | 'form' | 'unknown' | undefined;
 }
 
+/** The names of parameters without the braces of a variable: the client would fill them in from the variables of the person. */
+const plainNames = (names: readonly string[]): string[] => names.filter(name => !name.includes('{{') && !name.includes('}}'));
+
 export function makeRoute(init: RouteInit): RawRoute {
   const path = finalizePath(init.path);
   const route: RawRoute = {
     method: init.method, path, framework: init.framework, group: init.group, file: init.file, line: init.line,
-    pathParams: pathParamNames(path), queryParams: init.queryParams ?? [], headerParams: init.headerParams ?? [],
+    pathParams: pathParamNames(path), queryParams: plainNames(init.queryParams ?? []), headerParams: plainNames(init.headerParams ?? []),
     receiver: init.receiver ?? '', receiverKind: init.receiverKind ?? 'router'
   };
   if (init.handler !== undefined && init.handler !== '') route.handler = init.handler;
