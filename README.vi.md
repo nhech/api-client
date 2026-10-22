@@ -13,7 +13,7 @@ English: [README.md](README.md) (bản đầy đủ nhất).
 
 ## Có gì
 
-- **Trình soạn request và khung kết quả cạnh nhau.** Phương thức và địa chỉ, rồi các tab Query, Headers, Auth, Body (JSON, text, XML, form, multipart có tệp, GraphQL, tệp nhị phân), Scripts, Settings, Docs và Code. Kết quả có thân (đẹp hoặc thô; ảnh được hiển thị), header, cookie, test, console của script, request như đã gửi và dòng thời gian (tra tên, kết nối, TLS, chờ, tải).
+- **Trình soạn request và khung kết quả cạnh nhau, hoặc xếp trên-dưới như Postman** (hai nút ở đầu request, hoặc setting `apiClient.layout`). Phương thức và địa chỉ, rồi các tab Query, Headers, Auth, Body (JSON, text, XML, form, multipart có tệp, GraphQL, tệp nhị phân), Scripts, Settings, Docs và Code. Kết quả có thân (đẹp hoặc thô; ảnh được hiển thị), header, cookie, test, console của script, request như đã gửi và dòng thời gian (tra tên, kết nối, TLS, chờ, tải).
 - **Collection, thư mục và môi trường ở thanh bên**: cây gốc của VS Code, kéo thả, đổi tên, nhân bản, chuyển, lọc, theo màu của theme. Thư mục hay collection đặt những gì request con dùng chung (base URL, header, xác thực, biến, test, script, cài đặt); cái gần nhất thắng.
 - **Request là file.** Mỗi request một file YAML, thư mục là thư mục, thứ tự nằm trong file của thư mục, thân và script là khối đọc được nên diff theo từng dòng. Cạnh mỗi request có thêm một bản sao `.http` cho người dùng REST Client, httpYac hay JetBrains.
 - **Biến và môi trường**, giá trị bí mật nằm ngoài Git. `{{ten}}` trong địa chỉ, header, thân, xác thực; từ động như `{{$guid}}`; mục ở thanh trạng thái để đổi môi trường.

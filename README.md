@@ -30,7 +30,7 @@ Vietnamese: [README.vi.md](README.vi.md).
 
 ## What you get
 
-- **A request editor and a response pane side by side.** Method and address, then Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, a binary file), Scripts, Settings, Docs and Code. The answer has its body (pretty or raw; pictures are shown), headers, cookies, tests, the console of your scripts, the request as it was sent and a timeline (name lookup, connection, TLS, waiting, download).
+- **A request editor and a response pane side by side, or one above the other as in Postman** (two buttons at the top of a request, or the setting `apiClient.layout`). Method and address, then Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, a binary file), Scripts, Settings, Docs and Code. The answer has its body (pretty or raw; pictures are shown), headers, cookies, tests, the console of your scripts, the request as it was sent and a timeline (name lookup, connection, TLS, waiting, download).
 - **Collections, folders and environments in the side bar**, native trees with drag and drop, rename, duplicate, move, filter, keyboard shortcuts and the colours of your theme. A folder or a collection sets what its requests share: a base address, headers, authentication, variables, tests, scripts and settings; the nearest one wins.
 - **Requests are files.** One YAML file per request, folders for folders, the order of a folder kept in its file, bodies and scripts as readable blocks, so a change shows up line by line in a diff. A `.http` copy is written next to each request for the people who use REST Client, httpYac or the JetBrains client.
 - **Variables and environments** with secret values kept out of Git. `{{name}}` in the address, headers, body, authentication; dynamic words such as `{{$guid}}`; a status bar item to change the environment.
@@ -168,6 +168,7 @@ The older converter, which turns Thunder Client data straight into `.http` files
 |---|---|
 | `apiClient.root` | the folder of the workspace that holds the client's files (default `api-client`) |
 | `apiClient.mirror.mode` | the `.http` copies: `on` (default), `off`, `gitignored` |
+| `apiClient.layout` | where the answer is shown: `auto` (beside the request when the editor is wide, below it when narrow), `below` (as in Postman), `beside` |
 | `apiClient.history.mode` | `metadata` (default), `full`, `off` (a machine setting: a repository cannot change it) |
 | `apiClient.scripts.enabled` | run scripts after you allowed them (a machine setting) |
 

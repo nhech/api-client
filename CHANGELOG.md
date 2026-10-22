@@ -8,7 +8,7 @@ The extension is now a full API client (extension id `longtd.api-client`); the i
 
 ### Added
 
-- **A request editor and a response pane** in VS Code: method and address, Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, binary), Scripts, Tests, Settings, Docs and Code tabs; the answer with its body (pretty, raw, pictures), headers, cookies, tests, console, the request as it was sent and a timeline of the phases.
+- **A request editor and a response pane** in VS Code (beside each other, or one above the other as in Postman: two buttons at the top of a request, kept in the setting `apiClient.layout`): method and address, Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, binary), Scripts, Tests, Settings, Docs and Code tabs; the answer with its body (pretty, raw, pictures), headers, cookies, tests, console, the request as it was sent and a timeline of the phases.
 - **Collections, folders and environments** in native trees (drag and drop, rename, duplicate, move, filter), with what a folder or collection sets (base address, headers, authentication, variables, tests, scripts, settings) inherited by its requests, and an environment picker in the status bar.
 - **Requests as files:** one YAML file per request in a strict, versioned subset of YAML (`schema: 1`), folders, the order kept in the folder's file, secret values in `*.local.yml` files that a `.gitignore` of the client folder keeps out of Git.
 - **Variables** with the nearest scope winning, dynamic words from a fixed table (`{{$guid}}`, `{{$randomInt a b}}`...), marks and hover in the editor, secret variables hidden wherever something is shown or written down.

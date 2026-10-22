@@ -197,6 +197,7 @@
             <ul class="ticks" role="list">
               <li>Query, Headers, Auth, Body (JSON, text, XML, form, multipart, GraphQL, a file), Scripts, Tests, Settings, Docs and Code</li>
               <li>The body pretty or raw, pictures too, headers, cookies, tests, the console of your scripts, the request as it was sent, and a timeline of the phases</li>
+              <li>The answer beside the request, or <strong>below it as in Postman</strong>: two buttons at the top of a request switch it</li>
               <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> sends; variables are marked known, unknown or dynamic as you type</li>
             </ul>
           </article>
@@ -322,6 +323,14 @@
             <figcaption><strong>A test that fails says why.</strong> The rules are lines of a small grammar, each shown with its result; a rule that cannot run says what the grammar knows. Values saved for the next request are listed, and a secret is not shown. <span class="shot-theme">Dark theme</span></figcaption>
           </figure>
 
+          <figure class="shot shot-wide reveal">
+            <a class="shot-link" href="img/layout-below.png">
+              <img src="img/layout-below.png" width="1400" height="830" loading="lazy" decoding="async"
+                alt="The same request with the answer below it, as in Postman: the method, the address and the tabs of the request on top, then the status line, the tabs of the answer and its JSON body">
+            </a>
+            <figcaption><strong>Beside, or below as in Postman.</strong> Two buttons at the top of a request, or the setting <code>apiClient.layout</code>, put the answer under the request instead of next to it; by default the width of the editor decides. <span class="shot-theme">Dark theme</span></figcaption>
+          </figure>
+
           <figure class="shot reveal">
             <a class="shot-link" href="img/scripts.png">
               <img src="img/scripts.png" width="1400" height="830" loading="lazy" decoding="async"
@@ -354,7 +363,7 @@
             <figcaption><strong>Secrets have a place.</strong> A variable marked secret keeps its value in a file that Git ignores, so nobody gets it from the repository. <span class="shot-theme">Dark theme</span></figcaption>
           </figure>
 
-          <figure class="shot reveal">
+          <figure class="shot shot-wide reveal">
             <a class="shot-link" href="img/hero-light.png">
               <img src="img/hero-light.png" width="1400" height="830" loading="lazy" decoding="async"
                 alt="The same request and answer in the light theme of VS Code, with the collections tree opened in the side bar">
@@ -532,6 +541,7 @@ code --install-extension ../.artifacts/api-client.vsix</code></pre>
               <ul class="ticks" role="list">
                 <li><code>apiClient.root</code>: the folder that holds the files (<code>api-client</code>)</li>
                 <li><code>apiClient.mirror.mode</code>: the <code>.http</code> copies: <code>on</code>, <code>off</code> or <code>gitignored</code></li>
+                <li><code>apiClient.layout</code>: the answer <code>auto</code> (the width decides), <code>below</code> (as in Postman) or <code>beside</code></li>
                 <li><code>apiClient.history.mode</code>: <code>metadata</code>, <code>full</code> or <code>off</code></li>
                 <li><code>apiClient.scripts.enabled</code>: run scripts after you allowed them</li>
               </ul>

@@ -18,7 +18,7 @@ The extension sends the requests **you** send and, for a request that uses OAuth
 
 ## What you get
 
-- **A request editor with the answer beside it.** Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, a binary file), Scripts, Tests, Settings, Docs and Code. The answer has the body (pretty or raw, pictures too), headers, cookies, tests, the console of your scripts, the request as it was sent and a timeline.
+- **A request editor with the answer beside it, or below it as in Postman** (two buttons at the top of a request). Query, Headers, Auth, Body (JSON, text, XML, form, multipart with files, GraphQL, a binary file), Scripts, Tests, Settings, Docs and Code. The answer has the body (pretty or raw, pictures too), headers, cookies, tests, the console of your scripts, the request as it was sent and a timeline.
 - **Collections, folders and environments** in native trees: drag and drop, rename, duplicate, move, filter. A folder or a collection sets what its requests share (base address, headers, authentication, variables, tests, scripts, settings), and the nearest one wins.
 - **Requests are files**: one YAML file per request, readable in a diff. You can edit them by hand (*Open as Text*) and the editor follows. Next to each request a generated `.http` copy is written for REST Client, httpYac and the JetBrains HTTP Client users (setting `apiClient.mirror.mode`).
 - **Variables and environments**, with secret values kept in files that Git ignores and hidden wherever something is shown or written down.
@@ -47,6 +47,7 @@ A collection can come from anyone, so everything in it is treated as hostile. Th
 |---|---|
 | `apiClient.root` | the folder of the workspace that holds the client's files (default `api-client`) |
 | `apiClient.mirror.mode` | the `.http` copies: `on` (default), `off`, `gitignored` |
+| `apiClient.layout` | the answer `auto` (the width decides), `below` (as in Postman) or `beside` the request |
 | `apiClient.history.mode` | `metadata` (default), `full`, `off` |
 | `apiClient.scripts.enabled` | run scripts after you allowed them |
 

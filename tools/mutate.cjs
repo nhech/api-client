@@ -879,7 +879,9 @@ const MUTATIONS = [
   { id: "M866", rule: "Routes: A group that two files have is told apart", file: "src/importers/routes/convert.ts", find: "(filesOfGroup.get(name)?.size ?? 1) > 1", replace: "(filesOfGroup.get(name)?.size ?? 1) > 0" },
   { id: "M867", rule: "Routes: A JSON body is an empty object", file: "src/importers/routes/convert.ts", find: "request.body = { kind: 'json', text: '{}' };", replace: "request.body = { kind: 'json', text: '' };" },
   { id: "M868", rule: "Routes: a path longer than 2000 characters is not a route", file: "src/importers/routes/detect.ts", find: "if (path.length > MAX_PATH_CHARS) { longPaths++; continue; }", replace: "" },
-  { id: "M869", rule: "Routes: the groups of a Laravel file are limited", file: "src/importers/routes/php.ts", find: "if (end >= 0 && scopes.length < MAX_SCOPES) scopes.push(", replace: "if (end >= 0) scopes.push(" }
+  { id: "M869", rule: "Routes: the groups of a Laravel file are limited", file: "src/importers/routes/php.ts", find: "if (end >= 0 && scopes.length < MAX_SCOPES) scopes.push(", replace: "if (end >= 0) scopes.push(" },
+  { id: "M870", rule: "Engine: a bundle that cannot be opened is a TLS problem in the words of newer OpenSSL too", file: "src/engine/transport.ts", find: "|bad password|incorrect.?password/i.test(message)", replace: "|bad password/i.test(message)" },
+  { id: "M871", rule: "Protocol: the page can only ask for a layout that exists", file: "src/view/request-protocol.ts", find: "typeof layout === 'string' && (PAGE_LAYOUTS as readonly string[]).includes(layout)", replace: "typeof layout === 'string'" }
 ];
 
 function run(mutation) {
