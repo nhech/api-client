@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 A full API client, in the same extension: a request editor with the answer beside it, collections, folders and environments in native trees, requests as plain YAML files with a generated `.http` copy, variables and secrets kept out of Git, authentication including OAuth 2.0, tests and captures, JavaScript scripts that run in a sandbox only after you allowed their exact text, a collection runner with JSON and JUnit reports, imports from OpenAPI and Swagger, from the routes of your controllers, from Thunder Client, Postman and cURL, a Code tab, cookies and history. The extension is now **API Client** (`longtd.api-client`).
 

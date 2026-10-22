@@ -1,6 +1,6 @@
 {
   "name": "api-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Import Thunder Client collections and environments into plain .http files for REST Client, httpYac and the JetBrains HTTP Client. Local only: no account, no network, no telemetry.",
   "keywords": [
