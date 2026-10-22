@@ -122,7 +122,8 @@ export class ImportService implements vscode.Disposable {
     let activated = '';
     if (first !== undefined && !hasActive) {
       const may = mayActivateEnvironment({
-        hasActive, collectionsBefore: before?.collections.length ?? 0, workspaceVariables: before?.workspace.file.vars.map(variable => variable.name) ?? [],
+        // A workspace that was not loaded is not known to be empty: the person chooses.
+        hasActive, collectionsBefore: before?.collections.length ?? 1, workspaceVariables: before?.workspace.file.vars.map(variable => variable.name) ?? [],
         environmentVariables: imported.environments[0]?.vars.map(variable => variable.name) ?? []
       });
       if (may) {

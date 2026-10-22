@@ -101,3 +101,33 @@ test('A description that is large and real is imported in full: many operations,
   assert.equal(requestsOf(imported).length, 4000);
   assert.ok(!noteTexts(imported).some(note => /Only the first/.test(note)), noteTexts(imported).join('\n'));
 });
+
+test('A reference that thousands of operations share is walked once: its answer is kept', () => {
+  // A reference just under the limit, to something that is not there: cutting its text apart costs about a thousand pieces, a million times without the cache.
+  const ref = `#/missing${'/a'.repeat(Math.floor((OPENAPI_LIMITS.refChars - 20) / 2))}`;
+  const operation = { get: { parameters: Array.from({ length: 200 }, () => ({ $ref: '#/components/parameters/P' })), responses: {} } };
+  const started = Date.now();
+  const imported = parse(shared(3000, operation, { components: { parameters: { P: { $ref: ref } } } }));
+  assert.ok(Date.now() - started < 8000, `took ${Date.now() - started} ms`);
+  assert.equal(requestsOf(imported).length, 3000);
+  assert.ok(noteTexts(imported).some(note => /points? at nothing in the file/.test(note)), noteTexts(imported).join('\n'));
+});
+
+test('Past the limit of steps no more operations are taken, and the notes say how many were', () => {
+  // A chain of 20 references for each of 400 parameters of each operation: about 8,000 steps for an operation, and the limit is 10 million.
+  const parameters: Record<string, unknown> = { P19: { name: 'q', in: 'query', example: 'v' } };
+  for (let index = 0; index < 19; index++) parameters[`P${index}`] = { $ref: `#/components/parameters/P${index + 1}` };
+  const list = Array.from({ length: 200 }, () => ({ $ref: '#/components/parameters/P0' }));
+  const imported = parse(shared(2500, { parameters: list, get: { parameters: list, responses: {} } }, { components: { parameters } }));
+  const count = requestsOf(imported).length;
+  assert.ok(count > 100 && count < 2500, `${count} operations`);
+  assert.ok(noteTexts(imported).some(note => new RegExp(`Only the first ${count} operations were imported: the references of the description lead to far more work`).test(note)), noteTexts(imported).join('\n'));
+});
+
+test('A value nested deeper than a body can be is not written out, one just inside the limit is', () => {
+  const nested = (levels: number): unknown => { let value: unknown = 'leaf'; for (let level = 0; level < levels; level++) value = { next: value }; return value; };
+  const body = (example: unknown) => requestsOf(parse(shared(1, { post: { requestBody: { content: { 'application/json': { schema: {}, example } } }, responses: {} } })))[0]?.body;
+  const inside = body(nested(50));
+  assert.ok(inside?.kind === 'json' && inside.text.includes('leaf'), 'fifty levels are written');
+  assert.deepEqual(body(nested(70)), { kind: 'json', text: '' }, 'seventy are not');
+});
