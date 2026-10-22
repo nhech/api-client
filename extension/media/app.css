@@ -76,6 +76,15 @@ button { font: inherit; cursor: pointer; }
   .panes { grid-template-columns: minmax(340px, 1fr) minmax(340px, 1fr); gap: 20px; }
   .panes > .response { border-top: 0; border-left: 1px solid var(--vscode-panel-border, var(--vscode-contrastBorder, transparent)); padding: 0 0 0 20px; }
 }
+/* The layout that the person chose: the answer always below the request (the way Postman shows it), or always beside it. These win over the width of the editor. */
+.panes[data-layout="below"] { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.panes[data-layout="below"] > .response { border-top: 1px solid var(--vscode-panel-border, var(--vscode-contrastBorder, transparent)); border-left: 0; padding: 8px 0 0; }
+.panes[data-layout="beside"] { grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr); gap: 20px; }
+.panes[data-layout="beside"] > .response { border-top: 0; border-left: 1px solid var(--vscode-panel-border, var(--vscode-contrastBorder, transparent)); padding: 0 0 0 20px; }
+.head { display: flex; align-items: center; gap: 8px; }
+.head input.title { flex: 1; width: auto; min-width: 0; }
+.layout-toggle { flex: none; }
+.layout-toggle button { white-space: nowrap; }
 .send.cancel { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
 .send.cancel:hover { background: var(--vscode-button-secondaryHoverBackground); }
 

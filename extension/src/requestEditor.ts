@@ -8,7 +8,7 @@ import { applyEditOps, minimalEdit, toRangeEdit } from '../../src/view/edit';
 import { generateCode } from '../../src/codegen/languages';
 import { REDACTED } from '../../src/core/redact';
 import { codeNotes, codeRequestFrom } from '../../src/view/code';
-import { parseToHost, type OAuthStatusView, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
+import { PAGE_LAYOUTS, parseToHost, type OAuthStatusView, type PageLayout, type RequestState, type ToHost, type ToView } from '../../src/view/request-protocol';
 import { configureAppPanel } from './appPanel';
 import { RequestRunner, type SendEnvironment } from './sender';
 
@@ -57,6 +57,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     this.subscriptions.push(
       panel.webview.onDidReceiveMessage((raw: unknown) => { this.receive(raw).catch(() => undefined); }),
       env.workspace.onDidChange(() => { if (this.ready) this.postVariables(); }),
+      vscode.workspace.onDidChangeConfiguration(event => { if (this.ready && event.affectsConfiguration('apiClient.layout')) this.postLayout(); }),
       env.onDidChangeVariables(() => { if (this.ready) this.postVariables(); }),
       vscode.workspace.onDidChangeTextDocument(event => {
         if (event.document !== document || event.contentChanges.length === 0) return;
@@ -102,7 +103,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
 
   private post(message: ToView): void {
     // The list of variables and the state of the token come whenever the files change; "what the page was last told" is about the file and the send, so they are left out.
-    if (message.type !== 'vars' && message.type !== 'oauth' && message.type !== 'code') this.last = message;
+    if (message.type !== 'vars' && message.type !== 'oauth' && message.type !== 'code' && message.type !== 'layout') this.last = message;
     this.recent.push(message);
     if (this.recent.length > 50) this.recent.shift();
     void this.panel.webview.postMessage(message);
@@ -124,6 +125,13 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
     if (folder === undefined) return undefined;
     const path = relative(folder.uri.fsPath, this.document.uri.fsPath).replaceAll('\\', '/');
     return path.startsWith('..') || isAbsolute(path) ? undefined : path;
+  }
+
+  /** Tells the page where the answer is to be drawn, as the setting says. */
+  private postLayout(): void {
+    const given = vscode.workspace.getConfiguration('apiClient').get<string>('layout', 'auto');
+    const layout: PageLayout = (PAGE_LAYOUTS as readonly string[]).includes(given) ? (given as PageLayout) : 'auto';
+    this.post({ type: 'layout', layout });
   }
 
   /** Tells the page which variables are defined for this request, as the files and the active environment say now. */
@@ -190,6 +198,7 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
       this.violations.splice(0, this.violations.length, ...message.violations);
       this.post({ type: 'init', ...this.state() });
       this.postVariables();
+      this.postLayout();
     } else if (message.type === 'openAsText') {
       await vscode.commands.executeCommand('vscode.openWith', this.document.uri, 'default');
     } else if (message.type === 'edit') {
@@ -206,6 +215,9 @@ class RequestSession implements vscode.Disposable, RequestEditorTestView {
       await this.runner.copy(message.pretty);
     } else if (message.type === 'oauth') {
       await this.token(message.action);
+    } else if (message.type === 'layout') {
+      // A preference of the person, kept for every request and every workspace.
+      await vscode.workspace.getConfiguration('apiClient').update('layout', message.layout, vscode.ConfigurationTarget.Global);
     } else if (message.type === 'code') {
       this.writeCode(message.language);
     } else if (message.type === 'copyCode') {

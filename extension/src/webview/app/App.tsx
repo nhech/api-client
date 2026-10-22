@@ -5,12 +5,13 @@ import { CodeEditor } from './CodeEditor';
 import { Choice, Field, KeyValueGrid, Tabs, type TabSpec } from './components';
 import { defaultRequestTab } from '../../../../src/view/tabs';
 import { DocumentPage } from './Pages';
+import { LayoutToggle } from './LayoutToggle';
 import { ResponsePane } from './ResponsePane';
 import { CodeTab } from './CodeTab';
 import { ScriptsForm } from './Scripts';
 import { SettingsForm } from './SettingsForm';
 import { TestsForm } from './TestsForm';
-import { confirmed, edit, flushNow, notice, request, screen, sending, sendNow, type HostPort } from './store';
+import { confirmed, edit, flushNow, layout, notice, request, screen, sending, sendNow, type HostPort } from './store';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
@@ -94,15 +95,18 @@ function Editor(props: { request: Request; port: HostPort }) {
   ];
   return (
     <div class="request">
+      <div class="head">
       <input class="title" aria-label="Name of the request" placeholder="Name of the request" value={r.name} spellcheck={false}
         onInput={event => { const value = (event.target as HTMLInputElement).value; if (value.trim() !== '') edit({ op: 'set', path: ['name'], value }); }}
         onBlur={event => { (event.target as HTMLInputElement).value = r.name; flushNow(); }} />
+      <LayoutToggle port={props.port} />
+      </div>
       <div class="bar">
         <Method value={r.method} />
         <CodeEditor value={r.url} oneLine label="Address" placeholder="https://example.com/path or {{baseUrl}}/path" onChange={value => edit({ op: 'set', path: ['url'], value })} onSubmit={send} onBlur={flushNow} />
         {running ? <button type="button" class="send cancel" onClick={() => props.port.post({ type: 'cancel' })}>Cancel</button> : <button type="button" class="send" onClick={send}>Send</button>}
       </div>
-      <div class="panes">
+      <div class="panes" data-layout={layout.value}>
       <Tabs tabs={tabs} active={tab} onSelect={setTab} label="Request">
         {tab === 'query' ? <><KeyValueGrid rows={r.query} path={['query']} label="Query parameters" namePlaceholder="Parameter" />{r.pathParams.length > 0 ? <><h3>Path parameters</h3><KeyValueGrid rows={r.pathParams} path={['pathParams']} label="Path parameters" /></> : null}</> : null}
         {tab === 'headers' ? <KeyValueGrid rows={r.headers} path={['headers']} label="Headers" namePlaceholder="Header" /> : null}

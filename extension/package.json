@@ -659,6 +659,22 @@
           "scope": "resource",
           "markdownDescription": "The `.http` file that is written next to each request, for people who use the files with REST Client, JetBrains or httpYac, or read them in a pull request. The request is the source: a `.http` file that you edit is never written over."
         },
+        "apiClient.layout": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "below",
+            "beside"
+          ],
+          "enumDescriptions": [
+            "The answer is beside the request when the editor is wide and below it when it is narrow.",
+            "The answer is always below the request, as in Postman.",
+            "The answer is always beside the request."
+          ],
+          "default": "auto",
+          "scope": "application",
+          "markdownDescription": "Where the answer of a request is shown. The two buttons at the top of a request switch it, and keep the choice here."
+        },
         "apiClient.history.mode": {
           "type": "string",
           "enum": [

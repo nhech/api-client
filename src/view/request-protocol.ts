@@ -22,6 +22,13 @@ export type EditOp =
   | { op: 'remove'; path: Path; index: number }
   | { op: 'move'; path: Path; from: number; to: number };
 
+/**
+ * Where the answer of a request is drawn: beside the request when the editor is wide and below it when it is narrow (`auto`), always below it (the way
+ * Postman shows it), or always beside it.
+ */
+export type PageLayout = 'auto' | 'below' | 'beside';
+export const PAGE_LAYOUTS: readonly PageLayout[] = ['auto', 'below', 'beside'];
+
 export type ToHost =
   /** The page is drawn; `violations` lists what the Content-Security-Policy refused (it should be empty). */
   | { type: 'ready'; violations: string[] }
@@ -44,7 +51,9 @@ export type ToHost =
   | { type: 'code'; language: string }
   | { type: 'copyCode' }
   /** Show the file in the text editor (when the page cannot edit it). */
-  | { type: 'openAsText' };
+  | { type: 'openAsText' }
+  /** The person chose where the answer is drawn: it is kept in the setting `apiClient.layout`, for every request. */
+  | { type: 'layout'; layout: PageLayout };
 
 export interface RequestState {
   rev: number;
@@ -81,7 +90,9 @@ export type ToView =
   /** Whether the request has an access token: sent whenever the request or the variables change, and after a try to get one. */
   | { type: 'oauth'; status: OAuthStatusView }
   /** The request written as code; `text` is empty when it cannot be written, and `notes` say why or what to put back. */
-  | { type: 'code'; language: string; text: string; notes: string[] };
+  | { type: 'code'; language: string; text: string; notes: string[] }
+  /** Where the answer is drawn: sent when the page is drawn and whenever the setting changes. */
+  | { type: 'layout'; layout: PageLayout };
 
 export interface OAuthStatusView {
   /** The authentication that applies to the request (its own or the one it inherits) is OAuth 2.0. */
@@ -167,6 +178,7 @@ export function parseToHost(raw: unknown): ToHost | undefined {
   if (type === 'copyResponse') return { type, pretty: own(raw, 'pretty') === true };
   if (type === 'copyCode') return { type };
   if (type === 'code') { const language = own(raw, 'language'); return typeof language === 'string' && CODE_LANGUAGE_IDS.includes(language) ? { type, language } : undefined; }
+  if (type === 'layout') { const layout = own(raw, 'layout'); return typeof layout === 'string' && (PAGE_LAYOUTS as readonly string[]).includes(layout) ? { type, layout: layout as PageLayout } : undefined; }
   if (type === 'oauth') { const action = own(raw, 'action'); return action === 'get' || action === 'clear' ? { type, action } : undefined; }
   if (type === 'ready') {
     const given = own(raw, 'violations');

@@ -1705,4 +1705,28 @@ exports.run = async function run() {
     guard.repositoryOf = originalRepository;
     guard.warn = originalWarn;
   }
+
+  // 24. Where the answer is shown: the page is told the setting when it is drawn and whenever it changes, and the choice that the page makes (below the
+  //     request as in Postman, or beside it) is kept in the setting; a value that is not a layout changes nothing.
+  const layoutSettings = vscode.workspace.getConfiguration('apiClient');
+  try {
+    put('api-client/collections/shop/layout-check.req.yml', 'schema: 1\nid: 01J9Z4V0N2XK7Q3M8T5R6Y1AB9\nname: Layout check\nmethod: GET\nurl: http://127.0.0.1:1/x\n');
+    const layoutUri = uriOf('api-client/collections/shop/layout-check.req.yml');
+    await vscode.commands.executeCommand('vscode.openWith', layoutUri, 'apiClient.request');
+    await until(() => test.requestEditor(layoutUri.toString())?.isReady === true, 'the request is open');
+    const layoutView = test.requestEditor(layoutUri.toString());
+    const layouts = () => layoutView.messages().filter(message => message.type === 'layout').map(message => message.layout);
+    await until(() => layouts().length > 0, 'the page is told the layout');
+    assert.equal(layouts().at(-1), 'auto', 'by default the width of the editor decides');
+    await layoutSettings.update('layout', 'below', vscode.ConfigurationTarget.Global);
+    await until(() => layouts().at(-1) === 'below', 'a change of the setting reaches the page');
+    await layoutView.receive({ type: 'layout', layout: 'beside' });
+    await until(() => layouts().at(-1) === 'beside', 'the choice of the page is kept in the setting and comes back');
+    assert.equal(vscode.workspace.getConfiguration('apiClient').get('layout'), 'beside');
+    await layoutView.receive({ type: 'layout', layout: 'sideways' });
+    await sleep(300);
+    assert.equal(vscode.workspace.getConfiguration('apiClient').get('layout'), 'beside', 'a value that is not a layout changes nothing');
+  } finally {
+    await layoutSettings.update('layout', undefined, vscode.ConfigurationTarget.Global);
+  }
 };

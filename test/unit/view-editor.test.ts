@@ -49,6 +49,8 @@ test('A message of the page is read only when it is exactly one of the known sha
   assert.deepEqual(parseToHost({ type: 'oauth', action: 'get' }), { type: 'oauth', action: 'get' });
   assert.deepEqual(parseToHost({ type: 'oauth', action: 'clear', url: 'https://evil.test' }), { type: 'oauth', action: 'clear' }, 'the page cannot say where to ask');
   for (const action of [undefined, 'refresh', 'GET', 5, null, ['get']]) assert.equal(parseToHost({ type: 'oauth', action }), undefined, String(action));
+  for (const layout of ['auto', 'below', 'beside']) assert.deepEqual(parseToHost({ type: 'layout', layout, extra: 1 }), { type: 'layout', layout }, layout);
+  for (const layout of [undefined, 'Below', 'left', 'constructor', '__proto__', 5, null, ['below']]) assert.equal(parseToHost({ type: 'layout', layout }), undefined, String(layout));
   assert.deepEqual(parseToHost({ type: 'copyResponse', pretty: true }), { type: 'copyResponse', pretty: true });
   assert.deepEqual(parseToHost({ type: 'copyResponse', pretty: 'yes' }), { type: 'copyResponse', pretty: false }, 'only true is true');
   assert.equal(parseToHost({ type: 'response' }), undefined, 'the answers of the extension are not messages to it');

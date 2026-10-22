@@ -192,6 +192,11 @@ exports.run = async function run() {
     await vscode.commands.executeCommand('apiClient.collections.focus');
     for (const command of ['list.focusFirst', 'list.expand', 'list.focusDown', 'list.expand']) { await vscode.commands.executeCommand(command); await sleep(500); }
     await shot('hero', 1400, 860, 1200);
+    // The layout of Postman: the answer below the request, chosen with the setting (the two buttons at the top of the request set it too).
+    await vscode.workspace.getConfiguration('apiClient').update('layout', 'below', vscode.ConfigurationTarget.Global);
+    await sleep(1000);
+    await shot('layout-below', 1400, 860, 1200);
+    await vscode.workspace.getConfiguration('apiClient').update('layout', undefined, vscode.ConfigurationTarget.Global);
   } finally {
     server.closeAllConnections();
     server.close();

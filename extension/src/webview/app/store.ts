@@ -2,7 +2,7 @@ import { signal } from '@preact/signals';
 import type { Container, Environment, Request } from '../../../../src/core/model';
 import type { VariableInfo } from '../../../../src/core/vars';
 import { applyEditOps, applyOps, containerCodec, ENVIRONMENT_CODEC } from '../../../../src/view/edit';
-import type { AppScreen, DocumentState, EditOp, OAuthStatusView, RequestState, ToHost, ToView } from '../../../../src/view/request-protocol';
+import type { AppScreen, DocumentState, EditOp, OAuthStatusView, PageLayout, RequestState, ToHost, ToView } from '../../../../src/view/request-protocol';
 import type { ResponseView } from '../../../../src/view/response';
 import type { ScriptReport } from '../../../../src/view/scripts';
 
@@ -48,6 +48,9 @@ export const sending = signal<{ id: number; since: number } | undefined>(undefin
 export const response = signal<ResponseView | undefined>(undefined);
 /** Whether the request has an access token (OAuth 2.0), as the extension last said. */
 export const oauthStatus = signal<OAuthStatusView | undefined>(undefined);
+
+/** Where the answer is drawn, as the setting of the person says. */
+export const layout = signal<PageLayout>('auto');
 /** The request written as code, as the extension last did. */
 export const codeResult = signal<{ language: string; text: string; notes: string[] } | undefined>(undefined);
 export const failure = signal<{ code: string; message: string; hint: string; warnings: string[]; scripts?: ScriptReport } | undefined>(undefined);
@@ -134,6 +137,10 @@ const modelOf = (state: DocumentState | undefined): Environment | Container | un
   state === undefined ? undefined : state.screen === 'environment' ? state.environment : state.container;
 
 export function receive(message: ToView): void {
+  if (message.type === 'layout') {
+    layout.value = message.layout;
+    return;
+  }
   if (message.type === 'init') {
     confirmed.value = message;
     request.value = message.request;
