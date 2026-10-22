@@ -1,6 +1,6 @@
 {
   "name": "{{NAME}}",
-  "short_name": "API Client",
+  "short_name": "Local API Client",
   "description": "A free API client for VS Code, with requests in plain files.",
   "start_url": "./",
   "scope": "./",

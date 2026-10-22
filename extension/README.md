@@ -1,4 +1,4 @@
-# API Client
+# Local API Client
 
 A free, **local-first API client for VS Code**. Your requests are plain files in your repository: no account, no limits on collections or requests, no telemetry, no server of ours. Write a request, press Send, read the answer next to it, and review the same files in a pull request.
 

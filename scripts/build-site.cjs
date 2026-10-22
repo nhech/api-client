@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 
 // The product name, the address of the page and the repository. Change them here only: pages use the {{NAME}}, {{SITE_URL}} and
 // {{REPO_URL}} placeholders (and scripts/deploy-site.cjs reads the address from here).
-const NAME = 'API Client';
+const NAME = 'Local API Client';
 const SITE_URL = 'https://api-client.longtd.me/';
 const REPO_URL = 'https://github.com/nhech/api-client';
 const OG_IMAGE = { file: 'og.jpg', type: 'image/jpeg', width: 1200, height: 630 };

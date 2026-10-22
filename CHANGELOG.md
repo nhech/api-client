@@ -23,7 +23,7 @@ The extension is now a full API client (extension id `longtd.local-api-client`);
 
 ### Changed
 
-- Extension id, display name and description: **API Client**, `longtd.local-api-client`. The older commands that write `.http` files for Thunder Client data are still there under *Convert Thunder Client Data to .http Files...*, and documented in `docs/converter.md`.
+- Extension id, display name and description: **Local API Client**, `longtd.local-api-client`. The older commands that write `.http` files for Thunder Client data are still there under *Convert Thunder Client Data to .http Files...*, and documented in `docs/converter.md`.
 - The claim "no network" is replaced by what is true: the extension sends the requests you send (and, for OAuth 2.0, the requests to the token server you configured) and nothing else; the converter and the readers of other tools' files still have no network access.
 
 ## 0.1.0 - 2026-10-21

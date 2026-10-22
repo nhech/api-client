@@ -1,4 +1,4 @@
-# API Client
+# Local API Client
 
 [![CI](https://github.com/nhech/api-client/actions/workflows/ci.yml/badge.svg)](https://github.com/nhech/api-client/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -44,7 +44,7 @@ Vietnamese: [README.vi.md](README.vi.md).
 
 ## Quick start
 
-Install **API Client** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.local-api-client) (Extensions view, search for it, or `ext install longtd.local-api-client`), or from Open VSX. It needs VS Code 1.100 or newer, a **trusted** local workspace (it is off in Restricted Mode, in the browser and in virtual workspaces) and runs where your files are (also over Remote SSH, WSL and containers, which have not been tried by hand yet).
+Install **Local API Client** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=longtd.local-api-client) (Extensions view, search for it, or `ext install longtd.local-api-client`), or from Open VSX. It needs VS Code 1.100 or newer, a **trusted** local workspace (it is off in Restricted Mode, in the browser and in virtual workspaces) and runs where your files are (also over Remote SSH, WSL and containers, which have not been tried by hand yet).
 
 1. Open a folder and the **API Client** icon in the Activity Bar. *New Collection...* creates `api-client/collections/<name>/`.
 2. *New Request...* on the collection. Type an address, press **Ctrl+Enter** (**Cmd+Enter** on a Mac) or the Send button.
