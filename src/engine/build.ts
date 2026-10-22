@@ -81,7 +81,13 @@ export function buildWire(input: BuildInput): Built {
   if (path.length > 0) {
     const values = new Map(path.map(row => [resolve(row.name), resolve(row.value)]));
     const hook = url.indexOf('?');
-    const head = (hook < 0 ? url : url.slice(0, hook)).replace(/\{([^{}/?#]+)\}/g, (whole, name: string) => (values.has(name) ? encodeURIComponent(values.get(name) as string) : whole));
+    const head = (hook < 0 ? url : url.slice(0, hook)).replace(/\{([^{}/?#]+)\}/g, (whole, name: string) => {
+      if (!values.has(name)) return whole;
+      const value = values.get(name) as string;
+      // The URL standard drops "." and ".." from a path, whatever the way they are written: the request would go to another address than the one shown.
+      if (/^(?:\.|%2e){1,2}$/i.test(value.trim())) warnings.push(`The path parameter ${name} is "${value.trim()}", which is removed from the address: the request goes to another path.`);
+      return encodeURIComponent(value);
+    });
     url = hook < 0 ? head : head + url.slice(hook);
   }
   const query = rows(request.query).map(([name, value]) => `${encode(name)}=${encode(value)}`);

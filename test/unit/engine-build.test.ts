@@ -38,6 +38,16 @@ test('Path parameters fill {name} in the path only, encoded, and an unknown {nam
   assert.equal(build({ url: 'https://x.test/{{host}}/{id}', pathParams: [kv('id', '{{n}}')] }, [scope({ host: 'h', n: '42' })]).wire.url, 'https://x.test/h/42');
 });
 
+test('A path parameter that is "." or ".." is warned about: the URL standard removes it from the path', () => {
+  for (const value of ['..', '.', '%2e%2E', ' .. ']) {
+    const built = build({ url: 'https://x.test/a/{id}/b', pathParams: [kv('id', value)] });
+    assert.ok(built.warnings.some(warning => /path parameter id is/.test(warning) && /another path/.test(warning)), `${value}: ${built.warnings.join('|')}`);
+  }
+  for (const value of ['...', '.hidden', 'a.b', '']) {
+    assert.deepEqual(build({ url: 'https://x.test/a/{id}/b', pathParams: [kv('id', value)] }).warnings, [], value);
+  }
+});
+
 test('Variables without a value are reported and left as they are; so are cycles', () => {
   const built = build({ url: '{{host}}/{{path}}', headers: [kv('X-A', '{{a}}')] }, [scope({ a: '{{a}}', host: 'https://h.test' })]);
   assert.equal(built.wire.url, 'https://h.test/{{path}}');
