@@ -144,6 +144,18 @@ test('Comments, document markers, a byte order mark, carriage returns, and only 
   assert.equal(read(''), null);
   assert.equal(read('# only a comment\n'), null);
   assert.equal(read('---\n'), null);
+  // A marker after the first one ends the first document even when it had nothing in it: the second is not read, as for any other YAML reader.
+  assert.equal(read('---\n---\nfoo: 1\n'), null);
+  assert.equal(read('# note\n---\n# note\n---\nfoo: 1\n'), null);
+});
+
+test('A folded scalar keeps the line breaks that YAML keeps: a leading empty line, and the empty lines around a line that is indented more', () => {
+  assert.deepEqual(data(read('x: >\n\n  folded\n  text here\ny: 1\n')), { x: '\nfolded text here\n', y: 1 });
+  assert.deepEqual(data(read('x: >\n\n\n  a\n')), { x: '\n\na\n' });
+  assert.deepEqual(data(read('x: >\n  a\n\n      c\n  b\n')), { x: 'a\n\n    c\nb\n' }, 'the break before the empty line is kept around a line that is indented more');
+  assert.deepEqual(data(read('x: >\n  a\n    b\n\n  c\n')), { x: 'a\n  b\n\nc\n' });
+  assert.deepEqual(data(read('x: >\n  a\n\n  b\n')), { x: 'a\nb\n' }, 'an empty line between two lines of the same indent is one line break');
+  assert.deepEqual(data(read('x: |\n\n  lit\n')), { x: '\nlit\n' }, 'a literal one was right already');
 });
 
 test('A key that appears twice is counted and the last one wins; __proto__ is a key like any other and nothing has a prototype', () => {

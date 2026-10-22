@@ -99,6 +99,7 @@ class Parser {
     const raws = text.split('\n');
     if (raws[raws.length - 1] === '') raws.pop();
     let content = false;
+    let started = false;
     for (let index = 0; index < raws.length; index++) {
       let raw = raws[index] ?? '';
       if (raw.endsWith('\r')) raw = raw.slice(0, -1);
@@ -108,8 +109,9 @@ class Parser {
       while (raw.charCodeAt(indent) === 32) indent++;
       if (indent === 0) {
         if (/^---(?:\s|$)/.test(raw)) {
-          // The second document is not read.
-          if (content) break;
+          // The second document is not read: a marker after the first one, with or without text in between, ends the first (an empty one, if it had none).
+          if (content || started) break;
+          started = true;
           // `--- text` or `--- # comment`: what follows the marker is the first line of the document.
           const rest = raw.slice(3).trimStart();
           if (rest !== '' && rest.charCodeAt(0) !== 35) { this.lines.push({ n: index + 1, indent: 0, text: rest }); content = true; }
@@ -387,14 +389,19 @@ class Parser {
     let text = '';
     if (!folded) text = content.join('\n');
     else {
-      // Lines are joined with a space, an empty line is a line break, and a line that is indented more keeps its breaks.
+      // Lines are joined with a space, an empty line is a line break, and a line that is indented more keeps its breaks (and the break before the empty
+      // lines that come before it, and after it: folding does not apply around a line that begins with white space).
       for (let index = 0; index < content.length; index++) {
         const current = content[index] as string;
+        if (current === '') { text += '\n'; continue; }
         if (index === 0) { text = current; continue; }
         const previous = content[index - 1] as string;
-        if (current === '') { text += '\n'; continue; }
-        const special = current.startsWith(' ') || previous.startsWith(' ');
-        text += previous === '' ? current : special ? `\n${current}` : ` ${current}`;
+        if (previous === '') {
+          let back = index - 1;
+          while (back >= 0 && content[back] === '') back--;
+          const before = back >= 0 ? (content[back] as string) : undefined;
+          text += before !== undefined && (current.startsWith(' ') || before.startsWith(' ')) ? `\n${current}` : current;
+        } else text += current.startsWith(' ') || previous.startsWith(' ') ? `\n${current}` : ` ${current}`;
       }
     }
     if (chomp === '-') return text;
