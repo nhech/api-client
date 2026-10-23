@@ -922,7 +922,18 @@ const MUTATIONS = [
   { id: "M909", rule: "Find: what a build makes comes after what is written by hand", file: "src/importers/openapi-find.ts", find: "Number(built(a)) - Number(built(b)) ||", replace: "" },
   { id: "M910", rule: "Find: the list is cut at the number that can be read", file: "src/importers/openapi-find.ts", find: "list: sorted.slice(0, MAX_LISTED)", replace: "list: sorted" },
   { id: "M911", rule: "Find: a # inside a quoted title is part of the title", file: "src/importers/openapi-find.ts", find: "if (end > 0) return trimmed.slice(1, end);", replace: "if (end > 0 && Date.now() < 0) return trimmed.slice(1, end);" },
-  { id: "M912", rule: "Find: a byte order mark does not hide a YAML description", file: "src/importers/openapi-find.ts", find: "head.replace(/^\\ufeff/, '')", replace: "head" }
+  { id: "M912", rule: "Find: a byte order mark does not hide a YAML description", file: "src/importers/openapi-find.ts", find: "head.replace(/^\\ufeff/, '')", replace: "head" },
+  { id: "M913", rule: "Discover: a web page starts with a tag", file: "src/importers/openapi-discover.ts", find: "head.startsWith('<') && /<(?:!doctype", replace: "/<(?:!doctype" },
+  { id: "M914", rule: "Discover: a quote with a backslash in the description of a script does not end it", file: "src/importers/openapi-discover.ts", find: "if (char === 92) at++;", replace: "if (char === 92 && Date.now() < 0) at++;" },
+  { id: "M915", rule: "Discover: only the origin that was typed is asked", file: "src/importers/openapi-discover.ts", find: "|| target.origin !== page.origin) return undefined;", replace: ") return undefined;" },
+  { id: "M916", rule: "Discover: a url of a script is followed only when it looks like a description", file: "src/importers/openapi-discover.ts", find: "if (reference === undefined || !test.test(reference)) return;", replace: "if (reference === undefined) return;" },
+  { id: "M917", rule: "Discover: the bundle of the library is not read for an address", file: "src/importers/openapi-discover.ts", find: "(?:init|initializer|config|settings)[^/]*\\.js", replace: "[^/]*\\.js" },
+  { id: "M918", rule: "Discover: the YAML of a program is tried last", file: "src/importers/openapi-discover.ts", find: "[...nearby, ...ROOT_PATHS, ...yaml]", replace: "[...nearby, ...yaml, ...ROOT_PATHS]" },
+  { id: "M919", rule: "Discover: the number of addresses that are asked is limited", file: "src/importers/openapi-discover.ts", find: "tried.length > DISCOVER_ATTEMPTS + DISCOVER_SCRIPTS", replace: "tried.length > (DISCOVER_ATTEMPTS + DISCOVER_SCRIPTS) * 1000" },
+  { id: "M920", rule: "Discover: an address that is the description is used as it is", file: "src/importers/openapi-discover.ts", find: "if (isDescription(first)) return", replace: "if (Date.now() < 0 && isDescription(first)) return" },
+  { id: "M921", rule: "OpenAPI: only an origin is taken as the address that a description was fetched from", file: "src/importers/openapi.ts", find: "/^https?:\\/\\/[^/\\s?#@]+$/i.test(options.origin)", replace: "true" },
+  { id: "M922", rule: "OpenAPI: a description with no server gets the address it was fetched from", file: "src/importers/openapi.ts", find: "if (addresses.length === 0 && origin !== undefined) {", replace: "if (Date.now() < 0 && addresses.length === 0 && origin !== undefined) {" },
+  { id: "M923", rule: "OpenAPI: a YAML with anchors is refused with a hint to use the JSON", file: "src/importers/openapi.ts", find: "/anchor|alias/i.test(result.error.message) ?", replace: "Date.now() < 0 && /anchor|alias/i.test(result.error.message) ?" }
 ];
 
 function run(mutation) {
