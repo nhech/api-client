@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased
+
+### Fixed
+
+- **The address of a page of documentation now works for the import.** Pasting `https://host/docs/admin` (a Swagger UI, Redoc or Scalar page) used to fail with "the file is not a mapping". The import now reads the page and its start-up scripts for the description (swagger-ui-express writes it into `swagger-ui-init.js`) or its address, then tries the addresses that programs usually serve it at (NestJS: `/docs/admin-json`; Spring: `/v3/api-docs`; FastAPI: `/openapi.json`), only on the origin you typed and at most 24 of them, and says where it found it. When nothing is found, the message says that the answer is a web page and to paste the address of the .json or .yaml file.
+- A description that names no server (NestJS writes none) gets the address it was fetched from as `baseUrl` instead of `http://localhost`, and a relative server such as `/api/v1` is put after it.
+- A YAML description written with anchors (what NestJS serves at `-yaml`) is still refused, now with a hint to use the JSON of the program.
+
 ## 0.2.1 - 2026-10-23
 
 ### Added
