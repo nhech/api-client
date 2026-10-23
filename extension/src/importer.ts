@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { Candidate } from '../../src/discover';
 import { looksLikeCurl, parseCurl } from '../../src/importers/curl';
 import { OPENAPI_LIMITS, parseOpenApi } from '../../src/importers/openapi';
+import { describeOpenApi } from '../../src/importers/openapi-find';
 import { parsePostman, POSTMAN_LIMITS } from '../../src/importers/postman';
 import { importSummary, renderNotes } from '../../src/importers/report';
 import { detectRoutes, isRouteSource, mayHaveRoutes, ROUTE_CONFIG_FILES, ROUTE_EXTENSIONS, ROUTE_LIMITS, ROUTE_SKIPPED_FOLDERS, routesToImported, type SourceFile } from '../../src/importers/routes';
@@ -16,6 +17,7 @@ import { compareCodePoints, printable } from '../../src/util/chars';
 import { writeImported, writeRequestInto } from '../../src/storage/import';
 import type { ContainerNode } from '../../src/storage/store';
 import type { ClientWorkspace } from './clientWorkspace';
+import { findOpenApiFiles, type OpenApiSearch } from './openApiFinder';
 import { OPEN_REQUEST_COMMAND } from './trees';
 import type { VscodeHost } from './vscodeHost';
 
@@ -214,28 +216,67 @@ export class ImportService implements vscode.Disposable {
     await this.finish('the source of this workspace', { ...found, notes: [...found.notes, ...largeNote] });
   }
 
+  /**
+   * Where the description is: the ones that the workspace already holds are listed as soon as they are found (the files named openapi or swagger first), and
+   * the last two choices are a file somewhere else and an address.
+   */
+  private async chooseOpenApi(): Promise<{ kind: 'file'; path: string } | { kind: 'url'; url: string } | undefined> {
+    interface Choice extends vscode.QuickPickItem { place?: 'file' | 'url'; path?: string }
+    const other: Choice[] = [
+      { label: 'Somewhere else', kind: vscode.QuickPickItemKind.Separator },
+      { label: '$(folder-opened) Choose another file...', description: 'an OpenAPI or Swagger description, as JSON or YAML', place: 'file' },
+      { label: '$(globe) An address...', description: 'for example http://localhost:8080/v3/api-docs of a program that is running; it is fetched like a request', place: 'url' }
+    ];
+    const picker = vscode.window.createQuickPick<Choice>();
+    picker.title = 'Import an OpenAPI or Swagger description';
+    picker.placeholder = 'Searching this workspace for descriptions...';
+    picker.matchOnDescription = true;
+    picker.items = other;
+    picker.busy = this.workspace.folder() !== undefined;
+    const searching = new AbortController();
+    const show = (found: OpenApiSearch, done: boolean): void => {
+      const listed: Choice[] = found.files.length === 0 ? [] : [
+        { label: `Found in this workspace${found.more > 0 ? ` (${found.more} more are not listed)` : ''}${found.stopped ? ' (the search stopped at its limit)' : ''}`, kind: vscode.QuickPickItemKind.Separator },
+        ...found.files.map((file): Choice => ({ label: `$(file-code) ${file.path}`, description: describeOpenApi(file), path: file.uri.fsPath }))
+      ];
+      picker.items = [...listed, ...other];
+      if (done) picker.busy = false;
+      picker.placeholder = found.files.length > 0 ? 'Pick a description found in this workspace, or say where it is' : done ? 'No OpenAPI or Swagger file was found in this workspace: say where it is' : 'Searching this workspace for descriptions...';
+    };
+    const search = this.workspace.folder() === undefined ? Promise.resolve() : this.findOpenApiFiles(searching.signal, found => show(found, false)).then(found => show(found, true), () => { picker.busy = false; });
+    const chosen = await new Promise<Choice | undefined>(resolve => {
+      picker.onDidAccept(() => resolve(picker.selectedItems[0]));
+      picker.onDidHide(() => resolve(undefined));
+      picker.show();
+    });
+    searching.abort();
+    picker.dispose();
+    void search;
+    if (chosen === undefined) return undefined;
+    if (chosen.path !== undefined) return { kind: 'file', path: chosen.path };
+    if (chosen.place === 'file') {
+      const picked = (await vscode.window.showOpenDialog({ canSelectFiles: true, canSelectFolders: false, canSelectMany: false, filters: { 'OpenAPI or Swagger': ['json', 'yaml', 'yml'] }, openLabel: 'Import', title: 'An OpenAPI or Swagger description (JSON or YAML)' }))?.[0]?.fsPath;
+      return picked === undefined ? undefined : { kind: 'file', path: picked };
+    }
+    if (chosen.place === 'url') {
+      const url = await vscode.window.showInputBox({
+        title: 'Import an OpenAPI or Swagger description', prompt: 'The address of the description (it is fetched with a GET request)', placeHolder: 'http://localhost:8080/v3/api-docs', ignoreFocusOut: true,
+        validateInput: value => (!/^https?:\/\/[^\s/]+/i.test(value.trim()) ? 'Start with http:// or https://' : hasUserinfo(value) ? NO_USERINFO : undefined)
+      });
+      return url === undefined || url.trim() === '' ? undefined : { kind: 'url', url: url.trim() };
+    }
+    return undefined;
+  }
+
+  /** The descriptions of OpenAPI and Swagger that the workspace holds (the start of each JSON and YAML file is read, nothing is run). */
+  findOpenApiFiles(signal: AbortSignal = new AbortController().signal, onList?: (found: OpenApiSearch) => void): Promise<OpenApiSearch> {
+    return findOpenApiFiles(this.workspace.root(), signal, onList);
+  }
+
   /** An OpenAPI or Swagger description, from a file or from an address (a program that is running often serves its own), as a collection with its environment. */
   async openApi(): Promise<void> {
     if (this.store() === undefined) return;
-    let where: { kind: 'file'; path: string } | { kind: 'url'; url: string } | undefined;
-    if (this.answers.openApi !== undefined) where = await this.answers.openApi();
-    else {
-      const choice = await vscode.window.showQuickPick([
-        { label: '$(file) A file', description: 'an OpenAPI or Swagger description, as JSON or YAML', place: 'file' as const },
-        { label: '$(globe) An address', description: 'for example http://localhost:8080/v3/api-docs of a program that is running; it is fetched like a request', place: 'url' as const }
-      ], { title: 'Import an OpenAPI or Swagger description', placeHolder: 'Where is it? Nothing is written before you confirm.' });
-      if (choice === undefined) return;
-      if (choice.place === 'file') {
-        const picked = (await vscode.window.showOpenDialog({ canSelectFiles: true, canSelectFolders: false, canSelectMany: false, filters: { 'OpenAPI or Swagger': ['json', 'yaml', 'yml'] }, openLabel: 'Import', title: 'An OpenAPI or Swagger description (JSON or YAML)' }))?.[0]?.fsPath;
-        where = picked === undefined ? undefined : { kind: 'file', path: picked };
-      } else {
-        const url = await vscode.window.showInputBox({
-          title: 'Import an OpenAPI or Swagger description', prompt: 'The address of the description (it is fetched with a GET request)', placeHolder: 'http://localhost:8080/v3/api-docs', ignoreFocusOut: true,
-          validateInput: value => (!/^https?:\/\/[^\s/]+/i.test(value.trim()) ? 'Start with http:// or https://' : hasUserinfo(value) ? NO_USERINFO : undefined)
-        });
-        where = url === undefined || url.trim() === '' ? undefined : { kind: 'url', url: url.trim() };
-      }
-    }
+    const where = this.answers.openApi !== undefined ? await this.answers.openApi() : await this.chooseOpenApi();
     if (where === undefined) return;
     if (where.kind === 'url' && hasUserinfo(where.url)) { void vscode.window.showErrorMessage(`API Client: ${NO_USERINFO}`); return; }
     let source: string;

@@ -1657,6 +1657,31 @@ exports.run = async function run() {
     assert.equal(test.client().collections.length, collectionsBefore, 'a failed fetch and a text that is not a description write nothing');
     assert.equal(importAsked.length, 1, 'and ask nothing');
 
+    // 22g2. The descriptions that the workspace already holds are found from the start of each file and listed: the ones named for it first, then the others;
+    //       what is in the folders of other people, and a file that only mentions swagger, are not listed.
+    put('api/openapi.yaml', 'openapi: 3.0.3\ninfo:\n  title: Found Shop\n  version: 1.0.0\npaths:\n  /shop:\n    get:\n      summary: List the shop\n      responses: {}\n');
+    put('docs/swagger.json', '{"swagger":"2.0","info":{"title":"Found Old","version":"1"},"paths":{}}');
+    put('notes/spec-v1.yaml', 'openapi: 3.0.0\ninfo:\n  title: By Content\n  version: 1\npaths: {}\n');
+    put('build/openapi.json', '{"openapi":"3.1.0","info":{"title":"Built"},"paths":{}}');
+    put('config/settings.json', '{"name":"swagger settings","swagger":"enabled"}');
+    put('node_modules/pkg/openapi.json', '{"openapi":"3.0.0","info":{"title":"Other People"},"paths":{}}');
+    const listed = [];
+    const search = await importService.findOpenApiFiles(undefined, early => listed.push(early.files.map(file => file.path)));
+    assert.deepEqual(search.files.map(file => file.path), ['api/openapi.yaml', 'docs/swagger.json', 'build/openapi.json', 'imports-src/petstore.yaml', 'notes/spec-v1.yaml']);
+    assert.deepEqual(search.files.map(file => `${file.kind} ${file.version} ${file.title}`), ['OpenAPI 3.0.3 Found Shop', 'Swagger 2.0 Found Old', 'OpenAPI 3.1.0 Built', 'OpenAPI 3.0.3 Swagger Pets', 'OpenAPI 3.0.0 By Content']);
+    assert.deepEqual(listed, [['api/openapi.yaml', 'docs/swagger.json', 'build/openapi.json']], 'the files named for it are listed before the others are looked at');
+    assert.equal(search.more, 0);
+    assert.equal(search.stopped, false);
+    // Picking one of them in the list imports it like a file that was chosen: the first of the list is the active item, and accepting it is all it takes.
+    importService.answers.openApi = undefined;
+    importAsked.length = 0;
+    const picking = vscode.commands.executeCommand('apiClient.importOpenApi');
+    await sleep(1500);
+    await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
+    await picking;
+    assert.deepEqual(importAsked, ['1 collection, 1 request, 1 environment']);
+    await until(() => nodeByLabel('Found Shop') !== undefined, 'the collection of the listed description is in the tree');
+
     // 22h. The routes of the controllers: read from the source files of the workspace (never run), with a folder for each controller; what is under
     //      node_modules and the files of tests are not read; the port in the code is the address of the environment.
     put('src/users.controller.ts', "import { Controller, Get, Post, Param, Body } from '@nestjs/common';\n@Controller('users')\nexport class UsersController {\n  @Get()\n  list() { return []; }\n  @Get(':id')\n  one(@Param('id') id: string) { return {}; }\n  @Post()\n  create(@Body() body: object) { return body; }\n}\n");
