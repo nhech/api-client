@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## Unreleased
 
+### Added
+
+- **The OpenAPI and Swagger files of the workspace are found and listed.** *Import an OpenAPI or Swagger Description...* opens a list that fills in as the workspace is searched: the files named `openapi`, `swagger` or `api-docs` at once, then the other JSON and YAML files, each with its kind, version and title. Picking one imports it; a file somewhere else and an address are the last two choices. Only the first 8 KB of a file are read, packages and virtual environments are not searched, and the search stops at 5,000 files.
+
+### Security review
+
 A fourth independent review (the OpenAPI import, the YAML reader and the route scanners, each read by a separate reviewer who tried real attacks) found 9 problems in the OpenAPI import and its writing, 14 in the route scanners and 4 low ones in the YAML reader. Every one that was real is fixed, with tests and mutations M872 to M903.
 
 ### Fixed
