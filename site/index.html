@@ -293,7 +293,7 @@
                 <tr role="row"><th scope="col" role="columnheader">From</th><th scope="col" role="columnheader">What comes across</th></tr>
               </thead>
               <tbody role="rowgroup">
-                <tr role="row"><th scope="row" role="rowheader">OpenAPI or Swagger</th><td role="cell">A JSON or YAML file, or the address of a program that is running (<code>/v3/api-docs</code>, <code>/swagger.json</code>): a folder for each tag, a request for each operation with its parameters, a body made from the example or the schema, the authentication, a status test, and the servers as environments.</td></tr>
+                <tr role="row"><th scope="row" role="rowheader">OpenAPI or Swagger</th><td role="cell">A JSON or YAML file (the ones in your workspace are found and listed for you), or the address of a program that is running (<code>/v3/api-docs</code>, <code>/swagger.json</code>): a folder for each tag, a request for each operation with its parameters, a body made from the example or the schema, the authentication, a status test, and the servers as environments.</td></tr>
                 <tr role="row"><th scope="row" role="rowheader">The controllers of your code</th><td role="cell">The routes found in the source of the workspace (NestJS, Express, Fastify, Spring, ASP.NET Core, FastAPI, Flask, Django, Laravel, Go and more), with the folders named after the controllers. Read from the text of the code, not by running it.</td></tr>
                 <tr role="row"><th scope="row" role="rowheader">Postman</th><td role="cell">Collections v2.0 and v2.1 with folders and their order, requests, authentication, scripts and variables; environments and globals files.</td></tr>
                 <tr role="row"><th scope="row" role="rowheader">Thunder Client</th><td role="cell">Collections, folders with what they set, requests and environments, from the data folder or exported files.</td></tr>
@@ -595,7 +595,7 @@ code --install-extension ../.artifacts/api-client.vsix</code></pre>
           <details>
             <summary>Can I import an OpenAPI or Swagger file, or find the routes of my code?</summary>
             <div class="faq-body">
-              <p>Yes, both. <em>Import an OpenAPI or Swagger Description...</em> reads a JSON or YAML file, or fetches the description from the address of a program that is running, and makes a folder for each tag, a request for each operation and an environment for each server. The routes of your controllers are read from the text of the source files of the workspace; since the code is not run, a prefix that a proxy or another file adds may be missing, and the notes say so.</p>
+              <p>Yes, both. <em>Import an OpenAPI or Swagger Description...</em> lists the descriptions that your workspace already holds (the files named <code>openapi</code> or <code>swagger</code> first), reads the one you pick or any other JSON or YAML file, or fetches the description from the address of a program that is running, and makes a folder for each tag, a request for each operation and an environment for each server. The routes of your controllers are read from the text of the source files of the workspace; since the code is not run, a prefix that a proxy or another file adds may be missing, and the notes say so.</p>
             </div>
           </details>
 
