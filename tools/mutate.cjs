@@ -913,7 +913,16 @@ const MUTATIONS = [
   { id: "M900", rule: "Routes: Flask is told from FastAPI once for the file", file: "src/importers/routes/python.ts", find: "(flaskOnly ??= /\\bflask\\b/i", replace: "(flaskOnly = /\\bflask\\b/i" },
   { id: "M901", rule: "YAML: a document marker after an empty first document ends it", file: "src/format/yaml/loose.ts", find: "if (content || started) break;", replace: "if (content) break;" },
   { id: "M902", rule: "YAML: a folded scalar keeps the break before the empty lines around a line that is indented more", file: "src/format/yaml/loose.ts", find: "(current.startsWith(' ') || before.startsWith(' ')) ?", replace: "(current.startsWith(' ')) ?" },
-  { id: "M903", rule: "YAML: a leading empty line of a folded scalar is a line break", file: "src/format/yaml/loose.ts", find: "if (current === '') { text += '\\n'; continue; }\n        if (index === 0)", replace: "if (current === '' && index > 0) { text += '\\n'; continue; }\n        if (index === 0)" }
+  { id: "M903", rule: "YAML: a leading empty line of a folded scalar is a line break", file: "src/format/yaml/loose.ts", find: "if (current === '') { text += '\\n'; continue; }\n        if (index === 0)", replace: "if (current === '' && index > 0) { text += '\\n'; continue; }\n        if (index === 0)" },
+  { id: "M904", rule: "Find: the key and the version of a description must agree", file: "src/importers/openapi-find.ts", find: "if (key === 'openapi' ? !number.startsWith('3') : !/^2(?:\\.0)?$/.test(number)) return undefined;", replace: "if (Date.now() < 0) return undefined;" },
+  { id: "M905", rule: "Find: a file whose name says nothing needs a key that a description has", file: "src/importers/openapi-find.ts", find: "if (!byName && !(json ?", replace: "if (Date.now() < 0 && !byName && !(json ?" },
+  { id: "M906", rule: "Find: the folders of other people are not searched", file: "src/importers/openapi-find.ts", find: ".some(folder => OPENAPI_SKIPPED_FOLDERS.includes(folder.toLowerCase()))", replace: ".some(folder => Date.now() < 0 && OPENAPI_SKIPPED_FOLDERS.includes(folder.toLowerCase()))" },
+  { id: "M907", rule: "Find: swagger in a name says that the file is a description", file: "src/importers/openapi-find.ts", find: "(?:openapi|swagger|api[-_.]?docs?", replace: "(?:openapi|api[-_.]?docs?" },
+  { id: "M908", rule: "Find: a file named for it comes first", file: "src/importers/openapi-find.ts", find: "Number(b.byName) - Number(a.byName) ||", replace: "" },
+  { id: "M909", rule: "Find: what a build makes comes after what is written by hand", file: "src/importers/openapi-find.ts", find: "Number(built(a)) - Number(built(b)) ||", replace: "" },
+  { id: "M910", rule: "Find: the list is cut at the number that can be read", file: "src/importers/openapi-find.ts", find: "list: sorted.slice(0, MAX_LISTED)", replace: "list: sorted" },
+  { id: "M911", rule: "Find: a # inside a quoted title is part of the title", file: "src/importers/openapi-find.ts", find: "if (end > 0) return trimmed.slice(1, end);", replace: "if (end > 0 && Date.now() < 0) return trimmed.slice(1, end);" },
+  { id: "M912", rule: "Find: a byte order mark does not hide a YAML description", file: "src/importers/openapi-find.ts", find: "head.replace(/^\\ufeff/, '')", replace: "head" }
 ];
 
 function run(mutation) {

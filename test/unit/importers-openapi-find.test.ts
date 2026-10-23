@@ -15,6 +15,7 @@ test('A YAML description is told the same way, in either order of the keys', () 
   assert.deepEqual(sniffOpenApi('openapi: 3.0.0\ninfo:\n  title: Shop API\n  version: 1.0\npaths: {}\n', false), { kind: 'OpenAPI', version: '3.0.0', title: 'Shop API' });
   assert.deepEqual(sniffOpenApi('# a comment\ninfo:\n  version: 2\n  title: "Quoted # not a comment"\nswagger: "2.0"\n', false), { kind: 'Swagger', version: '2.0', title: 'Quoted # not a comment' });
   assert.equal(sniffOpenApi("---\nopenapi: '3.0.1'\ninfo: {}\n", false)?.version, '3.0.1');
+  assert.equal(sniffOpenApi(`${String.fromCharCode(0xfeff)}openapi: 3.0.0\ninfo: {}\n`, false)?.version, '3.0.0', 'a byte order mark before the first key of a YAML file');
 });
 
 test('What is not a description is not offered: other versions, a settings file, a nested key, text that only mentions it', () => {
