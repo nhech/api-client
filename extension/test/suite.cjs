@@ -1682,6 +1682,37 @@ exports.run = async function run() {
     assert.deepEqual(importAsked, ['1 collection, 1 request, 1 environment']);
     await until(() => nodeByLabel('Found Shop') !== undefined, 'the collection of the listed description is in the tree');
 
+    // 22g3. The address of a page of documentation (the Swagger UI of swagger-ui-express): the description is found in its start-up script, the server that
+    //       it was fetched from is the address of its environment, and a page with no description near it writes nothing.
+    const specText = JSON.stringify({ openapi: '3.0.0', info: { title: 'Docs Admin' }, paths: { '/admin/api/order': { post: { summary: 'Create an order', responses: {} } } } });
+    const docsPage = '<!DOCTYPE html><html><head><title>Swagger UI</title></head><body><script src="./admin/swagger-ui-bundle.js"></script><script src="./admin/swagger-ui-init.js"></script></body></html>';
+    const docsFetched = [];
+    importService.fetchText = async address => {
+      docsFetched.push(address);
+      if (address === 'http://127.0.0.1:1/docs/admin') return docsPage;
+      if (address === 'http://127.0.0.1:1/docs/admin/swagger-ui-init.js') return `window.onload = function() { let options = { "swaggerDoc": ${specText} }; };`;
+      throw new Error('the server answered 404 Not Found');
+    };
+    importService.answers.openApi = async () => ({ kind: 'url', url: 'http://127.0.0.1:1/docs/admin' });
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importOpenApi');
+    assert.deepEqual(importAsked, ['1 collection, 1 request, 1 environment']);
+    assert.deepEqual(docsFetched, ['http://127.0.0.1:1/docs/admin', 'http://127.0.0.1:1/docs/admin/swagger-ui-init.js']);
+    await until(() => nodeByLabel('Docs Admin') !== undefined, 'the collection found behind the page is in the tree');
+    await until(() => test.client().workspace.loaded.environments.some(item => item.environment.vars.some(variable => variable.value === 'http://127.0.0.1:1')), 'the environment has the address that the description was fetched from');
+    importService.fetchText = async address => {
+      if (address === 'http://127.0.0.1:1/nothing') return '<html><body>hello</body></html>';
+      throw new Error('the server answered 404 Not Found');
+    };
+    importService.answers.openApi = async () => ({ kind: 'url', url: 'http://127.0.0.1:1/nothing' });
+    const collectionsBeforePage = test.client().collections.length;
+    importAsked.length = 0;
+    await vscode.commands.executeCommand('apiClient.importOpenApi');
+    await sleep(300);
+    assert.equal(importAsked.length, 0, 'a page with no description asks nothing');
+    assert.equal(test.client().collections.length, collectionsBeforePage, 'and writes nothing');
+    importService.fetchText = originalFetch;
+
     // 22h. The routes of the controllers: read from the source files of the workspace (never run), with a folder for each controller; what is under
     //      node_modules and the files of tests are not read; the port in the code is the address of the environment.
     put('src/users.controller.ts', "import { Controller, Get, Post, Param, Body } from '@nestjs/common';\n@Controller('users')\nexport class UsersController {\n  @Get()\n  list() { return []; }\n  @Get(':id')\n  one(@Param('id') id: string) { return {}; }\n  @Post()\n  create(@Body() body: object) { return body; }\n}\n");

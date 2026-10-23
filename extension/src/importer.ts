@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { Candidate } from '../../src/discover';
 import { looksLikeCurl, parseCurl } from '../../src/importers/curl';
 import { OPENAPI_LIMITS, parseOpenApi } from '../../src/importers/openapi';
+import { discoverDescription, guessAddresses } from '../../src/importers/openapi-discover';
 import { describeOpenApi } from '../../src/importers/openapi-find';
 import { parsePostman, POSTMAN_LIMITS } from '../../src/importers/postman';
 import { importSummary, renderNotes } from '../../src/importers/report';
@@ -281,6 +282,8 @@ export class ImportService implements vscode.Disposable {
     if (where.kind === 'url' && hasUserinfo(where.url)) { void vscode.window.showErrorMessage(`API Client: ${NO_USERINFO}`); return; }
     let source: string;
     let content: string;
+    let foundAt: string | undefined;
+    let origin: string | undefined;
     try {
       if (where.kind === 'file') {
         const uri = vscode.Uri.file(where.path);
@@ -290,20 +293,32 @@ export class ImportService implements vscode.Disposable {
         source = where.path.split(/[\\/]/).pop() ?? 'OpenAPI';
       } else {
         const address = where.url;
-        content = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Fetching the description', cancellable: true }, (_progress, token) => {
+        const discovery = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Fetching the description', cancellable: true }, async (progress, token) => {
           const controller = new AbortController();
           token.onCancellationRequested(() => controller.abort());
-          return this.fetchText(address, controller.signal);
+          const first = await this.fetchText(address, controller.signal);
+          const result = await discoverDescription(address, first, (url, signal) => this.fetchText(url, signal), controller.signal, url => progress.report({ message: url }));
+          // What is not a page and is not a description is given to the reader as it is, so that it says what is wrong with it.
+          return result.found !== undefined || result.page ? result : { ...result, found: { text: first, from: address } };
         });
         source = (() => { try { return new URL(address).host; } catch { return 'an address'; } })();
+        if (discovery.found === undefined) {
+          void vscode.window.showErrorMessage(`API Client: ${printable(source)} answers with a web page, not with a description, and none was found at the usual addresses (${discovery.tried.length - 1} tried, such as ${printable(guessAddresses(address)[0] ?? '/openapi.json')}). Paste the address of the .json or .yaml file of the description.`);
+          return;
+        }
+        content = discovery.found.text;
+        if (discovery.found.from !== address) foundAt = discovery.found.from;
+        origin = (() => { try { return new URL(address).origin; } catch { return undefined; } })();
       }
     } catch (error) {
       void vscode.window.showErrorMessage(`API Client: the description could not be read: ${printable(error instanceof Error ? error.message : 'the request failed')}`);
       return;
     }
-    const result = parseOpenApi(content);
+    const result = parseOpenApi(content, origin === undefined ? {} : { origin });
     if (!result.ok) { void vscode.window.showErrorMessage(`API Client: ${result.error}`); return; }
-    await this.finish(`OpenAPI (${source})`, result.imported);
+    // The address that was typed is a page of documentation: say where the description was found.
+    const imported = foundAt === undefined ? result.imported : { ...result.imported, notes: [{ where: '', message: `The address is a page, not the description: the description was found at ${printable(foundAt)}.` }, ...result.imported.notes] };
+    await this.finish(`OpenAPI (${source})`, imported);
   }
 
   async postman(): Promise<void> {

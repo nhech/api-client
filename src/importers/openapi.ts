@@ -50,7 +50,9 @@ function read(source: string): { ok: true; value: unknown } | { ok: false; error
   }
   const result = parseLooseYaml(source);
   if (result.ok) return { ok: true, value: result.value };
-  return { ok: false, error: `The file is not JSON or YAML that can be read (line ${result.error.line}, column ${result.error.column}: ${printable(result.error.message)}).` };
+  // A program that writes its YAML with anchors (`&ref_0`, NestJS for one) usually serves the same description as JSON too.
+  const hint = /anchor|alias/i.test(result.error.message) ? ' The same description is usually served as JSON too (NestJS: the address of the page with -json at the end): use that one.' : '';
+  return { ok: false, error: `The file is not JSON or YAML that can be read (line ${result.error.line}, column ${result.error.column}: ${printable(result.error.message)}).${hint}` };
 }
 
 // ---- references ----
@@ -706,7 +708,7 @@ function serverUrl(server: Json, notes: Notes): string {
   return url;
 }
 
-function environments(doc: Document, version: 2 | 3, notes: Notes): ImportedEnvironment[] {
+function environments(doc: Document, version: 2 | 3, notes: Notes, origin: string | undefined): ImportedEnvironment[] {
   const root = doc.root;
   const addresses: { url: string; label: string }[] = [];
   if (version === 3) {
@@ -721,14 +723,17 @@ function environments(doc: Document, version: 2 | 3, notes: Notes): ImportedEnvi
     if (host !== '') addresses.push({ url: `${scheme}://${host}${basePath === '/' ? '' : basePath}`, label: '' });
     else if (basePath !== '') addresses.push({ url: basePath, label: '' });
   }
-  if (addresses.length === 0) { notes.add('', 'The description names no server: baseUrl is http://localhost; change it to the address of the API.'); addresses.push({ url: 'http://localhost', label: 'Local' }); }
+  if (addresses.length === 0 && origin !== undefined) { notes.add('', `The description names no server: baseUrl is the address that it was fetched from, ${origin}.`); addresses.push({ url: origin, label: '' }); }
+  else if (addresses.length === 0) { notes.add('', 'The description names no server: baseUrl is http://localhost; change it to the address of the API.'); addresses.push({ url: 'http://localhost', label: 'Local' }); }
   const result: ImportedEnvironment[] = [];
   const used = new Set<string>();
   for (const [index, address] of addresses.entries()) {
     let value = address.url === '' ? '/' : address.url;
     if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
-      notes.add('', `The server address ${oneLine(value, 80)} has no host: it was put after http://localhost; change baseUrl to the address of the API.`);
-      value = `http://localhost${value.startsWith('/') ? '' : '/'}${value === '/' ? '' : value}`;
+      // Put after the address that the description was fetched from, when it was, and after http://localhost when it was read from a file.
+      const host = origin ?? 'http://localhost';
+      notes.add('', `The server address ${oneLine(value, 80)} has no host: it was put after ${origin === undefined ? host : 'the address of the description'}; change baseUrl to the address of the API.`);
+      value = `${host}${value.startsWith('/') ? '' : '/'}${value === '/' ? '' : value}`;
     }
     let label = address.label;
     if (label === '') { try { label = new URL(value).host; } catch { label = ''; } }
@@ -746,16 +751,17 @@ function environments(doc: Document, version: 2 | 3, notes: Notes): ImportedEnvi
 // ---- the whole description ----
 
 /** A description is data from anywhere: one that is nested deeper than the engine can walk is refused, not a crash. */
-export function parseOpenApi(source: string): OpenApiResult {
+export function parseOpenApi(source: string, options: { origin?: string } = {}): OpenApiResult {
   try {
-    return convert(source);
+    // The origin of the address that the description was fetched from (`https://host:port`), for a server that the description gives without a host.
+    return convert(source, options.origin !== undefined && /^https?:\/\/[^/\s?#@]+$/i.test(options.origin) ? options.origin : undefined);
   } catch (error) {
     if (error instanceof RangeError) return { ok: false, error: 'The description is nested too deeply to be read.' };
     throw error;
   }
 }
 
-function convert(source: string): OpenApiResult {
+function convert(source: string, origin: string | undefined): OpenApiResult {
   const parsed = read(source);
   if (!parsed.ok) return parsed;
   if (!isRecord(parsed.value)) return { ok: false, error: 'This is not an OpenAPI or Swagger description: the file is not a mapping.' };
@@ -848,7 +854,7 @@ function convert(source: string): OpenApiResult {
   const empty = operations === 0 && collection.folders.length === 0;
   const made = empty ? undefined : protectCollection(collection);
   if (made !== undefined && made.moved > 0) notes.add(made.collection.container.name, `${made.moved} ${made.moved === 1 ? 'credential that was' : 'credentials that were'} given as ${made.moved === 1 ? 'an example' : 'examples'} in the description ${made.moved === 1 ? 'was' : 'were'} moved to secret variables of the collection: their values are in a file next to it that Git ignores.`);
-  const imported: Imported = { collections: made === undefined ? [] : [made.collection], environments: environments(doc, version, notes), notes: [], skipped: 0 };
+  const imported: Imported = { collections: made === undefined ? [] : [made.collection], environments: environments(doc, version, notes, origin), notes: [], skipped: 0 };
   imported.notes = notes.done();
   return { ok: true, imported };
 }
