@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- **The address of a page of documentation works for the import.** Paste the address of a Swagger UI, Redoc or Scalar page (for example `https://host/docs/admin`) into *Import an OpenAPI or Swagger Description... > An address*: the page and its start-up scripts are read for the description (swagger-ui-express writes it into `swagger-ui-init.js`), then the addresses that programs usually serve it at are tried (NestJS `/docs/admin-json`, Spring `/v3/api-docs`, FastAPI `/openapi.json`), only on the origin you typed. When nothing is found, the message says so and asks for the address of the .json or .yaml file.
+- A description that names no server (NestJS writes none) gets the address it was fetched from as `baseUrl`, and a relative server such as `/api/v1` is put after it.
+- A YAML description written with anchors (what NestJS serves at `-yaml`) is refused with a hint to use the JSON of the program.
+
 ## 0.2.1
 
 - **The OpenAPI and Swagger files of your workspace are found and listed.** *Import an OpenAPI or Swagger Description...* opens a list that fills in as the workspace is searched: the files named `openapi`, `swagger` or `api-docs` at once, then the other JSON and YAML files, each with its kind, version and title. Pick one to import it.

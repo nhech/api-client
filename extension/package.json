@@ -2,7 +2,7 @@
   "name": "local-api-client",
   "displayName": "Local API Client",
   "description": "A free, local-first API client for VS Code. Requests are plain YAML files in your repository: environments, OAuth 2.0, tests, scripts and a collection runner. No account, no limits, no telemetry.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "longtd",
   "license": "MIT",
   "preview": true,
